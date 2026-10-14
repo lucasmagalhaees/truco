@@ -1,9 +1,11 @@
-"""End to end, through the screen, in the browser: a whole game played the way a table would, on a phone-sized window.
+"""End to end, through the screen, in the browser: the home screen, training, the real-table assistant and games
+against the computer, on a phone-sized window.
 
 Usage: python3 tests/e2e.py [dark|light]   (needs dist/ built: npm run build)
 Opens dist/index.html from the disk, with the network blocked: the page must not need anything from outside to work.
-Chance is taken out of the way by stacking the roles and the deck through window.__APP.S (invented test data); every
-action is still a tap on the screen. Screenshots go to tests/shots/.
+Chance is taken out of the way by stacking hands through window.__APP.S (invented test data) and, where a bluff is
+wanted, by fixing Math.random; the computer players think for a fixed 20 ms (ui.wait). The microphone is a stand-in
+that "hears" a fixed sentence. Every action of the person is a tap on the screen. Screenshots go to tests/shots/.
 """
 import json, pathlib, re, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -14,241 +16,230 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHOTS = ROOT / 'tests' / 'shots'; SHOTS.mkdir(exist_ok=True)
 THEME = sys.argv[1] if len(sys.argv) > 1 else 'dark'
 assert THEME in ('dark', 'light'), THEME
-KEY = 'secrethitler.v1'
-NAMES = ['Ana', 'Bia', 'Caio', 'Duda', 'Edu', 'Fê', '<b>Gil</b>']
+KEY = 'truco.v1'
+# a stand-in microphone: says what window.__say holds, then stops
+FAKE_MIC = '''window.__say = "vira sete de copas minha mão zap três de ouros e rei de espadas";
+window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { setTimeout(() => { this.onresult && this.onresult({ results: [[{ transcript: window.__say }]] }); this.onend && this.onend(); }, 30); } stop() { this.onend && this.onend(); } };'''
 
 with sync_playwright() as p:
     b = p.chromium.launch()
-    # the main run asks for less motion, as a device can: nothing waits for an animation, so every tap acts at once.
-    # A short run with motion on, at the end, checks the animations themselves.
+    # the main run asks for less motion, as a device can: nothing waits for an animation. A short run with motion on,
+    # at the end, checks the animations themselves.
     ctx = b.new_context(viewport=dict(width=393, height=852), device_scale_factor=2, color_scheme=THEME, locale='pt-BR', timezone_id='America/Sao_Paulo', has_touch=True, is_mobile=True, reduced_motion='reduce')
     ctx.route('**/*', lambda r: r.abort() if r.request.url.startswith('http') else r.continue_())
+    ctx.add_init_script(FAKE_MIC)
     pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
     cov.start(pg)
     pg.goto((ROOT / 'dist' / 'index.html').as_uri()); pg.wait_for_function('window.__APP && window.__APP.S')
-    txt = lambda sel: pg.text_content(sel).replace('\xa0', ' ')      # the words in the page; CSS may show them in capitals
+    txt = lambda sel: pg.text_content(sel).replace('\xa0', ' ')
     overflow = lambda: pg.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
     shot = lambda name: pg.screenshot(path=str(SHOTS / name), full_page=True)
     G = lambda: pg.evaluate('window.__APP.S.game')
-    wait = lambda: pg.wait_for_function('window.__APP && window.__APP.S')
+    S = lambda: pg.evaluate('window.__APP.S')
+    def ready():
+        pg.wait_for_function('window.__APP && window.__APP.S'); pg.evaluate('window.__APP.ui.wait = 20')
+    def reload():
+        cov.reload(pg); ready()
+    ready()
 
-    # ---------- the table ----------
-    assert pg.locator('#empty').count() == 1 and pg.locator('[data-act=start]').is_disabled(), txt('#view')
-    assert pg.locator('select').count() == 0, 'no select of the system: its list is drawn by the device, with colours of its own'
-    pg.click('[data-act=addname]'); assert 'Escreve um nome' in txt('#msg')
-    for i, n in enumerate(NAMES):
-        pg.fill('#name', n)
-        if i % 2: pg.press('#name', 'Enter')
-        else: pg.click('[data-act=addname]')
-    assert pg.locator('#names li').count() == 7 and pg.locator('#names b b').count() == 0 and '<b>Gil</b>' in txt('#names'), 'names, and markup shown as text'
-    pg.fill('#name', 'ana'); pg.click('[data-act=addname]'); assert 'já está na mesa' in txt('#msg')
-    pg.locator('#names li', has_text='Fê').locator('[data-act=rmname]').click()
-    assert pg.locator('#names li').count() == 6 and 'Começar com 6' in txt('[data-act=start]')
-    pg.fill('#name', 'Fê'); pg.click('[data-act=addname]')
-    for extra in ('H', 'I', 'J'): pg.fill('#name', extra); pg.click('[data-act=addname]')
-    pg.fill('#name', 'K'); pg.click('[data-act=addname]'); assert 'de 5 a 10' in txt('#msg')
-    for extra in ('H', 'I', 'J'): pg.click(f'[aria-label="Tirar {extra}"]')
-    assert overflow() == 0, 'nothing wider than the phone'
-    shot(f's1-mesa-{THEME}.png')
+    # ---------- home ----------
+    assert pg.locator('#start').count() == 1 and pg.locator('select').count() == 0, 'no select of the system'
+    assert 'Nenhuma partida terminada' in txt('#tally') and 'Nenhum exercício' in txt('#trainstats')
+    pg.click('[data-act=level][data-v=dificil]'); assert S()['level'] == 'dificil' and 'Lembra de cada carta' in txt('#leveltext')
+    pg.click('[data-act=level][data-v=facil]'); assert 'quase não blefa' in txt('#leveltext')
+    pg.click('[data-act=level][data-v=medio]')
+    assert overflow() == 0; shot(f'e1-inicio-{THEME}.png')
 
     # the theme: the device's by default, or the one chosen, which stays
     rgb = lambda: [int(v) for v in re.findall(r'\d+', pg.evaluate('getComputedStyle(document.body).backgroundColor'))[:3]]
     dark = lambda: max(rgb()) < 60
-    assert dark() == (THEME == 'dark') and pg.locator('[data-act=theme][data-t=auto]').get_attribute('aria-pressed') == 'true', rgb()
+    assert dark() == (THEME == 'dark') and pg.locator('[data-act=theme][data-v=auto]').get_attribute('aria-pressed') == 'true', rgb()
     other = 'light' if THEME == 'dark' else 'dark'
-    pg.click(f'[data-act=theme][data-t={other}]'); assert dark() == (other == 'dark') and pg.evaluate('document.documentElement.dataset.theme') == other
-    cov.reload(pg); wait(); assert dark() == (other == 'dark'), 'the chosen theme stays'
-    assert pg.locator('#names li').count() == 7, 'the table is kept on the device'
-    pg.click('[data-act=theme][data-t=auto]'); assert dark() == (THEME == 'dark') and pg.evaluate('document.documentElement.dataset.theme') is None
-    # the style: the poster by default, or art deco, which stays
-    look = lambda: pg.evaluate('document.documentElement.dataset.look')
-    assert look() == 'poster' and pg.locator('[data-act=look][data-l=poster]').get_attribute('aria-pressed') == 'true'
-    pg.click('[data-act=look][data-l=deco]'); assert look() == 'deco' and dark() == (THEME == 'dark')
-    cov.reload(pg); wait(); assert look() == 'deco', 'the chosen style stays'
-    shot(f's0-deco-{THEME}.png')
-    pg.click('[data-act=look][data-l=poster]'); assert look() == 'poster' and 'look' not in json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")'))
-    # sound and vibration: on by default, off when chosen, and that stays
-    saved = lambda: json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")'))
-    assert pg.locator('[data-act=fx][data-v=on]').get_attribute('aria-pressed') == 'true'
-    pg.click('[data-act=fx][data-v=off]'); assert saved().get('quiet') is True and pg.locator('[data-act=fx][data-v=off]').get_attribute('aria-pressed') == 'true'
-    pg.click('[data-act=fx][data-v=on]'); assert 'quiet' not in saved()
-    # opened from the disk there is no service worker, and the screen says so
+    pg.click(f'[data-act=theme][data-v={other}]'); assert dark() == (other == 'dark')
+    reload(); assert dark() == (other == 'dark'), 'the chosen theme stays'
+    pg.click('[data-act=theme][data-v=auto]'); assert dark() == (THEME == 'dark') and pg.evaluate('document.documentElement.dataset.theme') is None
+    for act, v, key, want in (('speed', 'rapida', 'speed', 'rapida'), ('speed', 'normal', 'speed', None), ('fx', 'off', 'quiet', True), ('fx', 'on', 'quiet', None), ('hints', 'off', 'hints', False), ('hints', 'on', 'hints', None)):
+        pg.click(f'[data-act={act}][data-v={v}]'); assert S().get(key) == want, (act, v, S())
     assert 'não fica guardado' in txt('#version') and pg.locator('[data-act=checkupdate]').count() == 0, txt('#version')
 
-    # ---------- roles, each behind the gate ----------
-    pg.click('[data-act=start]')
-    g = G(); assert g['phase'] == 'reveal' and len(g['players']) == 7
-    for i in range(7):
-        assert 'Passe o celular para' in txt('#phase') and pg.locator('#role').count() == 0, 'the role is not on screen before the tap'
-        pg.click('[data-act=open]')
-        me = G()['players'][i]
-        assert pg.locator('#role svg.art').count() == 1, 'the role card shows its illustration'
-        assert pg.locator('#role').count() == 1 and {'liberal': 'LIBERAL', 'fascista': 'FASCISTA', 'hitler': 'HITLER'}[me['role']] in txt('#role').upper(), txt('#phase')
-        if me['role'] == 'fascista':
-            hitler = next(p['name'] for p in G()['players'] if p['role'] == 'hitler')
-            assert hitler in txt('#allies .ally.H'), txt('#phase')
-            others = [p['name'] for j, p in enumerate(G()['players']) if p['role'] == 'fascista' and j != i]
-            assert all(o in txt('#allies .ally.F') for o in others) and hitler not in txt('#allies .ally.F'), txt('#allies')
-        if i == 0: shot(f's2-papel-{THEME}.png')
-        pg.click('[data-act=hiderole]')
-    assert G()['phase'] == 'nominate'
+    # ---------- ranking and glossary ----------
+    pg.click('#gloss [data-act=vira][data-r="3"]')
+    assert pg.locator('#glossrank li').count() == 13 and pg.locator('#glossrank li.man').count() == 4
+    assert pg.locator('#glossrank li').first.locator('[data-c="4p"]').count() == 1 and 'zap' in txt('#glossrank li:first-child')
+    assert 'manilha é 4' in txt('#gloss') and 'Picafumo' in txt('#gloss') and 'Cangar' in txt('#gloss')
 
-    # stack the table so the game below is the same every time: Ana is Hitler, Bia and Caio fascists; Duda presides
-    pg.evaluate('''() => { const g = window.__APP.S.game; g.players.forEach((p, i) => { p.role = i === 0 ? 'hitler' : i < 3 ? 'fascista' : 'liberal'; }); g.pres = 3; }''')
-    pg.evaluate(f'localStorage.setItem("{KEY}", JSON.stringify(window.__APP.S))')
-    cov.reload(pg); wait()
-    assert G()['pres'] == 3 and 'Duda' in txt('#phase') and 'Duda' in txt('#status'), 'the game in course comes back after a reload'
-    assert pg.locator('#board .slot.new').count() == 0, 'a reload stamps nothing'
-    stack = lambda deck: pg.evaluate('(d) => { window.__APP.S.game.deck = d.split(""); }', deck)
+    # ---------- training ----------
+    pg.click('[data-act=drill][data-k=manilha]'); assert pg.locator('#drill').count() == 1
+    d = pg.evaluate('window.__APP.ui.drill')
+    pg.click(f'#drill [data-act=guess][data-v="{d["answer"]}"]')
+    assert 'Isso!' in txt('#verdict') and S()['train'] == {'ok': 1, 'total': 1, 'best': 1}
+    assert pg.locator('#drill [data-act=guess]:not([disabled])').count() == 0, 'one answer per question'
+    pg.click('#drill [data-act=drill]'); d = pg.evaluate('window.__APP.ui.drill')
+    wrong = next(o for o in d['options'] if o != d['answer'])
+    pg.click(f'#drill [data-act=guess][data-v="{wrong}"]'); assert 'Não foi dessa vez' in txt('#verdict') and S()['train']['total'] == 2
+    assert pg.locator('#drill .is-right').count() == 1 and pg.locator('#drill .is-wrong').count() == 1
+    pg.click('[data-act=home]'); pg.click('[data-act=drill][data-k=round]')
+    d = pg.evaluate('window.__APP.ui.drill'); assert pg.locator('#drill .dp').count() == 4
+    pg.click(f'#drill [data-act=guess][data-v="{d["answer"]}"]'); assert 'Isso!' in txt('#verdict') and pg.locator('#drillrank li').count() == 13
+    assert overflow() == 0; shot(f'e2-treino-{THEME}.png')
+    pg.click('[data-act=brand]'); assert pg.locator('#start').count() == 1, 'the name at the top goes home from training'
+    assert 'Acertos: 2 de 3' in txt('#trainstats') and 'Melhor sequência: 1' in txt('#trainstats')
 
-    def nominate(i):
-        pg.click(f'#phase [data-act=nominate][data-i="{i}"]'); assert G()['phase'] == 'vote'
-    def votes(elected):
-        pg.click(f'[data-act=elect][data-v="{1 if elected else 0}"]')
-    def hand(role, keep):
-        """Through the gate, the president or the chancellor throws away a law that is not `keep` if there is one."""
-        assert pg.locator('#phase .law').count() == 0 and 'Passe o celular para' in txt('#phase'), 'the laws are not on screen before the tap'
-        pg.click('[data-act=open]')
-        h = G()['hand']; k = next((j for j, l in enumerate(h) if l != keep), 0)
-        assert pg.locator('#phase .law').count() == len(h) and pg.locator(f'[data-act={role}discard]').is_disabled()
-        pg.click(f'#phase [data-act=pick][data-k="{k}"]')
-    def govern(chanc, law):
-        nominate(chanc); votes(True); assert G()['phase'] == 'president', G()['log'][-1]
-        hand('p', law); pg.click('[data-act=pdiscard]'); assert G()['phase'] == 'chancellor'
-        hand('c', law); pg.click('[data-act=cdiscard]')
-        assert pg.locator('#board .slot.new').count() == (0 if G()['phase'] == 'over' else 1), 'the new law stamps onto the board'
+    # ---------- the real table ----------
+    pg.click('[data-act=real]'); assert 'Diga primeiro a vira' in txt('#realsay')
+    def pick(target, card):
+        pg.click(f'#real [data-act=sheet][data-v={target}]'); assert pg.locator('#sheet').count() == 1
+        pg.click(f'#sheet button[data-c="{card}"]'); assert pg.locator('#sheet').count() == 0
+    pick('vira', '6o'); assert 'manilha 7' in txt('#real').replace('\n', ' ')
+    pg.click('#real [data-act=sheet][data-v=hand]'); assert pg.locator('#sheet button[data-c="6o"]').is_disabled(), 'a card already told is off'
+    assert pg.locator('#sheet button[data-c="7p"] .pc.man').count() == 1, 'with the vira known the manilhas stand out'
+    pg.click('[data-act=closesheet]'); assert pg.locator('#sheet').count() == 0
+    for c in ('7p', '3o', 'Ke'): pick('hand', c)
+    assert 'garantida' in txt('#real') and 'perde pra 3' in txt('#real') and 'não perde pra nenhuma' in txt('#realsay')
+    for c in ('2p', '7c'): pick('table', c)
+    assert 'a mais forte é 7 de copas' in txt('#realsay') and 'a mais barata que leva é 7 de paus (zap)' in txt('#realsay')
+    assert pg.locator('#real .adv.best').count() == 1 and pg.locator('#realranking li').count() == 13
+    assert overflow() == 0; shot(f'e3-mesa-real-{THEME}.png')
+    pg.click('#real .realtable [data-act=untell][data-c="7c"]'); assert S()['real']['table'] == ['2p']
+    pg.click('[data-act=nextround]'); assert S()['real']['gone'] == ['2p'] and S()['real']['table'] == []
+    reload(); pg.click('[data-act=real]'); assert S()['real']['hand'] == ['7p', '3o', 'Ke'], 'the real table is kept on the device'
+    pg.click('[data-act=resetreal]'); assert S()['real']['vira'] is None
+    pg.click('[data-act=listen]'); pg.wait_for_function('window.__APP.S.real.hand.length === 3')
+    assert S()['real']['vira'] == '7c' and S()['real']['hand'] == ['Qp', '3o', 'Ke'] and 'Ouvi:' in txt('#heard'), S()['real']
+    pg.evaluate('window.__say = "bom dia"'); pg.click('[data-act=listen]'); pg.wait_for_function('!document.getElementById("toast").hidden')
+    assert 'Não entendi' in txt('#toast')
+    pg.click('#real [data-act=home]'); assert pg.locator('#start').count() == 1
 
-    # three governments rejected: the top law goes in by itself
-    # help for the phase, open and closed
-    pg.click('[data-act=help]'); assert 'escolhe quem vai ser o chanceler' in txt('#helptext')
-    pg.click('[data-act=help]'); assert pg.locator('#helptext').count() == 0
-    # a nomination and a vote result can be taken back, until something else happens
-    nominate(4); assert pg.locator('#undo').count() == 1
-    pg.click('#undo'); assert G()['phase'] == 'nominate' and G()['chanc'] is None and pg.locator('#undo').count() == 0
-    nominate(4); votes(False)
-    assert pg.evaluate('document.getElementById("stamp").hidden') is False and 'Rejeitado' in txt('#stamp'), 'the vote result is stamped on the screen'
-    assert G()['tracker'] == 1 and pg.locator('#tracker.bump').count() == 1, 'the tracker shakes when it moves'
-    pg.click('#undo'); assert G()['phase'] == 'vote' and G()['tracker'] == 0 and G()['chanc'] == 4
-    votes(False); assert G()['tracker'] == 1 and G()['pres'] == 4 and 'rejeitado' in txt('#toast')
-    nominate(5); votes(False)
-    stack('LFFLFFLL')
-    nominate(6); votes(False)
-    g = G(); assert g['laws'] == {'L': 1, 'F': 0} and g['tracker'] == 0 and g['pres'] == 6 and 'Lei liberal aprovada' in txt('#toast'), g['log'][-3:]
-    # a government: 3 laws, 2, one enacted
-    stack('FFLFFLFFL'); govern(0, 'F')
-    assert G()['laws']['F'] == 1 and G()['pres'] == 0 and 'Lei fascista aprovada' in txt('#toast')
-    # term limits: the last government cannot come back as chancellor
-    assert pg.locator('#phase [data-act=nominate][data-i="0"]').count() == 0 and pg.locator('#phase [data-act=nominate][data-i="6"]').count() == 0 and 'último governo' in txt('#phase')
-    assert overflow() == 0; shot(f's3-mesa-de-jogo-{THEME}.png')
+    # ---------- a game: a random start, played through the screen until the hand ends ----------
+    pg.click('[data-act=new]'); g = G(); assert g and g['n'] == 1 and len(g['hands'][0]) == 3 and g['level'] == 'medio'
+    def settle():
+        pg.wait_for_function('(() => { const g = window.__APP.S.game; return !g || window.__APP.Core.whoActs(g) === 0 || g.phase === "handEnd" || g.phase === "over"; })()', timeout=20000)
+    def finish_hand():
+        for _ in range(40):
+            settle(); g = G()
+            if g['phase'] in ('handEnd', 'over'): return g
+            if g['phase'] == 'eleven': pg.click('[data-act=eleven][data-v="1"]')
+            elif g['phase'] == 'truco': pg.click('[data-act=answer][data-v=accept]')
+            else: pg.click('#hand [data-act=play] >> nth=0')
+        raise AssertionError('the hand did not end')
+    before = G()['score']; g = finish_hand()
+    assert g['phase'] == 'handEnd' and sum(g['score']) - sum(before) == (g['result']['points']), g['result']
+    assert 'Fim da mão' in txt('#action') and pg.locator('[data-act=next]').count() == 1
+    pg.click('[data-act=next]'); assert G()['n'] == 2
 
-    # 2nd fascist law: Ana sees Caio's party
-    stack('FFLFFL'); govern(1, 'F'); assert G()['phase'] == 'investigate'
-    pg.click('#phase [data-act=investigate][data-i="2"]')
-    assert pg.locator('#party').count() == 0; pg.click('[data-act=open]'); assert pg.locator('#party svg.art').count() == 1 and 'FASCISTA' in txt('#party').upper() and 'Caio' in txt('#party')
-    pg.click('[data-act=endpower]'); assert G()['phase'] == 'nominate' and G()['pres'] == 1
-    # 3rd, at a table of 7: Bia calls a special election and makes Edu president; then the order goes on after Bia
-    stack('FFLFFL'); govern(3, 'F'); assert G()['phase'] == 'special' and 'eleição especial' in txt('#phase')
-    assert pg.locator('#phase [data-act=special][data-i="1"]').count() == 0, 'not the president herself'
-    pg.click('#phase [data-act=special][data-i="4"]'); assert G()['pres'] == 4 and G()['back'] == 1 and 'Edu é o próximo presidente' in txt('#toast')
-    nominate(6); votes(False); assert G()['pres'] == 2 and G()['back'] is None
-    # 4th: Caio eliminates Gil (Fê went back in at the end of the table)
-    stack('FFLFFL'); govern(4, 'F'); assert G()['phase'] == 'execute'
-    assert pg.locator('[data-act=execute]').is_disabled()
-    pg.click('#phase [data-act=pickp][data-i="5"]'); assert 'Eliminar <b>Gil</b>' in txt('[data-act=execute]')
-    pg.click('[data-act=execute]'); assert G()['players'][5]['alive'] is False and '<b>Gil</b> foi eliminado' in txt('#toast') and pg.locator('#players li.dead').count() == 1
-    # 5th: Duda eliminates Bia
-    stack('FFLFFL'); govern(6, 'F'); assert G()['phase'] == 'execute' and G()['laws']['F'] == 5
-    pg.click('#phase [data-act=pickp][data-i="1"]'); pg.click('[data-act=execute]'); assert G()['pres'] == 4
+    def stack(game):
+        """Puts a stacked game in place and reloads, so the screen starts from it. Chance is fixed high: nobody bluffs
+        and every computer player plays by its rules, so the stacked game always goes the same way."""
+        pg.evaluate('(g) => { const a = window.__APP; const base = a.Core.newGame(a.Core.seeded(1), "medio"); a.S.game = { ...base, log: [], ...g }; localStorage.setItem("truco.v1", JSON.stringify(a.S)); }', game)
+        reload(); pg.evaluate('window.__realRandom = Math.random; Math.random = () => 0.99')
 
-    # veto: refused, then the chancellor must enact one
-    stack('LLFLLF'); nominate(2); votes(True)
-    hand('p', 'L'); pg.click('[data-act=pdiscard]')
-    pg.click('[data-act=open]'); pg.click('[data-act=askveto]'); assert G()['phase'] == 'veto' and 'quer vetar' in txt('#phase')
-    pg.click('[data-act=veto][data-v="0"]'); assert G()['phase'] == 'chancellor' and 'Veto recusado' in txt('#toast')
-    hand('c', 'L'); assert pg.locator('[data-act=askveto]').count() == 0 and 'recusou o veto' in txt('#phase')
-    pg.click('[data-act=cdiscard]'); assert G()['laws'] == {'L': 2, 'F': 5} and G()['pres'] == 6
-    # veto: accepted, and it counts as a failed government
-    stack('LLFLLF'); nominate(3); votes(True)
-    hand('p', 'L'); pg.click('[data-act=pdiscard]'); pg.click('[data-act=open]'); pg.click('[data-act=askveto]')
-    pg.click('[data-act=veto][data-v="1"]'); assert G()['tracker'] == 1 and G()['laws'] == {'L': 2, 'F': 5} and 'Veto aceito' in txt('#toast')
+    # ---------- truco accepted, and a round taken by the suit (zap over copas) ----------
+    stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['5c', '4e', '6o'], ['5p', '4c', '6e'], ['Ke', '7o', 'Qe'], ['Jo', 'Jc', '6c']]})
+    assert pg.locator('#hand .pc.man').count() == 1 and 'copas' in txt('#hand') and pg.locator('#hand .pc small').count() == 3, 'rodinhas: the manilha and the places'
+    assert 'manilha: 5' in txt('#vira')
+    pg.click('[data-act=truco]'); settle()
+    g = G(); assert g['value'] == 3 and g['phase'] == 'play' and g['raisedBy'] == 0 and 'Aceito' in txt('#seat1') + txt('#seat1 .bubble') or g['value'] == 3, g
+    assert pg.locator('[data-act=truco]').count() == 0, 'no raising twice in a row'
+    pg.click('#hand [data-act=play][data-k="0"]')
+    while True:                     # the others may raise on the way (a bluffed seis, say): accept and go on
+        settle(); g = G()
+        if g['rounds'] or g['phase'] != 'truco': break
+        pg.click('[data-act=answer][data-v=accept]')
+    pg.wait_for_function('window.__APP.S.game.rounds.length >= 1')
+    assert G()['rounds'][0] == 1 and any('ganha no naipe' in l for l in G()['log']), G()['log'][-6:]
+    g = finish_hand(); assert g['phase'] in ('handEnd', 'over') and g['value'] >= 3
+    # the explanation of that round, on a table where it is your turn (nothing moves meanwhile)
+    stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [1], 'hands': [['4e', '6o'], ['4c', '6e'], ['7o', 'Qe'], ['Jc', '6c']],
+           'last': {'plays': [{'seat': 0, 'card': '5c'}, {'seat': 1, 'card': '5p'}, {'seat': 2, 'card': 'Ke'}, {'seat': 3, 'card': 'Jo'}], 'winner': 1}})
+    assert 'decide o naipe' in txt('#explain') and 'zap > copas' in txt('#explain'), txt('#explain')
+    assert pg.locator('#center .slot.won').count() == 1 and pg.locator('#status .dots i.eles').count() == 1
+    assert overflow() == 0; shot(f'e4-naipe-{THEME}.png')
 
-    # Hitler elected chancellor with 3 or more fascist laws: the fascists win
-    assert G()['pres'] == 0; nominate(2); votes(False); assert G()['pres'] == 2
-    nominate(0); votes(True)
-    g = G(); assert g['phase'] == 'over' and g['winner'] == 'F' and 'fascistas venceram' in txt('#phase')
-    assert pg.locator('#confetti i').count() > 0 and pg.locator('#phase .cheer svg.art').count() == 1, 'confetti and the winners cheering'
-    assert 'Ana investigou Caio: era fascista' in ' '.join(txt('#summary').split()), txt('#summary')
-    assert 'eliminou' in txt('#summary') and 'rejeitados' in txt('#summary') and 'Caos' in txt('#summary') and 'vetaram' in txt('#summary'), txt('#summary')
-    assert pg.locator('#players .role').count() == 7 and 'Hitler' in txt('#players'), 'the roles are shown at the end'
-    assert overflow() == 0; shot(f's4-fim-{THEME}.png')
+    # ---------- a tied third round (cangou): it goes to whoever took the first ----------
+    stack({'vira': '7c', 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0, 1], 'hands': [['3o'], ['3e'], ['4o'], ['4c']]})
+    pg.click('#hand [data-act=play][data-k="0"]'); g = finish_hand()
+    assert g['rounds'] == [0, 1, -1] and g['result']['team'] == 0 and any('cangou' in l for l in g['log']), (g['rounds'], g['log'][-3:])
 
-    # again with the same table, then ending a game halfway
-    pg.click('[data-act=again]'); assert G()['phase'] == 'reveal' and G()['laws'] == {'L': 0, 'F': 0}
+    # ---------- a bluff: Biu asks truco on nothing, you run, he shows his cards ----------
+    stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['4e', '2e', 'Ac'], ['6e', '7o', 'Qe'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
+    pg.evaluate('Math.random = () => 0.01')       # chance says: bluff
+    pg.click('#hand [data-act=play][data-k="0"]'); settle(); g = G(); assert g['phase'] == 'truco' and g['ask']['by'] == 1 and g['ask'].get('bluff') is True, g['phase']
+    assert 'pediu truco' in txt('#action') and 'Cida cochicha' in txt('#tip') and 'TRUCO' in txt('#seat1 .bubble').upper()
+    pg.evaluate('Math.random = window.__realRandom')
+    pg.click('[data-act=answer][data-v=run]')
+    g = G(); assert g['phase'] == 'handEnd' and g['score'][1] == 1 and 'Era blefe!' in txt('#shown') and pg.locator('#shown .pc').count() == 3, g['result']
+    assert overflow() == 0; shot(f'e5-blefe-{THEME}.png')
+
+    # ---------- raises back and forth: you truco, Biu (a monster) asks seis, you nove, he doze; you run, they take 9 ----------
+    stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['3o', '2e', 'Ac'], ['5p', '5c', '3e'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
+    pg.click('[data-act=truco]'); settle(); g = G()
+    assert g['phase'] == 'truco' and g['ask'] == {'by': 1, 'value': 6} and g['value'] == 3, g['ask']
+    assert 'Nove!' in txt('[data-act=answer][data-v=raise]')
+    pg.click('[data-act=answer][data-v=raise]'); settle(); g = G()
+    assert g['ask']['value'] == 12 and g['value'] == 9, g['ask']            # he went to doze over your nove
+    assert pg.locator('[data-act=answer][data-v=raise]').count() == 0, 'nothing above doze'
+    pg.click('[data-act=answer][data-v=run]'); assert G()['score'][1] == 9 and 'Correu' not in ''
+
+    # ---------- a hand of eleven: you see Cida's cards; run once, then play ----------
+    stack({'score': [11, 5], 'phase': 'handEnd', 'result': {'team': 0, 'points': 1, 'why': 'x'}, 'dealer': 0})
+    pg.click('[data-act=next]'); g = G(); assert g['phase'] == 'eleven' and g['eleven'] == 0
+    assert pg.locator('#partner .pc').count() == 3 and 'Mão de onze' in txt('#action')
+    pg.click('[data-act=eleven][data-v="0"]'); assert G()['score'] == [11, 6] and G()['phase'] == 'handEnd'
+    pg.click('[data-act=next]'); pg.click('[data-act=eleven][data-v="1"]'); g = G()
+    assert g['phase'] == 'play' and g['value'] == 3 and pg.locator('[data-act=truco]').count() == 0
+    # the other pair at 11 decides by itself
+    stack({'score': [3, 11], 'phase': 'handEnd', 'result': {'team': 1, 'points': 1, 'why': 'x'}, 'dealer': 0})
+    pg.click('[data-act=next]'); pg.wait_for_function('window.__APP.S.game.phase !== "eleven"')
+
+    # ---------- a hand of iron: both at 11, blind ----------
+    stack({'score': [11, 11], 'phase': 'handEnd', 'result': {'team': 1, 'points': 1, 'why': 'x'}, 'dealer': 3})
+    pg.click('[data-act=next]'); g = G()
+    assert g['blind'] and g['value'] == 1 and pg.locator('#hand .pc.back').count() == 3 and 'Mão de ferro' in txt('#view')
+    pg.click('#hand [data-act=play][data-k="2"]'); pg.wait_for_function('window.__APP.S.game.played.length >= 1')
+    assert len(G()['hands'][0]) == 2
+    shot(f'e6-ferro-{THEME}.png')
+
+    # ---------- the end of a game: you take the last hand, confetti, the summary, the tally ----------
+    stack({'vira': '7c', 'score': [11, 3], 'value': 1, 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0], 'hist': [{'team': 1, 'points': 3, 'how': 'Eles levaram a mão.', 'value': 3}], 'hands': [['Qp'], ['4e'], ['5e'], ['6e']]})
+    reload()
+    assert 'Nós 11' in txt('#score') and pg.locator('#hand [data-act=play]').count() == 1
+    pg.click('#hand [data-act=play][data-k="0"]'); settle(); pg.wait_for_function('window.__APP.S.game.phase === "over"')
+    g = G(); assert g['winner'] == 0 and g['score'] == [12, 3]
+    assert 'Vocês venceram' in txt('#action') and pg.locator('#summary li').count() == 2 and pg.evaluate('document.getElementById("confetti").children.length') > 0
+    assert S()['tally'] == {'w': 1, 'l': 0}
+    assert overflow() == 0; shot(f'e7-fim-{THEME}.png')
+    pg.click('[data-act=home]'); assert 'Neste aparelho: 1 vitória e 0 derrotas' in txt('#tally')
+    # without rodinhas the table is a plain table
+    pg.click('[data-act=hints][data-v=off]'); pg.click('[data-act=new]')
+    settle(); assert pg.locator('#explain').count() == 0 and pg.locator('#hand .pc small').count() == 0 and pg.locator('#rank').count() == 0
     pg.click('[data-act=end]'); assert G() is not None and 'Toque de novo' in txt('[data-act=end]')
-    pg.click('[data-act=end]'); assert G() is None and pg.locator('#table').count() == 1 and pg.locator('#names li').count() == 7
-    saved = json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")')); assert saved['game'] is None and len(saved['names']) == 7
-
-    # the liberals win by eliminating Hitler
-    pg.click('[data-act=start]')
-    pg.evaluate('''() => { const g = window.__APP.S.game; g.players.forEach((p, i) => { p.role = i === 0 ? 'hitler' : i < 3 ? 'fascista' : 'liberal'; }); g.phase = 'nominate'; g.pres = 3; g.laws = { L: 0, F: 3 }; }''')
-    pg.evaluate(f'localStorage.setItem("{KEY}", JSON.stringify(window.__APP.S))'); cov.reload(pg); wait()
-    stack('FFLFFL')
-    nominate(4); votes(True); hand('p', 'F'); pg.click('[data-act=pdiscard]'); hand('c', 'F'); pg.click('[data-act=cdiscard]')
-    assert G()['phase'] == 'execute'
-    pg.click('#phase [data-act=pickp][data-i="0"]'); pg.click('[data-act=execute]')
-    assert G()['winner'] == 'L' and 'liberais venceram' in txt('#phase')
-    pg.click('[data-act=table]'); assert G() is None and pg.locator('#table').count() == 1
-
-    # a table of 5: Hitler knows the fascist, and the 3rd fascist law lets the president see the next 3 laws
-    pg.locator('#names li', has_text='Fê').locator('[data-act=rmname]').click()
-    pg.locator('#names li', has_text='Gil').locator('[data-act=rmname]').click()
-    pg.click('[data-act=start]'); assert len(G()['players']) == 5
-    pg.evaluate('''() => { window.__APP.S.game.players.forEach((p, i) => { p.role = i === 0 ? 'hitler' : i === 1 ? 'fascista' : 'liberal'; }); }''')
-    pg.evaluate(f'localStorage.setItem("{KEY}", JSON.stringify(window.__APP.S))'); cov.reload(pg); wait()
-    pg.click('[data-act=open]'); assert 'Seu fascista' in txt('#allies') and 'Bia' in txt('#allies .ally.F'), txt('#phase')
-    # a secret closes by itself when the app leaves the screen, or when the phone is put face down
-    pg.evaluate('''() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden; }''')
-    assert pg.locator('#role').count() == 0 and 'saiu da tela' in txt('#toast'), 'hidden when the app goes away'
-    pg.click('[data-act=open]'); pg.evaluate("window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { beta: 175 }))")
-    assert pg.locator('#role').count() == 0 and 'virado para baixo' in txt('#toast'), 'hidden when the phone is face down'
-    pg.click('[data-act=open]')
-    for i in range(5):
-        if i: pg.click('[data-act=open]')
-        pg.click('[data-act=hiderole]')
-    assert 'espiar' in txt('#board') and 'partido' not in txt('#board') and 'eleição' not in txt('#board'), txt('#board')
-    pg.evaluate('''() => { const g = window.__APP.S.game; g.pres = 3; g.laws = { L: 0, F: 2 }; }''')
-    pg.evaluate(f'localStorage.setItem("{KEY}", JSON.stringify(window.__APP.S))'); cov.reload(pg); wait()
-    stack('FFLFFL'); govern(4, 'F'); assert G()['phase'] == 'peek'
-    pg.click('[data-act=open]'); top = G()['deck'][:3]
-    assert [('L' if 'LIBERAL' in t.upper() else 'F') for t in pg.locator('#peek .law').all_inner_texts()] == top
-    pg.click('[data-act=endpower]'); assert G()['pres'] == 4
+    pg.click('[data-act=end]'); assert G() is None and pg.locator('#start').count() == 1
+    pg.click('[data-act=hints][data-v=on]')
+    saved = json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")')); assert saved['game'] is None and saved['tally']['w'] == 1
 
     cov.stop(pg, f'e2e-{THEME}')
     assert not errs, errs
 
-    # ---------- with motion on: the animations play, and taps wait for the falling card ----------
+    # ---------- with motion on: the hand is dealt, a card flies in, TRUCO! is stamped ----------
     mctx = b.new_context(viewport=dict(width=393, height=852), color_scheme=THEME, locale='pt-BR', reduced_motion='no-preference')
     mctx.route('**/*', lambda r: r.abort() if r.request.url.startswith('http') else r.continue_())
     mp = mctx.new_page(); merrs = []
     mp.on('pageerror', lambda e: merrs.append(str(e)))
     cov.start(mp)
-    mp.goto((ROOT / 'dist' / 'index.html').as_uri()); mp.wait_for_function('window.__APP && window.__APP.S')
-    for n in NAMES[:5]: mp.fill('#name', n); mp.press('#name', 'Enter')
-    mp.click('[data-act=start]')
-    mp.click('[data-act=open]'); assert mp.locator('.turn.go .back').count() == 1, 'the role card turns over'
-    mp.click('[data-act=hiderole]')
-    for _ in range(4): mp.click('[data-act=open]'); mp.click('[data-act=hiderole]')
-    mp.locator('#phase [data-act=nominate]').first.click(); mp.click('[data-act=elect][data-v="1"]')
-    assert mp.locator('#stamp.go').count() == 1 and 'Eleito' in mp.text_content('#stamp')
-    mp.click('[data-act=open]'); assert mp.locator('.flip .hand .law').count() == 3, 'the laws are dealt'
-    mp.click('#phase [data-act=pick][data-k="0"]'); mp.click('[data-act=pdiscard]')
-    assert mp.locator('#phase .law.toss').count() == 1 and mp.evaluate('window.__APP.S.game.phase') == 'president', 'the card falls before the game moves on'
-    mp.click('[data-act=pdiscard]')                                                   # a tap while it falls changes nothing
-    mp.wait_for_function("window.__APP.S.game.phase === 'chancellor'", timeout=3000)
-    assert mp.evaluate('window.__APP.S.game.discard.length') == 1, 'one discard, not two'
+    mp.goto((ROOT / 'dist' / 'index.html').as_uri()); mp.wait_for_function('window.__APP && window.__APP.S'); mp.evaluate('window.__APP.ui.wait = 1e6')
+    mp.click('[data-act=new]'); assert mp.locator('#hand .hc.deal').count() == 3, 'a new hand is dealt in a fan'
+    mp.evaluate('''() => { const a = window.__APP; Object.assign(a.S.game, { vira: "4o", starter: 0, turn: 0, phase: "play", hands: [["5c", "4e", "6o"], ["5p", "4c", "6e"], ["Ke", "7o", "Qe"], ["Jo", "Jc", "6c"]] }); a.ui.wait = 20; }''')
+    mp.click('[data-act=end]')                                    # a repaint with nothing new: the hand is not dealt again
+    assert mp.locator('#hand .hc.deal').count() == 0
+    mp.click('[data-act=truco]'); assert mp.locator('#stamp.go').count() == 1 and 'TRUCO' in mp.text_content('#stamp')
+    mp.wait_for_function('window.__APP.S.game.phase === "play"')
+    mp.evaluate('window.__APP.ui.wait = 1e6')                    # the others wait: the card on the table is yours
+    mp.click('#hand [data-act=play][data-k="1"]'); assert 'out' in (mp.get_attribute('#hand [data-k="1"]', 'class') or ''), 'the card lifts off the hand'
+    mp.wait_for_function('window.__APP.S.game.played.length >= 1')
+    mp.wait_for_selector('#center .slot.fly')
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): mesa, papéis atrás do portão, eleição, caos, leis, limite de mandato, poderes, veto, eleição especial, mesa de 5 (Hitler conhece o fascista, espiar), desfazer, ajuda, segredo que se esconde sozinho, resumo da partida, animações, fim de jogo pelos dois lados, guardado no aparelho, tema, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): início, níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
