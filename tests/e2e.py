@@ -64,6 +64,28 @@ with sync_playwright() as p:
         pg.click(f'[data-act={act}][data-v={v}]'); assert S().get(key) == want, (act, v, S())
     assert 'não fica guardado' in txt('#version') and pg.locator('[data-act=checkupdate]').count() == 0, txt('#version')
 
+    # ---------- the club: names, colours, the rivals mode ----------
+    top_bg = lambda: pg.evaluate('getComputedStyle(document.querySelector(".top")).backgroundColor')
+    plain_top = top_bg()
+    pg.click('[data-act=team][data-v=flamengo]')
+    assert S()['team'] == 'flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
+    assert 'Pedro' in txt('#squad') and 'Você e Pedro contra Lucas Paquetá e Carrascal' in txt('#lineup'), txt('#lineup')
+    pg.click('[data-act=editplayers]'); pg.fill('#pl1', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
+    assert S()['custom'] == {'flamengo': ['Pedro', '<b>Gerson</b>', 'Carrascal']} and '<b>Gerson</b>' in txt('#lineup') and pg.locator('#lineup b b').count() == 0, 'a name typed shows as text'
+    pg.click('[data-act=editplayers]'); pg.click('[data-act=resetplayers]'); assert 'custom' not in S() and 'Lucas Paquetá' in txt('#lineup')
+    pg.click('[data-act=mode][data-v=rivals]'); assert S().get('rival') and pg.locator('#club [data-act=rival][data-v=flamengo]').count() == 0, 'your own club is not a rival'
+    pg.click('[data-act=rival][data-v=palmeiras]'); assert 'Você e Pedro contra Vitor Roque e Flaco López' in txt('#lineup')
+    assert overflow() == 0; shot(f'e1-time-{THEME}.png')
+    reload(); assert S()['team'] == 'flamengo' and S()['rival'] == 'palmeiras' and top_bg() == 'rgb(200, 16, 46)', 'the club stays on the device'
+    pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
+    assert g['names'] == ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'] and g['sides'] == ['flamengo', 'palmeiras']
+    assert 'Vitor Roque' in txt('#seat1') and 'Pedro' in txt('#seat2') and 'Flaco López' in txt('#seat3')
+    assert pg.evaluate('getComputedStyle(document.querySelector(".chip.eles")).backgroundColor') == 'rgb(0, 100, 55)', 'the rival\'s colour on "Eles"'
+    assert overflow() == 0; shot(f'e1-rivais-{THEME}.png')
+    pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
+    pg.click('[data-act=mode][data-v=own]'); assert 'rival' not in S()
+    pg.click('[data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in txt('#lineup')
+
     # ---------- ranking and glossary ----------
     pg.click('#gloss [data-act=vira][data-r="3"]')
     assert pg.locator('#glossrank li').count() == 13 and pg.locator('#glossrank li.man').count() == 4
@@ -242,4 +264,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): início, níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): início, seu time (nomes, cores, nomes trocados, modo rivais), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')

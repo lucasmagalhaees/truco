@@ -24,7 +24,7 @@ stamp: the default once pointed at a stranger's app with a similar name), and an
 import os, pathlib, re, subprocess, sys, time, urllib.error, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_URL = 'https://truco-ia.vercel.app/'
+DEFAULT_URL = 'https://turco-six.vercel.app/'
 URL = os.environ.get('APP_PROD_URL') or DEFAULT_URL
 AGENT = 'truco-production-check/1.0'
 STAMP = re.compile(r'<meta name="app-commit" content="([^"]*)"')

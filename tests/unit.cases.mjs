@@ -163,13 +163,25 @@ export default function cases(Core) {
   eq('hearing: the vira said first sets the manilha for the rest', Core.hear('vira três de paus, zap', null, 'vira'), [{ card: '3p', target: 'vira' }, { card: '4p', target: 'hand' }]);
   eq('hearing: words that are not cards are left out', [Core.hear('as cartas estão boas', null, 'hand'), Core.hear('', null, 'hand'), Core.hear('valete de coração e dama de espada', null, 'table')], [[], [], [{ card: 'Jc', target: 'table' }, { card: 'Qe', target: 'table' }]]);
 
+  /* the clubs */
+  eq('20 clubs of the Série A 2026, each with an id, colours and three players', [Core.TEAMS.length, new Set(Core.TEAMS.map(t => t.id)).size, Core.TEAMS.every(t => t.colors.length === 3 && t.colors.every(c => /^#[0-9a-f]{6}$/.test(c)) && t.players.length === 3 && t.players.every(p => p && p.length <= 24))], [20, 20, true]);
+  eq('the clubs promoted for 2026 are in, the ones relegated are not', [['athletico', 'chapecoense', 'coritiba', 'remo'].every(Core.teamById), ['fortaleza', 'ceara', 'juventude', 'sport'].some(Core.teamById)], [true, false]);
+  eq('no club: the bar table', Core.lineup(), { names: ['Você', 'Biu', 'Cida', 'Toinho'], sides: [null, null] });
+  eq('a club: the star is the partner, the other two the opponents', Core.lineup('flamengo'), { names: ['Você', 'Lucas Paquetá', 'Pedro', 'Carrascal'], sides: ['flamengo', null] });
+  eq('rivals: the star with you, the rival\'s first two against', Core.lineup('flamengo', 'palmeiras'), { names: ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'], sides: ['flamengo', 'palmeiras'] });
+  eq('a rival that is your own club, or unknown, is no rival', [Core.lineup('flamengo', 'flamengo').sides, Core.lineup('flamengo', 'xyz').sides, Core.lineup('xyz').names[1]], [['flamengo', null], ['flamengo', null], 'Biu']);
+  eq('names the person changed win; blank ones fall back to the club\'s', [Core.playersOf('santos', { santos: ['Pelé', ' ', 'Zito'] }), Core.lineup('santos', null, { santos: ['Pelé', 'Coutinho', 'Zito'] }).names], [['Pelé', 'Gabigol', 'Zito'], ['Você', 'Coutinho', 'Pelé', 'Zito']]);
+  const club = Core.newGame(Core.seeded(4), 'medio', Core.lineup('flamengo', 'palmeiras'));
+  eq('a game with a club: the names at the table and in the log, the clubs of each pair', [club.names, club.sides, Core.raise({ ...club, phase: 'play', turn: 1 }, 1).log.at(-1)], [['Você', 'Vitor Roque', 'Pedro', 'Flaco López'], ['flamengo', 'palmeiras'], 'Vitor Roque pediu truco!']);
+
   /* what is saved */
-  const st = { v: 1, game: h, tally: { w: 2, l: 1 }, level: 'dificil', train: { ok: 3, total: 4, best: 2 }, real: rt, theme: 'dark', speed: 'rapida', quiet: true, hints: false };
+  const st = { v: 1, game: h, tally: { w: 2, l: 1 }, level: 'dificil', train: { ok: 3, total: 4, best: 2 }, real: rt, theme: 'dark', speed: 'rapida', quiet: true, hints: false, team: 'flamengo', rival: 'palmeiras', custom: { flamengo: ['A', 'B', 'C'] } };
   eq('read state: a saved state comes back as it was', Core.readState(JSON.parse(JSON.stringify(st))), st);
   const empty = { v: 1, game: null, tally: { w: 0, l: 0 }, level: 'medio', train: { ok: 0, total: 0, best: 0 }, real: Core.emptyTable() };
   eq('read state: what is not a state reads as an empty one', [null, 'x', 7, { game: 'no' }].map(x => Core.readState(x)), Array(4).fill(empty));
-  eq('read state: unknown settings are dropped, bad numbers read as 0', Core.readState({ level: 'deus', theme: 'pink', speed: 'turbo', quiet: 1, hints: 0, tally: { w: -1, l: 2.5 }, train: { ok: 'a' } }), empty);
-  const broken = [{ ...h, level: 'x' }, { ...h, score: [13, 0] }, { ...h, hands: [['Xx'], [], [], []] }, { ...h, vira: '9o' }, { ...h, phase: 'dance' }, { ...h, value: 2 }, { ...h, phase: 'truco', ask: null }, { ...h, phase: 'eleven', eleven: null }, { ...h, rounds: [0, 0, 0, 0] }, { ...h, table: [{ seat: 7, card: '3o' }] }, { ...h, log: [1] }, { ...h, blind: 'no' }, { ...h, last: { plays: [], winner: 9 } }, { ...h, ask: { by: 9, value: 3 } }, { ...h, shout: { seat: 'x' } }, { ...h, result: { why: 1 } }];
+  eq('read state: unknown settings are dropped, bad numbers read as 0', Core.readState({ level: 'deus', theme: 'pink', speed: 'turbo', quiet: 1, hints: 0, tally: { w: -1, l: 2.5 }, train: { ok: 'a' }, team: 'real-madrid', rival: 'x', custom: { flamengo: ['a'], xyz: ['a', 'b', 'c'] } }), empty);
+  eq('read state: a rival equal to the club is dropped', Core.readState({ team: 'bahia', rival: 'bahia' }).rival, undefined);
+  const broken = [{ ...h, names: ['a'] }, { ...h, sides: ['xyz', null] }, { ...h, level: 'x' }, { ...h, score: [13, 0] }, { ...h, hands: [['Xx'], [], [], []] }, { ...h, vira: '9o' }, { ...h, phase: 'dance' }, { ...h, value: 2 }, { ...h, phase: 'truco', ask: null }, { ...h, phase: 'eleven', eleven: null }, { ...h, rounds: [0, 0, 0, 0] }, { ...h, table: [{ seat: 7, card: '3o' }] }, { ...h, log: [1] }, { ...h, blind: 'no' }, { ...h, last: { plays: [], winner: 9 } }, { ...h, ask: { by: 9, value: 3 } }, { ...h, shout: { seat: 'x' } }, { ...h, result: { why: 1 } }];
   eq('read game: what does not hold together is null', broken.map(Core.readGame), broken.map(() => null));
   eq('read real table: what does not hold together is empty', [Core.readReal({ ...rt, hand: ['3o', '4o', '5o', '6o'] }), Core.readReal({ ...rt, target: 'x' }), Core.readReal(null)], [Core.emptyTable(), Core.emptyTable(), Core.emptyTable()]);
 

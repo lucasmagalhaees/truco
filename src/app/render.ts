@@ -1,7 +1,7 @@
 import { Core } from '../core';
 import type { Card, Drill, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
-import { S, ui } from './state';
+import { S, applyClub, ui } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
 
@@ -14,17 +14,23 @@ import { canListen } from './voice';
 let seenHand = -1, seenPlayed = 0, seenLast = '', seenScore = '';
 
 export function render(): void {
+  const view = part('view'), active = document.activeElement;
+  if (active && view.contains(active) && active.matches('input')) return;        // never throw away what is being typed
   const g = S.game;
+  applyClub();
+  seatNames = g ? g.names : Core.lineup(S.team, S.rival, S.custom).names;
   const sc = g ? `${g.score[0]}-${g.score[1]}` : '';
   const bump = !!g && seenScore !== '' && sc !== seenScore; seenScore = sc;
   part('score').innerHTML = g ? `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>` : '';
-  part('view').innerHTML = g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
+  view.innerHTML = g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
 }
 
 /* ---------- cards ---------- */
 export const SUIT: Record<string, string> = { o: '♦', e: '♠', c: '♥', p: '♣' };
 const hints = (): boolean => S.hints !== false;
-const name = (s: Seat): string => Core.SEATS[s];
+/** The names at the table: the game's, or the ones the chosen club gives. */
+let seatNames: string[] = Core.SEATS;
+const name = (s: Seat): string => esc(seatNames[s]);
 /** Where a card stands with this vira: 1 for the zap, 2 for copas… down to the 4s. */
 const place = (c: Card, vira: Card): number => Core.ranking(vira).findIndex(r => r.cards.includes(c)) + 1;
 /** A card face. With `vira`, a manilha gets its nickname, and with rodinhas every card gets its place in the ranking. */
@@ -50,10 +56,11 @@ function vHome(): string {
   const lv = S.level, t = S.tally, tr = S.train;
   const lvBtn = (v: string): string => `<button class="${lv === v ? 'on' : ''}" data-act="level" data-v="${v}" aria-pressed="${lv === v}">${LEVEL[v][0]}</button>`;
   return `<section class="card" id="start"><span class="label">Nova partida</span>
-    <p class="big">Você e a <b>Cida</b> contra <b>Biu</b> e <b>Toinho</b>. Quem fizer ${Core.WIN_POINTS} pontos primeiro leva.</p>
+    <p class="big" id="lineup">Você e <b>${(name(2))}</b> contra <b>${(name(1))}</b> e <b>${(name(3))}</b>. Quem fizer ${Core.WIN_POINTS} pontos primeiro leva.</p>
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>
     <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p></section>
+  ${vClub()}
   <section class="card" id="train"><span class="label">Treino</span>
     <p>Exercícios rápidos pra ver na hora o que manda na mesa.</p>
     <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button></div>
@@ -62,6 +69,29 @@ function vHome(): string {
     <p>Jogando de verdade? Diga a vira e suas cartas (num toque ou falando) e o app mostra o ranking, as manilhas, o que ainda pode ganhar de você e qual carta joga.</p>
     <button class="btn ghost block" data-act="real">Abrir o assistente</button></section>
   ${vGloss()}${vRules()}${vSettings()}`;
+}
+
+/* ---------- the club ---------- */
+const clubBtn = (act: string, id: string, label: string, on: boolean, colors?: [string, string, string]): string =>
+  `<button class="clubbtn${on ? ' on' : ''}" data-act="${act}" data-v="${id}" aria-pressed="${on}"${colors ? ` style="--c:${colors[0]};--c2:${colors[1]};--ci:${colors[2]}"` : ''}>${label}</button>`;
+function vClub(): string {
+  const t = Core.teamById(S.team), r = Core.teamById(S.rival);
+  const grid = (act: string, cur: string | undefined, skip?: string): string => `<div class="clubs">${Core.TEAMS.filter(c => c.id !== skip).map(c => clubBtn(act, c.id, c.name, cur === c.id, c.colors)).join('')}</div>`;
+  let h = `<section class="card" id="club"><span class="label">Seu time</span>
+    <p class="hint">Escolha o seu time: a IA ganha os nomes do elenco (o craque é sua dupla) e o app fica com as cores do clube.</p>
+    ${grid('team', S.team)}<button class="btn ghost block" data-act="team" data-v=""${t ? '' : ' disabled'}>Sem time</button>`;
+  if (t) {
+    const p = Core.playersOf(t.id, S.custom);
+    h += `<p id="squad">Elenco do ${esc(t.name)}: <b>${esc(p[0])}</b> (craque), ${esc(p[1])} e ${esc(p[2])}.</p>`;
+    h += ui.editing ? `<div class="edit" id="edit">${p.map((x, i) => `<div class="field"><input id="pl${i}" maxlength="24" autocomplete="off" value="${esc(x)}" aria-label="${i ? `Jogador ${i + 1}` : 'Craque'}"></div>`).join('')}
+      <div class="pick"><button class="btn" data-act="saveplayers">Salvar nomes</button><button class="btn ghost" data-act="resetplayers">Voltar aos do clube</button></div></div>`
+      : `<button class="btn ghost block" data-act="editplayers">Trocar os nomes</button>`;
+    h += `<p class="hint">Modo</p><div class="segm" role="group" aria-label="Modo"><button class="${r ? '' : 'on'}" data-act="mode" data-v="own" aria-pressed="${!r}">Elenco</button><button class="${r ? 'on' : ''}" data-act="mode" data-v="rivals" aria-pressed="${!!r}">Rivais</button></div>`;
+    h += r ? `<p class="hint">Rivais: você e ${esc(p[0])} contra os dois principais de outro time. Escolha o adversário:</p>${grid('rival', S.rival, t.id)}`
+      : `<p class="hint">Elenco: você e ${esc(p[0])} contra ${esc(p[1])} e ${esc(p[2])}.</p>`;
+    h += `<p class="hint">Elencos conferidos em ${Core.TEAMS_CHECKED}, pelas escalações prováveis publicadas. Jogador troca de clube: se algum nome estiver velho, troque acima.</p>`;
+  }
+  return h + '</section>';
 }
 
 /* ---------- the assistant for a real table ---------- */
@@ -127,7 +157,7 @@ function vGloss(): string {
 function vRules(): string {
   return `<section class="card" id="rules"><span class="label">Como joga (truco paulista)</span><ul class="rules">
     <li>Baralho de 40 cartas (sem 8, 9, 10 e coringas). ${Core.HAND_SIZE} cartas pra cada um e uma vira.</li>
-    <li>Duplas: você e a Cida (de frente) contra Biu e Toinho. Joga-se em roda: você, Biu, Cida, Toinho.</li>
+    <li>Duplas: você e sua dupla (de frente) contra a outra dupla. Joga-se em roda: você, quem está à sua direita, sua dupla, quem está à sua esquerda.</li>
     <li>Cada rodada, ganha a carta mais forte; quem fez começa a próxima. Quem fizer 2 rodadas leva a mão.</li>
     <li>A mão vale 1. Com truco vale 3, depois seis (6), nove (9) e doze (12).</li>
     <li>Com ${Core.ELEVEN} pontos, mão de onze: vale ${Core.ELEVEN_VALUE}, sem truco. Os dois com ${Core.ELEVEN}: mão de ferro, às cegas.</li>
@@ -214,11 +244,11 @@ function vAction(g: Game): string {
     const tip = Core.aiAnswer(g, 2), tipTxt = { accept: 'aceita', run: 'corre', raise: `pede ${WORD[Core.nextValue(g.ask.value)].toLowerCase()}` }[tip];
     return `<section class="card ask" id="action"><span class="label">${name(g.ask.by)} pediu ${WORD[g.ask.value].toLowerCase()}</span><p class="big">Se aceitar, a mão vale <b>${g.ask.value}</b>. Se correr, eles levam <b>${g.value}</b>.</p>
       <div class="pick"><button class="btn" data-act="answer" data-v="accept">Aceito</button><button class="btn ghost" data-act="answer" data-v="run">Corro</button>${g.ask.value < Core.WIN_POINTS ? `<button class="btn truco" data-act="answer" data-v="raise">${WORD[Core.nextValue(g.ask.value)]}!</button>` : ''}</div>
-      <p class="hint" id="tip">Cida cochicha: “eu ${tipTxt}”.</p></section>`;
+      <p class="hint" id="tip">${(name(2))} cochicha: “eu ${tipTxt}”.</p></section>`;
   }
   if (g.phase === 'eleven') {
     if (who !== 0) return `<p class="thinking" id="action">Eles estão com ${Core.ELEVEN}: decidindo se jogam…</p>`;
-    return `<section class="card ask" id="action"><span class="label">Mão de onze</span><p>Vocês estão com ${Core.ELEVEN}. As cartas da Cida:</p><div class="hand small" id="partner">${g.hands[2].map(c => face(c, g.vira, hints())).join('')}</div>
+    return `<section class="card ask" id="action"><span class="label">Mão de onze</span><p>Vocês estão com ${Core.ELEVEN}. As cartas de ${(name(2))}:</p><div class="hand small" id="partner">${g.hands[2].map(c => face(c, g.vira, hints())).join('')}</div>
       <p class="hint">Jogar: a mão vale ${Core.ELEVEN_VALUE}, sem truco. Correr: eles levam 1.</p><div class="pick"><button class="btn" data-act="eleven" data-v="1">Jogar</button><button class="btn ghost" data-act="eleven" data-v="0">Correr</button></div></section>`;
   }
   const r = g.result;

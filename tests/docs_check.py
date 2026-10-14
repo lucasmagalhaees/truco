@@ -54,6 +54,7 @@ CONSTANTS = [
     (r"export const SUITS = \['o', 'e', 'c', 'p'\] as const;", 'ouros < espadas < copas < paus (`SUITS`)'),
     (r"export const THINK: Record<Speed, number> = \{ calma: 1500, normal: 900, rapida: 400 \};", 'calma 1,5 s, normal 0,9 s, rápida 0,4 s (`THINK`)'),
     (r'export const ROUND_PAUSE = 700;', 'mais 0,7 s depois de uma rodada fechada (`ROUND_PAUSE`)'),
+    (r"export const TEAMS_CHECKED = '14/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
 ]
 for pattern, phrase in CONSTANTS:

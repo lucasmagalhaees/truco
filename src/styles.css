@@ -38,14 +38,14 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .wrap{max-width:720px;margin:0 auto;padding:0 16px}
 
 /* the masthead: felt green with the name and the score */
-.top{position:sticky;top:0;z-index:5;background:var(--felt2);color:var(--chalk);border-bottom:4px solid var(--rim);padding-top:env(safe-area-inset-top)}
+.top{position:sticky;top:0;z-index:5;background:var(--club,var(--felt2));color:var(--club-ink,var(--chalk));border-bottom:4px solid var(--club2,var(--rim));padding-top:env(safe-area-inset-top)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;min-height:56px;gap:12px}
-.brand{font:800 24px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--chalk)}
-.brand span{color:var(--accent-bg)}
+.brand{font:800 24px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:inherit}
+.brand span{color:var(--club2,var(--accent-bg))}
 .score{display:flex;gap:6px}
 .chip{font:800 15px/1 var(--display);letter-spacing:.04em;padding:7px 10px;border-radius:999px;color:#fff;white-space:nowrap}
-.chip.nos{background:#2563a8}
-.chip.eles{background:#c0392b}
+.chip.nos{background:var(--club,#2563a8);color:var(--club-ink,#fff);box-shadow:inset 0 0 0 2px var(--club-ink,transparent)}
+.chip.eles{background:var(--rival,#c0392b);color:var(--rival-ink,#fff);box-shadow:inset 0 0 0 2px var(--rival-ink,transparent)}
 .chip.bump{animation:bump .5s ease-out}
 @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
 
@@ -93,7 +93,7 @@ main .wrap{display:flex;flex-direction:column;gap:14px;padding-top:14px;padding-
 .seat.p-left{grid-area:left;justify-content:center}
 .seat.p-right{grid-area:right;justify-content:center}
 .seat.p-bottom{grid-area:bottom}
-.seat .who{font:800 14px/1 var(--display);letter-spacing:.06em;padding:5px 9px;border-radius:999px;background:rgba(0,0,0,.25);white-space:nowrap}
+.seat .who{font:800 14px/1 var(--display);letter-spacing:.04em;padding:5px 9px;border-radius:999px;background:rgba(0,0,0,.25);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .seat.t0 .who{box-shadow:inset 0 -3px 0 #7fb2ec}
 .seat.t1 .who{box-shadow:inset 0 -3px 0 #ff8a7a}
 .seat .who small{font-size:10px;background:var(--accent-bg);color:#1f1a14;border-radius:999px;padding:1px 5px;margin-left:3px;text-transform:uppercase}
@@ -249,6 +249,14 @@ details.card .log,details.card .ranking{margin-top:12px}
 .confetti i:nth-child(5n){background:#f4efe2}
 .confetti i:nth-child(7n){background:#1f6b45}
 @keyframes fall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:1;transform:translateY(105vh) rotate(var(--r,360deg)) translateX(30px)}}
+
+/* the clubs: a button in each club's colours, a stripe of the second colour */
+.clubs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.clubbtn{min-height:44px;padding:4px;border-radius:10px;border:2px solid var(--line);background:var(--c);color:var(--ci);box-shadow:inset 0 -5px 0 var(--c2);font:800 13px/1.1 var(--display);letter-spacing:.02em;min-width:0}
+.clubbtn.on{outline:3px solid var(--accent-bg);outline-offset:2px}
+.edit{display:flex;flex-direction:column;gap:8px}
+.field{display:flex;align-items:center;border:2px solid var(--line);border-radius:10px;padding:0 12px;background:var(--bg)}
+.field input{flex:1;min-width:0;border:0;background:none;color:var(--fg);height:46px;font:inherit;font-size:16px;outline:none}
 
 /* the assistant for a real table, and the grid of 40 cards */
 .realrow{display:flex;gap:14px;align-items:flex-start}

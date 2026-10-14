@@ -2,6 +2,7 @@ import { Core } from '../core';
 import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } from '../core';
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
+import { valOf } from './format';
 import { S, applyTheme, saveS, setS, ui } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
@@ -56,7 +57,7 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; play(Core.newGame(rand, S.level)); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
+function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, Core.lineup(S.team, S.rival, S.custom))); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
 function home(): void { clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS(); render(); window.scrollTo(0, 0); }
 /** The person plays a card: it lifts off the hand, then lands on the table. Taps wait meanwhile. */
 function playMine(g: Game, k: number): void {
@@ -89,6 +90,20 @@ function voice(): void {
   }, error => { ui.listening = false; render(); if (error && error !== 'no-speech' && error !== 'aborted') toast(error === 'not-allowed' ? 'O microfone não foi liberado.' : 'Não deu pra ouvir agora.'); });
 }
 
+/** The club, the mode and the names of the players. */
+function club(a: string, v: string): void {
+  if (a === 'team') { if (v) S.team = v; else delete S.team; if (!v || S.rival === v) delete S.rival; ui.editing = false; }
+  else if (a === 'mode') { if (v === 'own') delete S.rival; else S.rival = (Core.TEAMS.find(t => t.id !== S.team) as { id: string }).id; }
+  else if (a === 'rival') S.rival = v;
+  else if (a === 'editplayers') ui.editing = true;
+  else if (a === 'saveplayers' && S.team) {
+    const names = [0, 1, 2].map(i => valOf(`#pl${i}`).trim().slice(0, 24));
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    S.custom = { ...(S.custom || {}), [S.team]: names }; ui.editing = false;
+  } else if (a === 'resetplayers' && S.team && S.custom) { const c = { ...S.custom }; delete c[S.team]; if (Object.keys(c).length) S.custom = c; else delete S.custom; ui.editing = false; }
+  saveS(); render();
+}
+
 /** A setting: saved, applied and painted. */
 function setting(a: string, v: string): void {
   if (a === 'level') S.level = v as Level;
@@ -104,6 +119,7 @@ export function initEvents(): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx'].includes(a)) setting(a, d.v || '');
+    else if (['team', 'mode', 'rival', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '');
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');

@@ -1,6 +1,7 @@
 /* What was saved on the device, read back. A saved game that does not hold together is dropped, so a damaged state
    never breaks the page: the tally, the level and the settings still come back. */
 import { LEVELS, VALUES, WIN_POINTS } from './game';
+import { teamById } from './teams';
 import type { AppState, Game, Level, Phase, RealTable, Speed } from './types';
 
 const PHASES: Phase[] = ['eleven', 'play', 'truco', 'handEnd', 'over'];
@@ -15,7 +16,9 @@ const isPlays = (x: unknown): boolean => Array.isArray(x) && x.length <= 4 && x.
 /** A saved game, or null if it does not hold together. */
 export function readGame(x: unknown): Game | null {
   const g = x as Game;
-  if (!g || typeof g !== 'object' || !LEVELS.includes(g.level) || typeof g.blind !== 'boolean' || !isCards(g.played, 12)) return null;
+  if (!g || typeof g !== 'object' || !Array.isArray(g.names) || g.names.length !== 4 || !g.names.every(x => typeof x === 'string' && x.length <= 24)) return null;
+  if (!Array.isArray(g.sides) || g.sides.length !== 2 || !g.sides.every(x => x === null || !!teamById(x))) return null;
+  if (!LEVELS.includes(g.level) || typeof g.blind !== 'boolean' || !isCards(g.played, 12)) return null;
   if (!Array.isArray(g.score) || g.score.length !== 2 || !g.score.every(isPts) || !isSeat(g.dealer) || !Number.isInteger(g.n) || g.n < 1) return null;
   if (!Array.isArray(g.hands) || g.hands.length !== 4 || !g.hands.every(h => isCards(h, 3)) || !isCard(g.vira)) return null;
   if (!isPlays(g.table) || !(g.last === null || (g.last && isPlays(g.last.plays) && (g.last.winner === -1 || isSeat(g.last.winner))))) return null;
@@ -37,9 +40,19 @@ export function readReal(x: unknown): RealTable {
   return { vira: t.vira, hand: t.hand, table: t.table, gone: t.gone, target: t.target };
 }
 
+/** The player names the person changed, by club: only known clubs, three short names each. */
+function readCustom(x: unknown): { custom?: Record<string, string[]> } {
+  if (!x || typeof x !== 'object') return {};
+  const out: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
+    if (teamById(k) && Array.isArray(v) && v.length === 3 && v.every(n => typeof n === 'string' && n.length <= 24)) out[k] = v as string[];
+  }
+  return Object.keys(out).length ? { custom: out } : {};
+}
+
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { team?: unknown; rival?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -49,6 +62,9 @@ export function readState(x: unknown): AppState {
     ...(o.theme === 'light' || o.theme === 'dark' ? { theme: o.theme } : {}),
     ...(SPEEDS.includes(o.speed as Speed) ? { speed: o.speed as Speed } : {}),
     ...(o.quiet === true ? { quiet: true as const } : {}),
-    ...(o.hints === false ? { hints: false as const } : {})
+    ...(o.hints === false ? { hints: false as const } : {}),
+    ...(typeof o.team === 'string' && teamById(o.team) ? { team: o.team } : {}),
+    ...(typeof o.rival === 'string' && teamById(o.rival) && o.rival !== o.team ? { rival: o.rival } : {}),
+    ...readCustom(o.custom)
   };
 }

@@ -13,6 +13,7 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 | Pela tela, nos dois temas, no Chromium em tamanho de celular: treino, ranking, mesa real (grade e voz simulada), partida, naipe, cangada, pedidos até o doze, blefe mostrado, mão de onze e de ferro, fim de jogo; 16 execuções seguidas sem falha | `python3 tests/e2e.py dark` e `light` | 14/10/2026 |
 | O app abre sem internet e troca de versão com um toque, no Chromium | `python3 tests/pwa.py` | 14/10/2026 |
 | Cobertura de 96,8% das funções e 97,3% do código | `scripts/verify.sh` | 14/10/2026 |
+| A produção (https://turco-six.vercel.app) servindo o merge do PR #1 (`fa495e3`, carimbo `app-commit` da página) | página lida pela web | 14/10/2026 |
 
 ## Não verificado
 
@@ -20,5 +21,5 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 |---|---|---|
 | O reconhecimento de voz entendendo cartas faladas | Os testes leem texto; ninguém falou no microfone ainda | Abrir a mesa real no celular, tocar em "Falar a carta" e dizer "vira sete de copas" |
 | O service worker no Safari do iPhone e no app instalado na Tela de Início | Os testes rodam no Chromium | Abrir a produção no iPhone, ligar o modo avião e abrir de novo |
-| A produção servindo o commit da `main` | Só depois de importar na Vercel | O workflow `Produção` no primeiro merge |
+| Os três jogadores de cada clube ainda estarem no clube | Elencos mudam; a fonte são prévias de julho a outubro de 2026 (D6) | Conferir o time da pessoa e trocar no app o que estiver velho |
 | Se o difícil é difícil para uma pessoa | A medição foi IA contra IA | Jogar umas partidas e anotar |

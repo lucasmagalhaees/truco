@@ -43,6 +43,8 @@ export interface HandRecord { team: Team | null; points: number; how: string; va
 export interface Shown { seat: Seat; cards: Card[]; bluff: boolean }
 
 export interface Game {
+  /** The names at the four seats (0 is always "Você"), and the club of each pair (null: none). */
+  names: string[]; sides: [string | null, string | null];
   /** How well the computer players play in this game. */
   level: Level;
   /** A hand of iron (both pairs with 11): everyone plays blind, without seeing their own cards. */
@@ -97,7 +99,12 @@ export interface RealTable { vira: Card | null; hand: Card[]; table: Card[]; gon
 export interface Training { ok: number; total: number; best: number }
 
 /** Everything saved on the device (`truco.v1`). `hints` false turns off the labels that help during a game. */
-export interface AppState { v: 1; game: Game | null; tally: Tally; level: Level; train: Training; real: RealTable; theme?: Theme; speed?: Speed; quiet?: true; hints?: false }
+export interface AppState {
+  v: 1; game: Game | null; tally: Tally; level: Level; train: Training; real: RealTable;
+  theme?: Theme; speed?: Speed; quiet?: true; hints?: false;
+  /** The person's club, the rival club in the rivals mode, and the player names the person changed, by club. */
+  team?: string; rival?: string; custom?: Record<string, string[]>;
+}
 
 /** An entry as the source describes it, once read by `normEntry`. */
 export interface Entry { id: string; name: string; value: number }
