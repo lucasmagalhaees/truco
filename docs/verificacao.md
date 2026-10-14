@@ -21,4 +21,5 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 | O reconhecimento de voz entendendo cartas faladas | Os testes leem texto; ninguém falou no microfone ainda | Abrir a mesa real no celular, tocar em "Falar a carta" e dizer "vira sete de copas" |
 | O service worker no Safari do iPhone e no app instalado na Tela de Início | Os testes rodam no Chromium | Abrir a produção no iPhone, ligar o modo avião e abrir de novo |
 | A produção servindo o commit da `main` | Só depois de importar na Vercel | O workflow `Produção` no primeiro merge |
+| Os três jogadores de cada clube ainda estarem no clube | Elencos mudam; a fonte são prévias de julho a outubro de 2026 (D6) | Conferir o time da pessoa e trocar no app o que estiver velho |
 | Se o difícil é difícil para uma pessoa | A medição foi IA contra IA | Jogar umas partidas e anotar |

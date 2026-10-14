@@ -66,22 +66,22 @@ export function ranking(vira: Card): { rank: string; cards: Card[]; manilha: boo
 }
 /** The difficulty levels. */
 export const LEVELS: Level[] = ['facil', 'medio', 'dificil'];
-const say = (s: Seat): string => SEATS[s];
+const say = (g: Pick<Game, 'names'>, s: Seat): string => g.names[s] || SEATS[s];
 const WORD: Record<number, Word> = { 3: 'truco', 6: 'seis', 9: 'nove', 12: 'doze' };
 export const nextValue = (v: number): number => VALUES[Math.min(VALUES.length - 1, VALUES.indexOf(v) + 1)];
 
 /* ---------- a game ---------- */
 /** Deals a new hand on top of what the game already has: score, history, log and the next dealer. */
-function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level'>, rand: () => number): Game {
+function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level' | 'names' | 'sides'>, rand: () => number): Game {
   const d = shuffle(deck(), rand), starter = nextSeat(base.dealer);
   const at = [base.score[0] === ELEVEN, base.score[1] === ELEVEN];
   const eleven: Team | null = at[0] !== at[1] ? (at[0] ? 0 : 1) : null;
   const vira = d[HAND_SIZE * 4];
-  const log = [...base.log, `Mão ${base.n}: ${say(base.dealer)} deu as cartas. Vira: ${cardName(vira)}.`];
+  const log = [...base.log, `Mão ${base.n}: ${say(base, base.dealer)} deu as cartas. Vira: ${cardName(vira)}.`];
   if (eleven !== null) log.push(`Mão de onze: ${eleven === 0 ? 'nós' : 'eles'} ${eleven === 0 ? 'decidimos' : 'decidem'} se jogam.`);
   else if (at[0] && at[1]) log.push('Mão de ferro: os dois com 11. Todo mundo joga às cegas, sem ver as próprias cartas; quem levar a mão leva o jogo.');
   return {
-    level: base.level, blind: at[0] && at[1], played: [],
+    names: base.names, sides: base.sides, level: base.level, blind: at[0] && at[1], played: [],
     score: base.score, dealer: base.dealer, n: base.n, hist: base.hist, log,
     hands: [0, 1, 2, 3].map(i => d.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE)), vira,
     table: [], last: null, rounds: [], starter, turn: starter, value: 1, raisedBy: null, ask: null,
@@ -89,13 +89,14 @@ function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'leve
   };
 }
 /** A new game: nobody has points, the first dealer is drawn. */
-export function newGame(rand: () => number, level: Level = 'medio'): Game {
-  return deal({ score: [0, 0], dealer: Math.floor(rand() * 4), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio' }, rand);
+export function newGame(rand: () => number, level: Level = 'medio', table?: { names: string[]; sides: [string | null, string | null] }): Game {
+  const names = table && table.names.length === 4 ? table.names.map((x, i) => String(x || SEATS[i]).slice(0, 24)) : [...SEATS];
+  return deal({ score: [0, 0], dealer: Math.floor(rand() * 4), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio', names, sides: table ? table.sides : [null, null] }, rand);
 }
 /** After a hand: the next one, dealt by the next seat. */
 export function nextHand(g: Game, rand: () => number): Game {
   if (g.phase !== 'handEnd') return g;
-  return deal({ score: g.score, dealer: nextSeat(g.dealer), n: g.n + 1, hist: g.hist, log: g.log, level: g.level }, rand);
+  return deal({ score: g.score, dealer: nextSeat(g.dealer), n: g.n + 1, hist: g.hist, log: g.log, level: g.level, names: g.names, sides: g.sides }, rand);
 }
 
 /** Who has to act now: the seat whose turn it is, the one who answers a raise (the person answers for their pair), or
@@ -131,10 +132,11 @@ export function handWinner(rounds: RoundResult[]): Team | null | undefined {
 }
 
 /** A finished round in words; when manilhas met, says that the suit decided it. */
-function roundSay(table: Play[], w: Seat | -1, n: number, vira: Card): string {
+function roundSay(g: Game, table: Play[], w: Seat | -1, n: number): string {
+  const vira = g.vira;
   if (w === -1) return `${n}ª rodada empatou (cangou).`;
   const card = (table.find(p => p.seat === w) as Play).card, manilhas = table.filter(p => isManilha(p.card, vira)).length;
-  return `${n}ª rodada: ${say(w)} fez com ${cardSay(card, vira)}${manilhas > 1 ? ', que ganha no naipe' : ''}.`;
+  return `${n}ª rodada: ${say(g, w)} fez com ${cardSay(card, vira)}${manilhas > 1 ? ', que ganha no naipe' : ''}.`;
 }
 /** Which manilhas met in a round, strongest first, when more than one did: the suit decides between them. */
 export function suitDuel(plays: Play[], vira: Card): Card[] {
@@ -165,7 +167,7 @@ export function playCard(g: Game, seat: Seat, k: number): Game {
   if (table.length < 4) return { ...next, turn: nextSeat(seat) };
   const w = roundWinner(table, g.vira), result: RoundResult = w === -1 ? -1 : teamOf(w);
   const rounds = [...g.rounds, result], n = rounds.length;
-  const log = [...g.log, ...table.map(p => `${say(p.seat)} jogou ${cardSay(p.card, g.vira)}.`), roundSay(table, w, n, g.vira)];
+  const log = [...g.log, ...table.map(p => `${say(g, p.seat)} jogou ${cardSay(p.card, g.vira)}.`), roundSay(g, table, w, n)];
   const done: Game = { ...next, rounds, table: [], last: { plays: table, winner: w }, log };
   const hw = handWinner(rounds);
   if (hw !== undefined) return endHand(done, hw, g.value, hw === null ? 'As três rodadas empataram.' : `${hw === 0 ? 'Nós levamos' : 'Eles levaram'} a mão.`);
@@ -182,7 +184,7 @@ export function canRaise(g: Game, seat: Seat): boolean {
 export function raise(g: Game, seat: Seat, bluff = false): Game {
   if (!canRaise(g, seat)) return g;
   const value = nextValue(g.value), word = WORD[value];
-  return { ...g, phase: 'truco', ask: bluff ? { by: seat, value, bluff: true } : { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(seat)} pediu ${word}!`] };
+  return { ...g, phase: 'truco', ask: bluff ? { by: seat, value, bluff: true } : { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} pediu ${word}!`] };
 }
 export type Answer = 'accept' | 'run' | 'raise';
 /** The answer to a raise. Accepting makes the hand worth what was asked; running gives the asking pair what the hand
@@ -190,15 +192,15 @@ export type Answer = 'accept' | 'run' | 'raise';
 export function answer(g: Game, a: Answer): Game {
   if (g.phase !== 'truco' || !g.ask) return g;
   const ask = g.ask, seat = responder(ask);
-  if (a === 'accept') return { ...g, phase: 'play', value: ask.value, raisedBy: teamOf(ask.by), ask: null, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(seat)} aceitou. Vale ${ask.value}.`] };
+  if (a === 'accept') return { ...g, phase: 'play', value: ask.value, raisedBy: teamOf(ask.by), ask: null, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(g, seat)} aceitou. Vale ${ask.value}.`] };
   if (a === 'run') {
-    const end = endHand(g, teamOf(ask.by), g.value, `${say(seat)} correu do ${WORD[ask.value]}.`);
+    const end = endHand(g, teamOf(ask.by), g.value, `${say(g, seat)} correu do ${WORD[ask.value]}.`);
     const shown = { seat: ask.by, cards: g.hands[ask.by], bluff: !!ask.bluff };
-    return { ...end, shout: { seat, word: 'corro' }, result: { ...(end.result as NonNullable<Game['result']>), shown }, log: shown.bluff ? [...end.log, `${say(ask.by)} estava blefando!`] : end.log };
+    return { ...end, shout: { seat, word: 'corro' }, result: { ...(end.result as NonNullable<Game['result']>), shown }, log: shown.bluff ? [...end.log, `${say(g, ask.by)} estava blefando!`] : end.log };
   }
   if (a === 'raise' && ask.value < WIN_POINTS) {
     const value = nextValue(ask.value), word = WORD[value];
-    return { ...g, value: ask.value, raisedBy: teamOf(ask.by), ask: { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(seat)} aceitou e pediu ${word}!`] };
+    return { ...g, value: ask.value, raisedBy: teamOf(ask.by), ask: { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
   }
   return g;
 }

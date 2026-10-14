@@ -1,6 +1,6 @@
 # Truco
 
-Truco paulista no celular: você e a Cida (IA) contra Biu e Toinho (IAs), com três níveis, blefe, modo de treino para enxergar manilha e desempate na hora, e um assistente para partidas de verdade (a vira e as cartas por toque ou por voz). A ideia é ser a bicicleta com rodinhas: treinar aqui e tirar as rodinhas na mesa de verdade.
+Truco paulista no celular: você e uma dupla de IA contra duas IAs, com os nomes e as cores do seu time da Série A, com três níveis, blefe, modo de treino para enxergar manilha e desempate na hora, e um assistente para partidas de verdade (a vira e as cartas por toque ou por voz). A ideia é ser a bicicleta com rodinhas: treinar aqui e tirar as rodinhas na mesa de verdade.
 
 Idioma da interface: português do Brasil, informal. Comentários no código: inglês.
 
@@ -64,12 +64,14 @@ O que cada peça do harness cobre:
 9. Três níveis de IA (`LEVELS`), escolhidos antes da partida: fácil (um terço das vezes joga qualquer carta, pede pouco, blefa pouco e cai em blefe), médio (regras de bar: abre forte, ganha com a carta mais barata, joga a pior quando o parceiro já tem, pede com mão boa, blefa de vez em quando), difícil (lembra de cada carta jogada na mão, sabe quando uma carta não perde mais, guarda a garantida, cobre o parceiro, blefa mais e onde funciona, paga blefe).
 10. Blefe: as IAs pedem com mão fraca às vezes. Quando a outra dupla corre, quem pediu mostra as cartas, e o app diz "Era blefe!" quando era.
 11. Rodinhas (`S.hints`, ligadas por padrão): marcam as manilhas e o lugar de cada carta no ranking, mostram quem está levando a rodada, explicam por que a rodada foi ganha (manilha, naipe ou sequência) e deixam o ranking da vira à mão. Sem rodinhas, a tela é a da mesa.
-12. A Cida cochicha o que faria quando pedem truco para vocês.
+12. A sua dupla (a Cida, ou o craque do seu time) cochicha o que faria quando pedem truco para vocês.
 13. Treino: "Qual é a manilha?" (vira → valor) e "Quem ganha a rodada?" (4 cartas na mesa, com muitos duelos de manilha e cangadas), com a explicação depois de cada resposta, acertos e melhor sequência guardados.
 14. Ranking e glossário: escolhida uma vira, todas as cartas da mais forte para a mais fraca; os termos da mesa (vira, manilha, zap, copas, espadilha, picafumo, cangar, mão de onze, mão de ferro, pé e mão, blefe).
 15. Mesa real: a pessoa diz a vira, as cartas dela e o que cai na mesa, por toque (uma grade com as 40 cartas, valor por naipe) ou por voz ("vira sete de copas", "minha mão zap, três de ouros", "mesa dois de paus"). O app mostra a manilha, o lugar de cada carta, quantas cartas ainda por aí ganham de cada uma (zero: garantida), a mais forte da mesa e a carta mais barata que leva. "Fim da rodada" tira da conta as cartas que já saíram.
 16. A partida, os acertos do treino, o placar de vitórias e a mesa real ficam guardados no aparelho; dá para encerrar a partida no meio (dois toques).
 17. Som e vibração (`S.quiet` desliga os dois): carta batendo, embaralhar, o "TRUCO!", ponto, acerto e erro no treino, fanfarra no fim. Vibra quando pedem truco para você e no fim. Só o Android deixa uma página vibrar.
+18. Seu time: os 20 clubes da Série A 2026 (`TEAMS`, conferidos em `TEAMS_CHECKED`), cada um com as cores e três jogadores, o craque primeiro. Escolhido um time, o craque é a dupla da pessoa e os outros dois são os adversários; o topo do app, o placar "Nós" e a barra do navegador ficam nas cores do clube. Sem time, a mesa de bar (Cida, Biu, Toinho). Os nomes podem ser trocados no app, por time (`S.custom`), e voltam aos do clube com um toque. Nenhum escudo ou logotipo é desenhado: só o nome e as cores.
+19. Modo rivais: a pessoa e o craque do time dela contra os dois primeiros nomes de outro clube da Série A, escolhido numa grade; o placar "Eles" fica nas cores do rival.
 
 ## Arquitetura
 
@@ -85,6 +87,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 |---|---|
 | `src/core/types.ts` | As formas dos dados: `Game`, `Card`, `Play`, `Phase`, `Ask`, `Shout`, `RealTable`, `AppState`, `Entry`, `Json` |
 | `src/core/game.ts` | As regras (`newGame`, `playCard`, `roundWinner`, `handWinner`, `raise`, `answer`, `decideEleven`, `nextHand`, `whoActs`), a força das cartas (`power`, `manilhaRank`, `ranking`, `suitDuel`), as IAs por nível (`aiCard`, `aiRaise`, `aiAnswer`, `aiEleven`, `aiAct`), o treino (`drill`, `drillOk`) e `seeded`/`shuffle` (o acaso entra como função) |
+| `src/core/teams.ts` | Os clubes da Série A 2026 (`TEAMS`, `TEAMS_CHECKED`), `teamById`, `playersOf` (com os nomes trocados pela pessoa) e `lineup` (quem senta onde, no modo elenco ou rivais) |
 | `src/core/assist.ts` | O assistente da mesa real: `tell`, `untell`, `nextRound`, `advise`, `tableSay` e `hear` (lê o que foi falado) |
 | `src/core/save.ts` | `readGame`, `readReal` e `readState`: lê o que foi guardado, descartando o que não fecha |
 | `src/core/source.ts` | Os leitores da fonte de dados (`normEntry`, `normEntries`). Único lugar que conhece o formato dela |
@@ -94,7 +97,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 
 | Módulo | O que tem |
 |---|---|
-| `src/app/state.ts` | `S` (o que é guardado), `ui` (o que está na tela: exercício, grade de cartas aberta, microfone, tempo fixo das IAs para os testes), gravação no `localStorage` e o tema (`applyTheme`) |
+| `src/app/state.ts` | `S` (o que é guardado), `ui` (o que está na tela: exercício, grade de cartas aberta, microfone, nomes em edição, tempo fixo das IAs para os testes), gravação no `localStorage`, o tema (`applyTheme`) e as cores dos clubes (`applyClub`) |
 | `src/app/format.ts` | `esc` e os acessos ao DOM (`$`, `part`, `valOf`) |
 | `src/app/api.ts` | `getJSON` (toda chamada passa por ele, com tempo máximo) e `loadEntries`. Sem fonte configurada, não chama nada |
 | `src/app/render.ts` | `render` e as telas (início, treino, mesa real com a grade de 40 cartas, partida), a carta desenhada (`face`), o que se mexe (só o que acabou de mudar), `stamp`, `confetti`, `toast`, `lift` |
@@ -117,7 +120,7 @@ Renderização é `innerHTML` a partir do estado. Todo texto que não veio do pr
 
 ### Estado no `localStorage`
 
-`truco.v1`: `{ v: 1, game: Game | null, tally, level, train, real, theme, speed, quiet, hints }`. `tally` são vitórias e derrotas; `level` o nível da próxima partida; `train` acertos, total e melhor sequência do treino; `real` a mesa real em curso. `theme` é `'light'` ou `'dark'` (sem o campo, segue o aparelho); `speed` é `'calma'` ou `'rapida'` (sem o campo, normal); `quiet` é `true` com som e vibração desligados; `hints` é `false` sem rodinhas. A partida inteira fica guardada, inclusive as cartas das IAs: quem abrir as ferramentas do navegador vê tudo. É um jogo para treinar, não um cassino. O que está aberto na tela (`ui`) não é guardado.
+`truco.v1`: `{ v: 1, game: Game | null, tally, level, train, real, theme, speed, quiet, hints, team, rival, custom }`. `team` é o clube da pessoa e `rival` o adversário no modo rivais (sem o campo, modo elenco); `custom` são os nomes trocados, por clube. `tally` são vitórias e derrotas; `level` o nível da próxima partida; `train` acertos, total e melhor sequência do treino; `real` a mesa real em curso. `theme` é `'light'` ou `'dark'` (sem o campo, segue o aparelho); `speed` é `'calma'` ou `'rapida'` (sem o campo, normal); `quiet` é `true` com som e vibração desligados; `hints` é `false` sem rodinhas. A partida inteira fica guardada, inclusive as cartas das IAs: quem abrir as ferramentas do navegador vê tudo. É um jogo para treinar, não um cassino. O que está aberto na tela (`ui`) não é guardado.
 
 ## Fonte de dados
 
@@ -160,7 +163,7 @@ Os casos do núcleo ficam em `tests/unit.cases.mjs`. Regra nova entra ali primei
 
 **Cobertura:** com `APP_COVERAGE=1` (o `verify.sh` completo liga sozinho), cada suíte grava quais funções e trechos do script de `dist/index.html` executou. `python3 tests/cov.py` junta tudo e falha abaixo de 95% das funções e 90% do código. Teste que recarrega a página usa `cov.reload(pg)` em vez de `pg.reload()`.
 
-`e2e.py` abre a página num tamanho de celular, com a rede bloqueada, e joga pela tela: troca tema, rodinhas, velocidade, som e nível, faz exercícios do treino (certo e errado), usa o ranking do glossário, monta uma mesa real pela grade de 40 cartas, e joga partidas com as cartas empilhadas por `window.__APP.S` (dado inventado de teste): rodada ganha no naipe, cangada, truco aceito, truco corrido com "Era blefe!", seis pedido de volta, mão de onze jogada e corrida, mão de ferro às cegas, fim de jogo com resumo e confete, encerrar no meio. Confere que a partida volta depois de recarregar, que nada passa da largura da tela e que não há erro de script. Capturas em `tests/shots/`.
+`e2e.py` abre a página num tamanho de celular, com a rede bloqueada, e joga pela tela: escolhe o time (cores no topo, nomes na mesa, nomes trocados aparecendo como texto, modo rivais com a cor do rival), troca tema, rodinhas, velocidade, som e nível, faz exercícios do treino (certo e errado), usa o ranking do glossário, monta uma mesa real pela grade de 40 cartas, e joga partidas com as cartas empilhadas por `window.__APP.S` (dado inventado de teste): rodada ganha no naipe, cangada, truco aceito, truco corrido com "Era blefe!", seis pedido de volta, mão de onze jogada e corrida, mão de ferro às cegas, fim de jogo com resumo e confete, encerrar no meio. Confere que a partida volta depois de recarregar, que nada passa da largura da tela e que não há erro de script. Capturas em `tests/shots/`.
 
 `pwa.py` publica o build e depois uma "versão seguinte" e confere: a página fica guardada, a primeira instalação não anuncia nada, o app abre com o site fora do ar, a versão nova é anunciada, o app em uso só troca depois do toque, a cópia antiga é apagada, publicar de novo sem mudar o app não avisa, e fechar e abrir de novo entra na versão que esperava. O build precisa estar num repositório git, porque a tela mostra o commit.
 

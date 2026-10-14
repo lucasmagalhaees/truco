@@ -1,7 +1,7 @@
 {
   "name": "truco",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Truco paulista contra três IAs, com níveis, blefe, treino e assistente para a mesa real.",
   "type": "module",
   "engines": {

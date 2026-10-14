@@ -2,6 +2,12 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). Versões: [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.2.0]
+
+### Adicionado
+- Seu time: os 20 clubes da Série A 2026 com as cores e três jogadores; o craque vira sua dupla e o app fica nas cores do clube. Os nomes podem ser trocados.
+- Modo rivais: você e o craque do seu time contra os dois principais de outro clube.
+
 ## [0.1.0]
 
 ### Adicionado

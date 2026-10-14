@@ -19,10 +19,10 @@ export function setS(next: AppState): void { S = next; }
  *  `drill` the training question on screen and `picked` the answer given to it (null: not answered yet); `streak` right
  *  answers in a row; `vira` the vira chosen in the ranking of the glossary; `wait` a fixed thinking time for the
  *  computer players, in ms, that only the tests set (null: the one of the chosen speed). */
-export interface Ui { confirmEnd: boolean; busy: boolean; drill: Drill | null; picked: string | null; streak: number; vira: string; wait: number | null; real: boolean; sheet: Target | null; heard: string; listening: boolean }
-/** `real` the real-table assistant on screen; `sheet` where the card picked in the grid of 40 goes (null: closed);
+export interface Ui { editing: boolean; confirmEnd: boolean; busy: boolean; drill: Drill | null; picked: string | null; streak: number; vira: string; wait: number | null; real: boolean; sheet: Target | null; heard: string; listening: boolean }
+/** `editing` the names of the club's players open for changing; `real` the real-table assistant on screen; `sheet` where the card picked in the grid of 40 goes (null: closed);
  *  `heard` the last words the microphone understood; `listening` the microphone is on. */
-export const ui: Ui = { confirmEnd: false, busy: false, drill: null, picked: null, streak: 0, vira: '7o', wait: null, real: false, sheet: null, heard: '', listening: false };
+export const ui: Ui = { editing: false, confirmEnd: false, busy: false, drill: null, picked: null, streak: 0, vira: '7o', wait: null, real: false, sheet: null, heard: '', listening: false };
 
 /** The theme: the device's, unless one was chosen. The choice goes on <html> and into the colour of the browser bars. */
 export function applyTheme(): void {
@@ -30,5 +30,15 @@ export function applyTheme(): void {
   if (t) root.dataset.theme = t; else delete root.dataset.theme;
   const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name=theme-color]')) m.content = dark ? '#0b1a12' : '#14532d';
+}
+/** The colours of the clubs: the person's on the masthead and on "Nós", the rival's on "Eles". During a game, the clubs
+ *  of that game; otherwise, the ones chosen. Without a club, the bar table's own colours. */
+export function applyClub(): void {
+  const sides = S.game ? S.game.sides : [S.team ?? null, S.rival ?? null], root = document.documentElement.style;
+  const mine = Core.teamById(sides[0]), theirs = Core.teamById(sides[1]);
+  const set = (k: string, v: string | undefined): void => { if (v) root.setProperty(k, v); else root.removeProperty(k); };
+  set('--club', mine?.colors[0]); set('--club2', mine?.colors[1]); set('--club-ink', mine?.colors[2]);
+  set('--rival', theirs?.colors[0]); set('--rival-ink', theirs?.colors[2]);
+  if (mine) for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name=theme-color]')) m.content = mine.colors[0];
 }
 applyTheme();
