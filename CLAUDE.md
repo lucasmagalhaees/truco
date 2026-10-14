@@ -169,7 +169,7 @@ Os casos do núcleo ficam em `tests/unit.cases.mjs`. Regra nova entra ali primei
 
 ## Publicação
 
-Deploy contínuo pela integração da Vercel com o GitHub: cada PR ganha uma URL de prévia e cada merge na `main` publica em produção, em https://truco-ia.vercel.app (o endereço só existe depois de importar o repositório na Vercel; se a Vercel der outro, troque aqui e em `scripts/check_production.py`, ou defina `APP_PROD_URL`). O `vercel.json` manda a Vercel fazer o mesmo que o `verify.sh` e o CI fazem: `npm ci`, `npm run build`, publicar `dist/`. Sem ele, a Vercel pode escolher sozinha outro preset e procurar arquivos que não existem. O `.vercelignore` deixa de fora o que o build não lê.
+Deploy contínuo pela integração da Vercel com o GitHub: cada PR ganha uma URL de prévia e cada merge na `main` publica em produção, em https://turco-six.vercel.app (se mudar, troque aqui e em `scripts/check_production.py`, ou defina `APP_PROD_URL`). O `vercel.json` manda a Vercel fazer o mesmo que o `verify.sh` e o CI fazem: `npm ci`, `npm run build`, publicar `dist/`. Sem ele, a Vercel pode escolher sozinha outro preset e procurar arquivos que não existem. O `.vercelignore` deixa de fora o que o build não lê.
 
 O build grava o commit em `<meta name="app-commit">`. Na Vercel ele vem da variável `VERCEL_GIT_COMMIT_SHA`; fora dela, do `git`.
 
@@ -178,7 +178,7 @@ A Vercel publica o que chegar na `main` sem olhar o CI. Quem garante que só ent
 **Merges em sequência podem deixar a produção numa versão antiga:** a Vercel faz um deploy por merge, e se o mais antigo termina por último ele fica com o endereço de produção. Por isso:
 
 - Mesclar um PR por vez e esperar o deploy, ou mesclar só o último quando um PR já contém os anteriores.
-- O workflow `Produção` roda `scripts/check_production.py` depois de cada push na `main`: espera a produção mostrar o carimbo do commit que entrou e **continua olhando por 5 min**. Falhou: na Vercel, promover o deploy do commit mais recente da `main`, ou fazer um novo merge. O endereço vem da variável `APP_PROD_URL` do repositório (Settings → Secrets and variables → Actions → Variables), com https://truco-ia.vercel.app como padrão. Se o endereço servir outro site (página sem carimbo) ou pedir login da Vercel, o script diz isso com todas as letras em vez de só esperar.
+- O workflow `Produção` roda `scripts/check_production.py` depois de cada push na `main`: espera a produção mostrar o carimbo do commit que entrou e **continua olhando por 5 min**. Falhou: na Vercel, promover o deploy do commit mais recente da `main`, ou fazer um novo merge. O endereço vem da variável `APP_PROD_URL` do repositório (Settings → Secrets and variables → Actions → Variables), com https://turco-six.vercel.app como padrão. Se o endereço servir outro site (página sem carimbo) ou pedir login da Vercel, o script diz isso com todas as letras em vez de só esperar.
 - Em PR o mesmo script só informa qual commit a produção está servindo (`--report`) e nunca falha. `--selftest` testa o script contra um servidor local e roda no `verify.sh`.
 
 **Publicar não troca o app de quem já abriu.** O aparelho mostra a cópia guardada até a pessoa tocar em "Atualizar agora".

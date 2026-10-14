@@ -17,7 +17,7 @@ Modelo de uma decisão:
 
 - **Contexto (14/10/2026):** "consegue fazer um app de truco, eu + 3 jogadores de IA", com a pasta do modelo (`modelo-app-mvp`) e depois: "aqui tem um jogo de cartas c varias ideias q vc pode aproveitar: https://github.com/lucasmagalhaees/secret-game … tem animacoes, e mts ideias bacanas".
 - **Decisão:** o projeto é uma cópia do secret-game (a versão mais nova do modelo, com som, vibração, animações só no que mudou, resumo no fim) trocando o jogo. Mesma arquitetura: página estática, núcleo puro em `src/core/`, página em `src/app/`, o mesmo harness de testes, deploy na Vercel. O primeiro commit foi direto na `main` porque o repositório estava vazio ("comita ai https://github.com/lucasmagalhaees/truco", "pode comitar assim que der"); daqui em diante, branch e PR.
-- **Não sei:** o endereço que a Vercel vai dar; o padrão `https://truco-ia.vercel.app` é um palpite até a importação.
+- **Endereço de produção (14/10/2026):** https://turco-six.vercel.app, o que a Vercel deu na importação; conferido servindo o merge do PR #1 (`fa495e3`).
 
 ## D2. Truco paulista, quatro jogadores
 
@@ -67,5 +67,4 @@ Modelo de uma decisão:
 
 | Pendência | Quem resolve |
 |---|---|
-| Importar o repositório na Vercel e conferir o endereço de produção | Dono do repositório |
 | Proteger a `main` exigindo PR e os checks do CI | Dono do repositório |

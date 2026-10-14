@@ -20,7 +20,7 @@ Para rodar: `npm install` e `npm run dev`. Para testar tudo: `scripts/verify.sh`
 ## Publicar na Vercel
 
 1. Em vercel.com: **Add New → Project → Import** o repositório `truco`. O `vercel.json` já diz o que fazer (`npm ci`, `npm run build`, publicar `dist/`); não precisa mexer em nada.
-2. Se o endereço de produção não for `https://truco-ia.vercel.app`, defina a variável `APP_PROD_URL` no GitHub (Settings → Secrets and variables → Actions → Variables) com o endereço que a Vercel deu.
+2. Produção: https://turco-six.vercel.app. Se mudar, defina a variável `APP_PROD_URL` no GitHub (Settings → Secrets and variables → Actions → Variables) com o endereço que a Vercel deu.
 3. No GitHub, proteja a `main`: exigir PR e os checks `checks`, `e2e (dark)` e `e2e (light)`. A Vercel publica o que chega na `main` sem olhar o CI; é essa proteção que segura código não testado.
 
 ## Estrutura
