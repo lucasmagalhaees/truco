@@ -1,0 +1,181 @@
+// The cases of the pure core, in one file. Two runners use them: tests/unit.py, in the browser, against the page that
+// ships (window.__APP.Core), and tests/core.mjs, in Node, against src/core built by itself. Plain JavaScript on purpose:
+// many cases pass data on purpose that the compiler would refuse. A new rule of the core gets its case here first.
+export default function cases(Core) {
+  const fails = []; let n = 0;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const eq = (name, got, want) => { n++; if (!same(got, want)) fails.push(`${name}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`); };
+  const rand = Core.seeded(42);
+  const never = () => 0.99, always = () => 0;            // chance that never / always fires (bluffs, random cards)
+
+  /* chance */
+  const r1 = Core.seeded(7), r2 = Core.seeded(7), xs = [r1(), r1(), r1()];
+  eq('seeded: the same seed gives the same numbers, all in [0, 1)', [same(xs, [r2(), r2(), r2()]), xs.every(x => x >= 0 && x < 1)], [true, true]);
+  const sh = Core.shuffle([1, 2, 3, 4, 5], Core.seeded(1));
+  eq('shuffle: a copy with the same things', [[...sh].sort(), sh.length], [[1, 2, 3, 4, 5], 5]);
+
+  /* the cards */
+  const d = Core.deck();
+  eq('deck: 40 cards, no 8, 9 or 10, all different', [d.length, new Set(d).size, d.some(c => /^[89T]/.test(c))], [40, 40, false]);
+  eq('the manilha is the rank after the vira; after the 3 comes the 4', ['4o', '7c', 'Qe', 'Jp', 'Ko', 'Ac', '2e', '3p'].map(Core.manilhaRank), ['5', 'Q', 'J', 'K', 'A', '2', '3', '4']);
+  eq('sequence without manilha: 4 5 6 7 Q J K A 2 3', ['4o', '5o', '6o', '7o', 'Qo', 'Jo', 'Ko', 'Ao', '2o', '3o'].map(c => Core.power(c, '3e')).slice(1), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  eq('manilhas by suit, rising: ouros < espadas < copas < paus (zap)', ['5o', '5e', '5c', '5p'].map(c => Core.power(c, '4c')), [10, 11, 12, 13]);
+  eq('the weakest manilha beats a 3', Core.power('5o', '4p') > Core.power('3p', '4p'), true);
+  eq('suit does not matter for a common card', Core.power('3o', '7c') === Core.power('3p', '7c'), true);
+  eq('card names, and manilhas with their nickname', [Core.cardName('Qe'), Core.cardName('Ac'), Core.cardSay('5p', '4o'), Core.cardSay('5o', '4o'), Core.cardSay('5e', '4o'), Core.cardSay('5c', '4o'), Core.cardSay('6c', '4o')], ['dama de espadas', 'ás de copas', '5 de paus (zap)', '5 de ouros (picafumo)', '5 de espadas (espadilha)', '5 de copas (copas)', '6 de copas']);
+  const rk = Core.ranking('7c');
+  eq('ranking with vira 7: the four Q manilhas by suit, then 3 2 A K J 7 6 5 4', [rk.length, rk.slice(0, 4).map(r => r.cards[0]), rk.slice(4).map(r => r.rank), rk.slice(4).every(r => r.cards.length === 4)], [13, ['Qp', 'Qc', 'Qe', 'Qo'], ['3', '2', 'A', 'K', 'J', '7', '6', '5', '4'], true]);
+  eq('ranking with vira 3: the 4s are manilhas', Core.ranking('3o').slice(0, 4).map(r => r.cards[0]), ['4p', '4c', '4e', '4o']);
+
+  /* rounds */
+  const P = (...cs) => cs.map((card, seat) => ({ seat, card }));
+  eq('round: the strongest card takes it', Core.roundWinner(P('4o', '3e', 'Ko', '2c'), '7o'), 1);
+  eq('round: a manilha beats any 3', Core.roundWinner(P('3o', '3e', 'Qo', '3c'), '7o'), 2);
+  eq('round: manilha against manilha, the suit decides (zap > copas > espadilha > picafumo)', [Core.roundWinner(P('Qo', 'Qe', '3o', '4o'), '7c'), Core.roundWinner(P('Qc', 'Qp', '3o', '4o'), '7c'), Core.roundWinner(P('Qc', 'Qe', 'Qo', '4o'), '7c'), Core.roundWinner(P('4o', 'Qo', '3o', 'Qe'), '7c')], [1, 1, 0, 3]);
+  eq('suitDuel: the manilhas that met, strongest first', [Core.suitDuel(P('Qo', 'Qp', 'Qe', '3c'), '7c'), Core.suitDuel(P('Qo', '3p', '2e', '3c'), '7c')], [['Qp', 'Qe', 'Qo'], []]);
+  eq('round: equal top cards of the two pairs tie (cangou)', Core.roundWinner(P('3o', '3e', 'Ko', '2c'), '7o'), -1);
+  eq('round: equal top cards of the same pair are that pair\'s', Core.roundWinner(P('3o', 'Ke', '3c', '2c'), '7o'), 0);
+  /* the hand, from its rounds */
+  eq('hand: two rounds win it', [Core.handWinner([0, 0]), Core.handWinner([1, 0, 1]), Core.handWinner([0])], [0, 1, undefined]);
+  eq('hand: tie in the 1st, the 2nd decides', [Core.handWinner([-1, 1]), Core.handWinner([-1, 0])], [1, 0]);
+  eq('hand: tie in the 2nd, whoever took the 1st', [Core.handWinner([0, -1]), Core.handWinner([1, -1])], [0, 1]);
+  eq('hand: 1-1 and a tie in the 3rd, whoever took the 1st', [Core.handWinner([1, 0, -1]), Core.handWinner([0, 1, -1])], [1, 0]);
+  eq('hand: two ties, the 3rd decides; three ties, nobody', [Core.handWinner([-1, -1]), Core.handWinner([-1, -1, 1]), Core.handWinner([-1, -1, -1])], [undefined, 1, null]);
+  eq('hand: 1-1 goes to the 3rd round', [Core.handWinner([0, 1]), Core.handWinner([0, 1, 1])], [undefined, 1]);
+
+  /* a game */
+  const g0 = Core.newGame(Core.seeded(3), 'medio');
+  eq('new game: 3 cards each, a vira, no repeats, nobody scored, worth 1', [g0.hands.map(h => h.length), new Set([...g0.hands.flat(), g0.vira]).size, g0.score, g0.value, g0.phase, g0.n, g0.turn === (g0.dealer + 1) % 4, g0.level, g0.blind], [[3, 3, 3, 3], 13, [0, 0], 1, 'play', 1, true, 'medio', false]);
+  eq('new game: an unknown level reads as médio', Core.newGame(rand, 'god').level, 'medio');
+  // a stacked hand: you lead; vira 4o, so the 5s are manilhas
+  const base = { ...g0, vira: '4o', dealer: 3, starter: 0, turn: 0, hands: [['5p', '3o', '4c'], ['5c', '2o', '6e'], ['Ke', 'Ac', '7o'], ['Jo', 'Qe', '6c']], table: [], rounds: [], played: [], log: [] };
+  eq('play: only on your turn, only a card you hold', [Core.playCard(base, 1, 0) === base, Core.playCard(base, 0, 3) === base, Core.playCard({ ...base, phase: 'truco' }, 0, 0).phase], [true, true, 'truco']);
+  let h = Core.playCard(base, 0, 1);                    // 3o
+  eq('play: the card goes to the table, the turn moves on', [h.table, h.hands[0], h.turn, h.played], [[{ seat: 0, card: '3o' }], ['5p', '4c'], 1, ['3o']]);
+  h = Core.playCard(h, 1, 1); h = Core.playCard(h, 2, 0); h = Core.playCard(h, 3, 0);    // 2o Ke Jo: 3o takes it
+  eq('fourth card: the round is decided, its winner leads', [h.rounds, h.table, h.last.winner, h.turn, h.starter], [[0], [], 0, 0, 0]);
+  h = Core.playCard(h, 0, 0); h = Core.playCard(h, 1, 0);             // 5p (zap) vs 5c (copas)
+  eq('during a round: who is on top', Core.roundWinner(h.table, h.vira), 0);
+  h = Core.playCard(h, 2, 0); h = Core.playCard(h, 3, 0);
+  eq('two rounds: the hand ends, worth 1', [h.phase, h.score, h.result.team, h.result.points, h.hist.length, h.hist[0].points], ['handEnd', [1, 0], 0, 1, 1, 1]);
+  eq('the log says the suit decided', h.log.some(l => l.includes('zap') && l.includes('ganha no naipe')), true);
+  const nx = Core.nextHand(h, rand);
+  eq('next hand: the next dealer, fresh cards, the score kept', [nx.dealer, nx.n, nx.score, nx.played, nx.rounds, nx.value, Core.nextHand(base, rand) === base], [0, 2, [1, 0], [], [], 1, true]);
+  // a tie leads again from the same starter
+  let t = { ...base, hands: [['3o', '4e', '4c'], ['3e', '5e', '6e'], ['Ke', 'Ac', '7o'], ['Jo', 'Qe', '6c']] };
+  t = [[0, 0], [1, 0], [2, 0], [3, 0]].reduce((x, [s, k]) => Core.playCard(x, s, k), t);
+  eq('a tied round: the one who led it leads again', [t.rounds, t.last.winner, t.turn], [[-1], -1, 0]);
+
+  /* raises */
+  eq('truco: on your turn, before playing', [Core.canRaise(base, 0), Core.canRaise(base, 1), Core.canRaise({ ...base, raisedBy: 0 }, 0), Core.canRaise({ ...base, value: 12 }, 0), Core.canRaise({ ...base, score: [11, 3] }, 0), Core.raise(base, 1) === base], [true, false, false, false, false, true]);
+  const tr = Core.raise(base, 0);
+  eq('truco asked: worth 3 if accepted; Biu answers for them', [tr.phase, tr.ask, Core.whoActs(tr), tr.shout], ['truco', { by: 0, value: 3 }, 1, { seat: 0, word: 'truco' }]);
+  const acc = Core.answer(tr, 'accept');
+  eq('accepted: worth 3, your turn again, only they may raise now', [acc.phase, acc.value, acc.raisedBy, acc.turn, Core.canRaise(acc, 0)], ['play', 3, 0, 0, false]);
+  const run = Core.answer(tr, 'run');
+  eq('ran: you take what the hand was worth before', [run.phase, run.score, run.result.points, run.result.shown.seat, run.result.shown.bluff], ['handEnd', [1, 0], 1, 0, false]);
+  const six = Core.answer(tr, 'raise');
+  eq('raised to seis: worth 3 already, you answer now', [six.value, six.ask, Core.whoActs(six), six.shout.word, six.raisedBy], [3, { by: 1, value: 6 }, 0, 'seis', 0]);
+  eq('ran from seis: they take 3', Core.answer(six, 'run').score, [0, 3]);
+  const nove = Core.answer(six, 'raise'), doze = Core.answer(Core.answer(nove, 'raise'), 'accept');
+  eq('nove, doze, and no raise above 12', [nove.ask.value, doze.value, Core.answer({ ...doze, phase: 'truco', ask: { by: 0, value: 12 } }, 'raise').ask.value, Core.answer(base, 'accept') === base], [9, 12, 12, true]);
+  eq('the partner of the asker never answers: the other pair does', Core.whoActs(Core.raise({ ...base, turn: 2 }, 2)), 3);
+  eq('a bluff is remembered, and shown when the others run', [Core.raise({ ...base, turn: 1 }, 1, true).ask.bluff, Core.answer(Core.raise({ ...base, turn: 1 }, 1, true), 'run').result.shown], [true, { seat: 1, cards: ['5c', '2o', '6e'], bluff: true }]);
+
+  /* eleven and iron */
+  const at11 = Core.nextHand({ ...h, score: [11, 4] }, Core.seeded(5));
+  eq('mão de onze: the pair with 11 decides first; no truco', [at11.phase, at11.eleven, Core.whoActs(at11), Core.canRaise({ ...at11, phase: 'play' }, at11.turn)], ['eleven', 0, 0, false]);
+  const play11 = Core.decideEleven(at11, true), run11 = Core.decideEleven(at11, false);
+  eq('mão de onze: played it is worth 3; run from, the others get 1', [play11.phase, play11.value, run11.score, run11.phase, Core.decideEleven(base, true) === base], ['play', 3, [11, 5], 'handEnd', true]);
+  const them11 = Core.nextHand({ ...h, score: [2, 11] }, Core.seeded(5));
+  eq('mão de onze for them: Biu decides', [them11.eleven, Core.whoActs(them11)], [1, 1]);
+  const iron = Core.nextHand({ ...h, score: [11, 11] }, Core.seeded(5));
+  eq('mão de ferro: both with 11, blind, worth 1, no truco, and it ends the game', [iron.phase, iron.blind, iron.value, iron.eleven, Core.canRaise(iron, iron.turn)], ['play', true, 1, null, false]);
+  const ironEnd = Core.playCard(Core.playCard({ ...iron, rounds: [0], turn: 0, starter: 0, table: [{ seat: 2, card: iron.hands[2][0] }, { seat: 3, card: iron.hands[3][0] }].slice(0, 0) }, 0, 0), 1, 0);
+  eq('mão de ferro: cards still go down one by one', ironEnd.table.length, 2);
+  const win = { ...base, score: [10, 4], value: 3, rounds: [0], hands: [['3o'], ['4e'], ['5o'], ['6e']] };
+  const won = [0, 1, 2, 3].reduce((x, s) => Core.playCard(x, s, 0), win);
+  eq('12 points end the game; the score stops at 12', [won.phase, won.winner, won.score, Core.whoActs(won), Core.nextHand(won, rand) === won], ['over', 0, [12, 4], null, true]);
+  const allTie = [0, 1, 2, 3].reduce((x, s) => Core.playCard(x, s, 0), { ...base, rounds: [-1, -1], hands: [['3o'], ['3e'], ['4c'], ['4p']] });
+  eq('three tied rounds: nobody scores', [allTie.phase, allTie.score, allTie.result.team], ['handEnd', [0, 0], null]);
+
+  /* the computer players */
+  const ai = (hands, extra = {}) => ({ ...base, hands, turn: 1, starter: 1, ...extra });
+  eq('AI leads its best card in the first round', Core.aiCard(ai([[], ['4e', '3e', 'Ke'], [], []]), 1, never), 1);
+  eq('AI keeps a manilha back when its second card is strong too', Core.aiCard(ai([[], ['4e', '5p', '3e'], [], []]), 1, never), 2);
+  eq('AI takes the round with its cheapest winning card', Core.aiCard(ai([[], ['3e', 'Ke', 'Ae'], [], []], { table: [{ seat: 0, card: 'Jc' }] }), 1, never), 1);
+  eq('AI throws its weakest when it cannot win, or when the partner has it', [Core.aiCard(ai([[], ['6e', '7e', 'Qe'], [], []], { table: [{ seat: 0, card: '3c' }] }), 1, never), Core.aiCard({ ...ai([[], [], [], ['3e', '6e', 'Ke']]), turn: 3, table: [{ seat: 0, card: 'Jc' }, { seat: 1, card: '3c' }, { seat: 2, card: '4c' }] }, 3, never)], [0, 1]);
+  const hardCover = { ...base, level: 'dificil', turn: 2, table: [{ seat: 0, card: 'Ko' }, { seat: 1, card: '7e' }], hands: [[], [], ['6e', 'Ae', '2e'], []] };
+  eq('hard AI covers its partner when an opponent still plays; médio throws low', [Core.aiCard(hardCover, 2, never), Core.aiCard({ ...hardCover, level: 'medio', hands: [[], [], ['6e', 'Ae', '2e'], []] }, 2, never)], [1, 0]);
+  eq('easy AI sometimes plays any card; blind play is always any card', [Core.aiCard({ ...ai([[], ['4e', '3e', 'Ke'], [], []]), level: 'facil' }, 1, always), Core.aiCard({ ...ai([[], ['4e', '3e', 'Ke'], [], []]), blind: true }, 1, always)], [0, 0]);
+  const strong = ai([[], ['5p', '5c', '3e'], [], []]), weak = ai([[], ['4e', '6o', '7e'], [], []]);
+  eq('AI raises with a strong hand, not with a weak one; bluffs when chance says so', [Core.aiRaise(strong, 1, never), Core.aiRaise(weak, 1, never), Core.aiRaise(weak, 1, always), Core.aiRaise({ ...weak, raisedBy: 1 }, 1, always)], ['yes', 'no', 'bluff', 'no']);
+  const sureWin = { ...base, rounds: [1], turn: 3, starter: 0, table: [{ seat: 0, card: '4e' }, { seat: 1, card: '6o' }, { seat: 2, card: 'Qe' }], hands: [[], [], [], ['Ke', '4o']] };
+  eq('AI raises when the hand is surely its own (last to play, a card that takes it, a round in the pocket)', Core.aiRaise(sureWin, 3, never), 'yes');
+  const asked = (hand, value = 3, level = 'medio') => ({ ...base, level, phase: 'truco', ask: { by: 0, value }, hands: [[], hand, [], []] });
+  eq('AI answers: raises with a monster, accepts a good hand, runs a bad one', [Core.aiAnswer(asked(['5p', '5c', '3e']), 1), Core.aiAnswer(asked(['3e', '2e', 'Ke']), 1), Core.aiAnswer(asked(['4e', '6o', '7e']), 1, never), Core.aiAnswer(asked(['4e', '6o', '7e']), 1, always)], ['raise', 'accept', 'run', 'accept']);
+  eq('easy AI never raises back', Core.aiAnswer(asked(['5p', '5c', '3e'], 3, 'facil'), 1), 'accept');
+  eq('hard AI counts a sure card', [Core.aiAnswer(asked(['5p', '6o', '7e'], 9, 'dificil'), 1, never), Core.aiAnswer(asked(['5p', '6o', '7e'], 9, 'medio'), 1, never)], ['accept', 'run']);
+  eq('cards not seen: 40 minus its hand, the vira and what was played', [Core.unseen({ ...base, played: ['2o'] }, 0).length, Core.sure(base, 0, '5p'), Core.sure(base, 0, '3o')], [35, true, false]);
+  eq('strength and weight: the zap is worth most', [Core.weight('5p', '4o'), Core.weight('4e', '4o'), Core.strength(['5p', '3o'], '4o')], [5, 0.2, 8]);
+  eq('AI plays a hand of eleven only when both hands are strong', [Core.aiEleven({ ...base, hands: [[], ['5p', '3o', '3e'], [], ['2o', '5c', 'Ae']] }, 1), Core.aiEleven({ ...base, hands: [[], ['4e', '6o', '7e'], [], ['4c', '6p', 'Qe']] }, 1)], [true, false]);
+  eq('aiAct: nothing when it is the person\'s move or nobody\'s', [Core.aiAct(base, rand) === base, Core.aiAct(h, rand) === h], [true, true]);
+  eq('aiAct: plays, answers, decides', [Core.aiAct(ai([[], ['4e', '3e', 'Ke'], [], []]), never).table.length, Core.aiAct({ ...Core.raise(base, 0), hands: [[], ['5p', '5c', '3e'], [], []] }, never).ask.value, Core.aiAct({ ...them11 }, never).phase !== 'eleven'], [1, 6, true]);
+  eq('aiAct: raises with a strong hand, bluff flagged', [Core.aiAct(strong, never).phase, Core.aiAct(weak, always).ask.bluff], ['truco', true]);
+  // whole games between computer players end, at every level
+  for (const level of Core.LEVELS) {
+    const rr = Core.seeded(11); let g = Core.newGame(rr, level), k = 0;
+    while (g.phase !== 'over' && k < 3000) { k++; const who = Core.whoActs(g); g = who === null ? Core.nextHand(g, rr) : who === 0 ? (g.phase === 'eleven' ? Core.decideEleven(g, true) : g.phase === 'truco' ? Core.answer(g, 'accept') : Core.playCard(g, 0, 0)) : Core.aiAct(g, rr); }
+    eq(`a whole game at ${level} ends with a winner at 12`, [g.phase, Math.max(...g.score), g.hist.length > 0, !!Core.readGame(JSON.parse(JSON.stringify(g)))], ['over', 12, true, true]);
+  }
+
+  /* training */
+  const dm = Core.drill('manilha', Core.seeded(9));
+  eq('drill manilha: four options, the answer among them, the answer is the manilha', [dm.options.length, dm.options.includes(dm.answer), dm.answer === Core.manilhaRank(dm.vira), Core.drillOk(dm, dm.answer), Core.drillOk(dm, 'x')], [4, true, true, true, false]);
+  let duels = 0, ties = 0, ok = true;
+  for (let s = 1; s <= 200; s++) {
+    const dr = Core.drill('round', Core.seeded(s)), w = Core.roundWinner(dr.plays, dr.vira);
+    ok = ok && dr.plays.length === 4 && new Set(dr.plays.map(p => p.card)).size === 4 && !dr.plays.some(p => p.card === dr.vira) && dr.answer === (w === -1 ? 'empate' : dr.plays[w].card) && dr.options.includes(dr.answer) && dr.why.length > 10;
+    if (Core.suitDuel(dr.plays, dr.vira).length) duels++;
+    if (w === -1) ties++;
+  }
+  eq('drill round: 200 drills, each answer right, with many suit duels and some ties', [ok, duels > 60, ties > 20], [true, true, true]);
+
+  /* the real table */
+  let rt = Core.emptyTable();
+  eq('real table: empty, the vira first', [rt.target, Core.tableSay(rt), Core.advise(rt)], ['vira', 'Diga primeiro a vira.', null]);
+  rt = Core.tell(rt, '6o');
+  eq('the vira told, the hand is next', [rt.vira, rt.target, Core.tableSay(rt)], ['6o', 'hand', 'Vira 6 de ouros: manilha é 7.']);
+  rt = ['7p', '3o', 'Ke'].reduce((x, c) => Core.tell(x, c), rt);
+  eq('three cards in the hand, then the table; a fourth is refused; a bad card is ignored', [rt.hand, rt.target, Core.tell(rt, '2c', 'hand') === rt, Core.tell(rt, 'Xx') === rt], [['7p', '3o', 'Ke'], 'table', true, true]);
+  const adv0 = Core.advise(rt);
+  eq('advice: the hand strongest first, with its place, and what still beats it', adv0.cards.map(c => [c.card, c.place, c.manilha, c.beatenBy, c.sure]), [['7p', 1, true, 0, true], ['3o', 5, false, 3, false], ['Ke', 8, false, 14, false]]);
+  rt = Core.tell(Core.tell(rt, '2p'), '7c');
+  const adv1 = Core.advise(rt);
+  eq('advice with cards on the table: the top one, and the cheapest of yours that takes it', [adv1.top, adv1.cheapest, Core.tableSay(rt)], ['7c', '7p', 'Na mesa, a mais forte é 7 de copas (copas).']);
+  eq('advice: a tie when nothing takes it', Core.advise({ vira: '6o', hand: ['3o', '4e'], table: ['3p'], gone: [], target: 'table' }).tie, '3o');
+  eq('two manilhas on the table: the suit', Core.tableSay({ vira: '6o', hand: [], table: ['7o', '7e'], gone: [], target: 'table' }), 'Na mesa, a mais forte é 7 de espadas (espadilha) (ganha no naipe das outras manilhas).');
+  const nr = Core.nextRound({ ...rt, table: ['2p', '7p'] });
+  eq('end of a round: the table goes out of play, your card leaves your hand', [nr.table, nr.gone, nr.hand], [[], ['2p', '7p'], ['3o', 'Ke']]);
+  eq('a card told again moves; untell takes it back', [Core.tell(rt, '3o', 'table').hand, Core.untell(rt, '7c').table, Core.untell(rt, '6o').vira], [['7p', 'Ke'], ['2p'], null]);
+  eq('hearing: cards with "de" or without, rank words and digits, and where they go', Core.hear('Vira sete de copas, minha mão: três de ouros, rei espadas e 2 de paus. Mesa: ás de copas', null, 'vira'), [{ card: '7c', target: 'vira' }, { card: '3o', target: 'hand' }, { card: 'Ke', target: 'hand' }, { card: '2p', target: 'hand' }, { card: 'Ac', target: 'table' }]);
+  eq('hearing: manilhas by nickname need the vira', [Core.hear('zap e espadilha e pica fumo', '7c', 'hand'), Core.hear('zap', null, 'hand')], [[{ card: 'Qp', target: 'hand' }, { card: 'Qe', target: 'hand' }, { card: 'Qo', target: 'hand' }], []]);
+  eq('hearing: the vira said first sets the manilha for the rest', Core.hear('vira três de paus, zap', null, 'vira'), [{ card: '3p', target: 'vira' }, { card: '4p', target: 'hand' }]);
+  eq('hearing: words that are not cards are left out', [Core.hear('as cartas estão boas', null, 'hand'), Core.hear('', null, 'hand'), Core.hear('valete de coração e dama de espada', null, 'table')], [[], [], [{ card: 'Jc', target: 'table' }, { card: 'Qe', target: 'table' }]]);
+
+  /* what is saved */
+  const st = { v: 1, game: h, tally: { w: 2, l: 1 }, level: 'dificil', train: { ok: 3, total: 4, best: 2 }, real: rt, theme: 'dark', speed: 'rapida', quiet: true, hints: false };
+  eq('read state: a saved state comes back as it was', Core.readState(JSON.parse(JSON.stringify(st))), st);
+  const empty = { v: 1, game: null, tally: { w: 0, l: 0 }, level: 'medio', train: { ok: 0, total: 0, best: 0 }, real: Core.emptyTable() };
+  eq('read state: what is not a state reads as an empty one', [null, 'x', 7, { game: 'no' }].map(x => Core.readState(x)), Array(4).fill(empty));
+  eq('read state: unknown settings are dropped, bad numbers read as 0', Core.readState({ level: 'deus', theme: 'pink', speed: 'turbo', quiet: 1, hints: 0, tally: { w: -1, l: 2.5 }, train: { ok: 'a' } }), empty);
+  const broken = [{ ...h, level: 'x' }, { ...h, score: [13, 0] }, { ...h, hands: [['Xx'], [], [], []] }, { ...h, vira: '9o' }, { ...h, phase: 'dance' }, { ...h, value: 2 }, { ...h, phase: 'truco', ask: null }, { ...h, phase: 'eleven', eleven: null }, { ...h, rounds: [0, 0, 0, 0] }, { ...h, table: [{ seat: 7, card: '3o' }] }, { ...h, log: [1] }, { ...h, blind: 'no' }, { ...h, last: { plays: [], winner: 9 } }, { ...h, ask: { by: 9, value: 3 } }, { ...h, shout: { seat: 'x' } }, { ...h, result: { why: 1 } }];
+  eq('read game: what does not hold together is null', broken.map(Core.readGame), broken.map(() => null));
+  eq('read real table: what does not hold together is empty', [Core.readReal({ ...rt, hand: ['3o', '4o', '5o', '6o'] }), Core.readReal({ ...rt, target: 'x' }), Core.readReal(null)], [Core.emptyTable(), Core.emptyTable(), Core.emptyTable()]);
+
+  /* the reader of the source: invented data here; real answers go in tests/fixtures/source/ and through tests/contract.py */
+  eq('source: an entry read', Core.normEntry({ id: 7, name: ' Um ', value: '2.5', extra: true }), { id: '7', name: 'Um', value: 2.5 });
+  eq('source: what is not an entry reads as null', [null, 'x', {}, { id: 1 }, { id: 1, name: 'x', value: 'abc' }, { name: 'x', value: 1 }].map(Core.normEntry), [null, null, null, null, null, null]);
+  eq('source: a list, leaving out what cannot be read', [Core.normEntries({ items: [{ id: 1, name: 'a', value: 1 }, { id: 2 }] }), Core.normEntries({}), Core.normEntries(null)], [[{ id: '1', name: 'a', value: 1 }], [], []]);
+  return { n, fails };
+}
