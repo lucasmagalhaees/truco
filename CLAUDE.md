@@ -14,8 +14,8 @@ Idioma da interface: português do Brasil, informal. Comentários no código: in
 
 ## Escopo: MVP
 
-- Não adicionar backend, login nem banco sem pedido. O app é uma página estática.
-- Uma pessoa contra a máquina, num aparelho: sem partida pela internet.
+- Não adicionar login nem banco sem pedido. O app é uma página estática; o único servidor é o de salas (`server/worker.ts`), para jogar online (D7).
+- Num aparelho, uma pessoa contra a máquina. Online, até 4 pessoas numa sala, cada uma no seu celular, e a máquina nos lugares vazios.
 - Regras do truco paulista (vira e manilha nova), D2.
 - Fora por enquanto: reconhecer carta por foto (precisa de modelo de visão; ver D5), encoberta (jogar carta virada), sinais entre parceiros, outras variantes (mineiro, gaúcho).
 
@@ -72,6 +72,7 @@ O que cada peça do harness cobre:
 17. Som e vibração (`S.quiet` desliga os dois): carta batendo, embaralhar, o "TRUCO!", ponto, acerto e erro no treino, fanfarra no fim. Vibra quando pedem truco para você e no fim. Só o Android deixa uma página vibrar.
 18. Seu time: os 20 clubes da Série A 2026 (`TEAMS`, conferidos em `TEAMS_CHECKED`), cada um com as cores e três jogadores, o craque primeiro. Escolhido um time, o craque é a dupla da pessoa e os outros dois são os adversários; o topo do app, o placar "Nós" e a barra do navegador ficam nas cores do clube. Sem time, a mesa de bar (Cida, Biu, Toinho). Os nomes podem ser trocados no app, por time (`S.custom`), e voltam aos do clube com um toque. Nenhum escudo ou logotipo é desenhado: só o nome e as cores.
 19. Modo rivais: a pessoa e o craque do time dela contra os dois primeiros nomes de outro clube da Série A, escolhido numa grade; o placar "Eles" fica nas cores do rival.
+20. Jogar online (D7): quem cria a sala recebe um código de 5 letras (`CODE_LEN`) e um link para mandar; quem abre o link escreve o nome e entra. Os lugares são tomados na ordem: quem criou, o primeiro a entrar (contra ele), a dupla de quem criou, a dupla do outro; lugar vazio fica com a IA, no nível escolhido por quem criou. Só quem criou começa e recomeça a partida. O servidor guarda a partida inteira e manda para cada celular só a visão daquela pessoa: ela embaixo, a dupla dela como "Nós", nenhuma carta dos outros (`viewFor`). As IAs jogam no servidor, depois de 0,9 s (`ROOM_THINK`), mais 0,7 s depois de uma rodada fechada (`ROOM_ROUND_PAUSE`). Quem cai volta ao mesmo lugar sozinho (o celular guarda a sala e um token); quem sai de vez pode ter o lugar passado para a IA por quem criou a sala.
 
 ## Arquitetura
 
@@ -88,6 +89,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 | `src/core/types.ts` | As formas dos dados: `Game`, `Card`, `Play`, `Phase`, `Ask`, `Shout`, `RealTable`, `AppState`, `Entry`, `Json` |
 | `src/core/game.ts` | As regras (`newGame`, `playCard`, `roundWinner`, `handWinner`, `raise`, `answer`, `decideEleven`, `nextHand`, `whoActs`), a força das cartas (`power`, `manilhaRank`, `ranking`, `suitDuel`), as IAs por nível (`aiCard`, `aiRaise`, `aiAnswer`, `aiEleven`, `aiAct`), o treino (`drill`, `drillOk`) e `seeded`/`shuffle` (o acaso entra como função) |
 | `src/core/teams.ts` | Os clubes da Série A 2026 (`TEAMS`, `TEAMS_CHECKED`), `teamById`, `playersOf` (com os nomes trocados pela pessoa) e `lineup` (quem senta onde, no modo elenco ou rivais) |
+| `src/core/online.ts` | A sala: `viewFor` (a partida como cada pessoa vê), `roomView`, `handle` (entrar, voltar, sair, começar, recomeçar, jogar, IA no lugar de quem saiu), `aiDelay` e `aiStep` (as IAs no servidor), `readMsg` e `readRoom` (o que chega pela rede e o que foi guardado) |
 | `src/core/assist.ts` | O assistente da mesa real: `tell`, `untell`, `nextRound`, `advise`, `tableSay` e `hear` (lê o que foi falado) |
 | `src/core/save.ts` | `readGame`, `readReal` e `readState`: lê o que foi guardado, descartando o que não fecha |
 | `src/core/source.ts` | Os leitores da fonte de dados (`normEntry`, `normEntries`). Único lugar que conhece o formato dela |
@@ -102,17 +104,22 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 | `src/app/api.ts` | `getJSON` (toda chamada passa por ele, com tempo máximo) e `loadEntries`. Sem fonte configurada, não chama nada |
 | `src/app/render.ts` | `render` e as telas (início, treino, mesa real com a grade de 40 cartas, partida), a carta desenhada (`face`), o que se mexe (só o que acabou de mudar), `stamp`, `confetti`, `toast`, `lift` |
 | `src/app/events.ts` | Um listener delegado por `data-act`; o único lugar que usa `Math.random`; o relógio das IAs (`schedule`, `THINK`, `ROUND_PAUSE`) |
+| `src/app/net.ts` | A conexão com o servidor de salas (WebSocket): `connect`, `send`, `leave`, a volta sozinha depois de cair (`RETRY`), o endereço (`ROOM_URL`, da variável `VITE_ROOM_URL` do build) |
 | `src/app/voice.ts` | O microfone: reconhecimento de fala do navegador (`listen`, `canListen`) |
 | `src/app/fx.ts` | Som (Web Audio, sintetizado), vibração e `later` (espera a animação, ou não espera quando o aparelho pede menos movimento) |
 | `src/app/update.ts` | Registro do service worker, aviso de versão nova (`initUpdates`, `applyUpdate`, `checkNow`) e `builtFrom`, o commit da página |
 | `src/main.ts` | Entrada: liga os listeners, expõe `window.__APP`, pinta a tela e registra o service worker |
 | `src/env.d.ts` | Declarações de tipo de `window.__APP`; os tipos do Vite vêm por referência |
 
+### `server/`: o servidor de salas
+
+`server/worker.ts` roda na Cloudflare (Workers com Durable Objects, configurado em `wrangler.toml`): cada código de sala é um Durable Object que guarda a sala e as conexões. Ele só passa mensagens para `handle` do núcleo, salva a sala, manda a cada conexão o `roomView` dela e acorda as IAs por alarme. Usa a hibernação de WebSocket: sala parada não conta tempo. Sala sem ninguém por 24 h é apagada. Os tipos são conferidos pelo `tsc` com `server/tsconfig.json` (no `npm run typecheck`). Nos testes, `tests/room_server.mjs` faz o mesmo papel em Node, com o mesmo núcleo e as mesmas mensagens, sem armazenamento nem alarme.
+
 `src/sw.js` é o service worker. É JavaScript puro, fora dos módulos e do `tsc`: roda em outro contexto, sem página, e o build só o copia para `dist/sw.js` trocando a versão.
 
 Os módulos de `src/app/` se importam em círculo (a tela chama ações, ações repintam a tela). Funciona porque nada é chamado enquanto os módulos carregam: o que roda na carga fica em `src/app/state.ts` (ler o que está salvo e aplicar o tema) e em `src/main.ts`. Código novo não deve chamar função de outro módulo no nível de cima do arquivo.
 
-`window.__APP` expõe `{Core, ui, S}` para teste.
+`window.__APP` expõe `{Core, ui, S, room}` para teste (`room`: a sala como o servidor mandou por último).
 
 Renderização é `innerHTML` a partir do estado. Todo texto que não veio do próprio código passa por `esc()`.
 
@@ -120,7 +127,7 @@ Renderização é `innerHTML` a partir do estado. Todo texto que não veio do pr
 
 ### Estado no `localStorage`
 
-`truco.v1`: `{ v: 1, game: Game | null, tally, level, train, real, theme, speed, quiet, hints, team, rival, custom }`. `team` é o clube da pessoa e `rival` o adversário no modo rivais (sem o campo, modo elenco); `custom` são os nomes trocados, por clube. `tally` são vitórias e derrotas; `level` o nível da próxima partida; `train` acertos, total e melhor sequência do treino; `real` a mesa real em curso. `theme` é `'light'` ou `'dark'` (sem o campo, segue o aparelho); `speed` é `'calma'` ou `'rapida'` (sem o campo, normal); `quiet` é `true` com som e vibração desligados; `hints` é `false` sem rodinhas. A partida inteira fica guardada, inclusive as cartas das IAs: quem abrir as ferramentas do navegador vê tudo. É um jogo para treinar, não um cassino. O que está aberto na tela (`ui`) não é guardado.
+`truco.v1`: `{ v: 1, game: Game | null, tally, level, train, real, theme, speed, quiet, hints, team, rival, custom, myName, online }`. `myName` é o nome usado online; `online` é a sala em que a pessoa está (`code` e o `token` que guarda o lugar dela), para voltar sozinha depois de recarregar. `team` é o clube da pessoa e `rival` o adversário no modo rivais (sem o campo, modo elenco); `custom` são os nomes trocados, por clube. `tally` são vitórias e derrotas; `level` o nível da próxima partida; `train` acertos, total e melhor sequência do treino; `real` a mesa real em curso. `theme` é `'light'` ou `'dark'` (sem o campo, segue o aparelho); `speed` é `'calma'` ou `'rapida'` (sem o campo, normal); `quiet` é `true` com som e vibração desligados; `hints` é `false` sem rodinhas. A partida inteira fica guardada, inclusive as cartas das IAs: quem abrir as ferramentas do navegador vê tudo. É um jogo para treinar, não um cassino. O que está aberto na tela (`ui`) não é guardado.
 
 ## Fonte de dados
 
@@ -165,6 +172,8 @@ Os casos do núcleo ficam em `tests/unit.cases.mjs`. Regra nova entra ali primei
 
 `e2e.py` abre a página num tamanho de celular, com a rede bloqueada, e joga pela tela: escolhe o time (cores no topo, nomes na mesa, nomes trocados aparecendo como texto, modo rivais com a cor do rival), troca tema, rodinhas, velocidade, som e nível, faz exercícios do treino (certo e errado), usa o ranking do glossário, monta uma mesa real pela grade de 40 cartas, e joga partidas com as cartas empilhadas por `window.__APP.S` (dado inventado de teste): rodada ganha no naipe, cangada, truco aceito, truco corrido com "Era blefe!", seis pedido de volta, mão de onze jogada e corrida, mão de ferro às cegas, fim de jogo com resumo e confete, encerrar no meio. Confere que a partida volta depois de recarregar, que nada passa da largura da tela e que não há erro de script. Capturas em `tests/shots/`.
 
+`e2e_online.py` sobe o `tests/room_server.mjs` nesta máquina e abre dois celulares: sem servidor o cartão avisa e desliga; quem cria a sala vê o código, o link e os lugares; o amigo abre o link (o código vem preenchido), entra com um nome que aparece como texto, e cada um se vê embaixo; código errado e sala já começada são recusados; na partida, cada um só tem as próprias cartas na página, as dos outros viradas; os dois jogam pela tela, o amigo pede truco, quem criou corre, e o placar aparece espelhado; o amigo recarrega e volta ao mesmo lugar; sai de vez, e quem criou passa o lugar para a IA.
+
 `pwa.py` publica o build e depois uma "versão seguinte" e confere: a página fica guardada, a primeira instalação não anuncia nada, o app abre com o site fora do ar, a versão nova é anunciada, o app em uso só troca depois do toque, a cópia antiga é apagada, publicar de novo sem mudar o app não avisa, e fechar e abrir de novo entra na versão que esperava. O build precisa estar num repositório git, porque a tela mostra o commit.
 
 ## Publicação
@@ -180,6 +189,8 @@ A Vercel publica o que chegar na `main` sem olhar o CI. Quem garante que só ent
 - Mesclar um PR por vez e esperar o deploy, ou mesclar só o último quando um PR já contém os anteriores.
 - O workflow `Produção` roda `scripts/check_production.py` depois de cada push na `main`: espera a produção mostrar o carimbo do commit que entrou e **continua olhando por 5 min**. Falhou: na Vercel, promover o deploy do commit mais recente da `main`, ou fazer um novo merge. O endereço vem da variável `APP_PROD_URL` do repositório (Settings → Secrets and variables → Actions → Variables), com https://turco-six.vercel.app como padrão. Se o endereço servir outro site (página sem carimbo) ou pedir login da Vercel, o script diz isso com todas as letras em vez de só esperar.
 - Em PR o mesmo script só informa qual commit a produção está servindo (`--report`) e nunca falha. `--selftest` testa o script contra um servidor local e roda no `verify.sh`.
+
+**O servidor de salas** é publicado pelo workflow `Salas` (`.github/workflows/salas.yml`) a cada push na `main` que mexe no servidor ou no núcleo, com `wrangler deploy`. Precisa dos secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no repositório; sem eles, o job avisa e não publica. O endereço que a Cloudflare der (`wss://truco-salas.<conta>.workers.dev`) vai na variável `VITE_ROOM_URL` do projeto na Vercel; sem ela, o cartão "Jogar online" diz que o servidor não está ligado.
 
 **Publicar não troca o app de quem já abriu.** O aparelho mostra a cópia guardada até a pessoa tocar em "Atualizar agora".
 

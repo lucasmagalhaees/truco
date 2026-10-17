@@ -17,6 +17,8 @@ const isPlays = (x: unknown): boolean => Array.isArray(x) && x.length <= 4 && x.
 export function readGame(x: unknown): Game | null {
   const g = x as Game;
   if (!g || typeof g !== 'object' || !Array.isArray(g.names) || g.names.length !== 4 || !g.names.every(x => typeof x === 'string' && x.length <= 24)) return null;
+  if (g.humans === undefined) g.humans = [0];                                   // saved before rooms existed
+  if (!Array.isArray(g.humans) || !g.humans.length || g.humans.length > 4 || !g.humans.every(isSeat) || new Set(g.humans).size !== g.humans.length) return null;
   if (!Array.isArray(g.sides) || g.sides.length !== 2 || !g.sides.every(x => x === null || !!teamById(x))) return null;
   if (!LEVELS.includes(g.level) || typeof g.blind !== 'boolean' || !isCards(g.played, 12)) return null;
   if (!Array.isArray(g.score) || g.score.length !== 2 || !g.score.every(isPts) || !isSeat(g.dealer) || !Number.isInteger(g.n) || g.n < 1) return null;
@@ -52,7 +54,7 @@ function readCustom(x: unknown): { custom?: Record<string, string[]> } {
 
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { team?: unknown; rival?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -65,6 +67,9 @@ export function readState(x: unknown): AppState {
     ...(o.hints === false ? { hints: false as const } : {}),
     ...(typeof o.team === 'string' && teamById(o.team) ? { team: o.team } : {}),
     ...(typeof o.rival === 'string' && teamById(o.rival) && o.rival !== o.team ? { rival: o.rival } : {}),
-    ...readCustom(o.custom)
+    ...readCustom(o.custom),
+    ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),
+    ...(o.online && typeof o.online === 'object' && /^[A-Z0-9]{5}$/.test(String((o.online as { code?: unknown }).code)) && /^[A-Za-z0-9-]{8,64}$/.test(String((o.online as { token?: unknown }).token))
+      ? { online: { code: String((o.online as { code: string }).code), token: String((o.online as { token: string }).token) } } : {})
   };
 }

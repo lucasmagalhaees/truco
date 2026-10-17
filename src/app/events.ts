@@ -6,6 +6,7 @@ import { valOf } from './format';
 import { S, applyTheme, saveS, setS, ui } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
+import { connect, inRoom, leave, net, rawSeat, roomLink, send } from './net';
 
 /* ================= events =================
    One listener for every tap, by data-act. Chance comes from Math.random here: the core only ever gets it as a
@@ -50,8 +51,9 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 /** If a computer player has to act, it acts after a moment (and only if nothing else changed the game meanwhile). */
 export function schedule(): void {
   clearTimeout(timer);
+  if (inRoom()) return;                                  // in a room the server moves the computer players
   const g = S.game, who = g ? Core.whoActs(g) : null;
-  if (!g || who === null || who === 0) return;
+  if (!g || who === null || Core.isHuman(g, who)) return;
   let ms = ui.wait ?? THINK[S.speed || 'normal'];
   if (ui.wait === null && g.phase === 'play' && !g.table.length && g.last) ms += ROUND_PAUSE;
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
@@ -104,6 +106,56 @@ function club(a: string, v: string): void {
   saveS(); render();
 }
 
+/* ---------- a room on the server ---------- */
+/** Refusals that end the attempt to join: the room is full, already playing, or the name is missing. */
+const FATAL = ['Essa partida já começou.', 'A sala está cheia.', 'Escreve seu nome.', 'Não deu pra entrar: recarregue a página.'];
+/** A new view of the room came: painted, with the moment that goes with it; a game that just ended counts in the tally. */
+function onRoom(before: typeof net.view): void {
+  const was = before?.game ?? null, now = net.view?.game ?? null;
+  if (now && was && now.phase === 'over' && was.phase !== 'over' && now.winner !== null) { S.tally = { w: S.tally.w + (now.winner === 0 ? 1 : 0), l: S.tally.l + (now.winner === 1 ? 1 : 0) }; saveS(); }
+  if (!before && net.view && location.search.includes('sala=')) history.replaceState(null, '', location.pathname);
+  render();
+  if (now) moment(was, now);
+}
+function onRoomError(why: string): void {
+  toast(why);
+  if (FATAL.includes(why) && !net.view?.game) { leave(); render(); }
+}
+function joinRoom(code: string): void {
+  const name = valOf('#oname').replace(/\s+/g, ' ').trim().slice(0, 16);
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  if (!name) { toast('Escreve seu nome antes.'); return; }
+  if (!Core.isCode(code)) { toast('O código da sala tem 5 letras.'); return; }
+  ui.drill = null; ui.real = false; ui.confirmEnd = false;
+  connect(code, name, onRoom, onRoomError);
+  render(); window.scrollTo(0, 0);
+}
+/** A move in a room goes to the server; the table changes when the server answers. */
+function netAct(a: string, d: DOMStringMap): void {
+  const g = net.view?.game;
+  if (!g) return;
+  if (a === 'play') { if (Core.whoActs(g) !== 0 || g.phase !== 'play') return; lift(Number(d.k)); send({ t: 'act', a: 'play', k: Number(d.k) }); }
+  else if (a === 'truco') send({ t: 'act', a: 'truco' });
+  else if (a === 'answer') send({ t: 'act', a: 'answer', v: d.v as Answer });
+  else if (a === 'eleven') send({ t: 'act', a: 'eleven', v: d.v === '1' });
+  else if (a === 'next') send({ t: 'act', a: 'next' });
+}
+function room(a: string, d: DOMStringMap): void {
+  const code = net.view?.code || S.online?.code || '';
+  if (a === 'createroom') joinRoom(Core.roomCode(rand));
+  else if (a === 'joinroom') joinRoom(valOf('#ocode').trim().toUpperCase());
+  else if (a === 'startroom') send({ t: 'start' });
+  else if (a === 'againroom') send({ t: 'again' });
+  else if (a === 'botseat') send({ t: 'bot', seat: rawSeat(Number(d.s)) });
+  else if (a === 'leaveroom') {
+    if (net.view?.game && net.view.game.phase !== 'over' && !ui.confirmEnd) { ui.confirmEnd = true; render(); return; }
+    ui.confirmEnd = false; leave(); render(); window.scrollTo(0, 0);
+  } else if (a === 'copylink') {
+    const link = roomLink(code);
+    navigator.clipboard.writeText(link).then(() => toast('Link copiado. Manda no grupo!'), () => toast(link));
+  } else if (a === 'sharelink') navigator.share({ title: 'Truco', text: `Bora jogar truco? Sala ${code}`, url: roomLink(code) }).catch(() => { /* closed without sharing */ });
+}
+
 /** A setting: saved, applied and painted. */
 function setting(a: string, v: string): void {
   if (a === 'level') S.level = v as Level;
@@ -134,6 +186,8 @@ export function initEvents(): void {
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
+    else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'leaveroom', 'copylink', 'sharelink'].includes(a)) room(a, d);
+    else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);
     else if (a === 'update') applyUpdate();
     else if (a === 'checkupdate') void checkNow();
     else if (!g) return;
@@ -146,4 +200,5 @@ export function initEvents(): void {
     else if (a === 'end') { ui.confirmEnd = true; render(); }
   });
   schedule();                      // a saved game may be waiting on a computer player
+  if (S.online) connect(S.online.code, S.myName || 'Jogador', onRoom, onRoomError);      // back to the room after a reload
 }

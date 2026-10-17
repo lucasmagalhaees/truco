@@ -174,6 +174,71 @@ export default function cases(Core) {
   const club = Core.newGame(Core.seeded(4), 'medio', Core.lineup('flamengo', 'palmeiras'));
   eq('a game with a club: the names at the table and in the log, the clubs of each pair', [club.names, club.sides, Core.raise({ ...club, phase: 'play', turn: 1 }, 1).log.at(-1)], [['Você', 'Vitor Roque', 'Pedro', 'Flaco López'], ['flamengo', 'palmeiras'], 'Vitor Roque pediu truco!']);
 
+  /* people at more than one seat */
+  const duo = { ...base, humans: [0, 1] };
+  eq('a pair with a person answers through that person; a computer pair through the one after who asked', [Core.whoActs(Core.raise({ ...duo, turn: 0 }, 0)), Core.whoActs(Core.raise({ ...duo, turn: 2 }, 2)), Core.whoActs(Core.raise({ ...base, turn: 2 }, 2)), Core.whoActs(Core.raise({ ...duo, turn: 1 }, 1))], [1, 1, 3, 0]);
+  eq('the computer never moves for a person', [Core.aiAct({ ...duo, turn: 1 }, never) === undefined, Core.aiAct({ ...duo, turn: 1 }, never).table.length, Core.isHuman(duo, 1), Core.isHuman(base, 1)], [false, 0, true, false]);
+  const elevenThem = Core.nextHand({ ...h, humans: [0, 1], score: [3, 11] }, Core.seeded(5));
+  eq('a hand of eleven for a pair with a person: that person decides', [Core.whoActs(elevenThem), Core.decideEleven(elevenThem, true).shout.seat], [1, 1]);
+  eq('humans go along to the next hand, and default to seat 0', [Core.nextHand({ ...h, humans: [0, 3] }, rand).humans, Core.newGame(rand).humans, Core.newGame(rand, 'medio', { names: ['a', 'b', 'c', 'd'], sides: [null, null], humans: [3, 0] }).humans], [[0, 3], [0], [0, 3]]);
+
+  /* each person's view */
+  const vg = { ...base, humans: [0, 1], dealer: 0, starter: 1, turn: 2, names: ['Ana', 'Bia', 'Caio', 'Duda'], score: [5, 2], rounds: [0, -1], raisedBy: 0, sides: ['flamengo', 'palmeiras'],
+    table: [{ seat: 1, card: '3e' }], last: { plays: [{ seat: 3, card: '2o' }], winner: 3 }, ask: { by: 3, value: 3, bluff: true }, shout: { seat: 3, word: 'truco' },
+    result: { team: 1, points: 3, why: 'Nós levamos a mão.', shown: { seat: 3, cards: ['4e'], bluff: true } }, hist: [{ team: 0, points: 1, how: 'Eles correram.', value: 1 }], log: ['Mão de onze: nós decidimos se jogamos.'] };
+  const v0 = Core.viewFor(vg, 0), v1 = Core.viewFor(vg, 1);
+  eq('seat 0 sees the table as it is, but only its own cards', [v0.names, v0.hands[0], v0.hands.slice(1).every(hh => hh.every(c => c === '??')), v0.hands.map(hh => hh.length), v0.ask], [['Ana', 'Bia', 'Caio', 'Duda'], vg.hands[0], true, [3, 3, 3, 3], { by: 3, value: 3 }]);
+  eq('seat 1 sees itself at the bottom, its pair as "Nós"', [v1.names, v1.hands[0], v1.score, v1.sides, v1.humans, v1.turn, v1.starter, v1.dealer, v1.rounds, v1.raisedBy], [['Bia', 'Caio', 'Duda', 'Ana'], vg.hands[1], [2, 5], ['palmeiras', 'flamengo'], [0, 3], 1, 0, 3, [1, -1], 1]);
+  eq('seat 1: the cards on the table, the last round, the raise, the shout and the result turned too', [v1.table, v1.last, v1.ask, v1.shout, v1.result.team, v1.result.shown.seat, v1.hist[0].team], [[{ seat: 0, card: '3e' }], { plays: [{ seat: 2, card: '2o' }], winner: 2 }, { by: 2, value: 3 }, { seat: 2, word: 'truco' }, 0, 2, 1]);
+  eq('seat 1: "Nós" and "Eles" swap in the words', [v1.result.why, v1.hist[0].how, v1.log[0], Core.swapSides('Nós levamos, eles correram')], ['Eles levaram a mão.', 'Nós corremos.', 'Mão de onze: eles decidem se jogam.', 'Eles levaram, nós corremos']);
+  const v11 = Core.viewFor({ ...vg, phase: 'eleven', eleven: 1 }, 3);
+  eq('a hand of eleven: the pair deciding sees both its hands, nobody else\'s', [v11.eleven, v11.hands[2], v11.hands[1].every(c => c === '??'), Core.viewFor({ ...vg, phase: 'eleven', eleven: 1 }, 0).hands[2].every(c => c === '??')], [0, vg.hands[1], true, true]);
+
+  /* a room */
+  const roll = Core.seeded(8), T = ['token-ana-1', 'token-bia-2', 'token-caio-3', 'token-duda-4', 'token-eva-5'];
+  let room = Core.newRoom(Core.roomCode(Core.seeded(3)));
+  eq('room codes: 5 letters that are hard to confuse', [Core.isCode(room.code), Core.isCode('AB0DE'), Core.isCode('abcde'), room.code.length], [true, false, false, Core.CODE_LEN]);
+  const join = (r, tk, name, level) => Core.handle(r, tk, { t: 'join', name, token: tk, level }, roll);
+  eq('joining: a name is needed, and a real token', [join(room, T[0], '  ').error, Core.handle(room, 'x', { t: 'join', name: 'Ana', token: 'x' }, roll).error], ['Escreve seu nome.', 'Não deu pra entrar: recarregue a página.']);
+  room = join(room, T[0], '  Ana   Maria ', 'dificil').room;
+  room = join(room, T[1], 'Bia', 'facil').room;
+  eq('the first is the host at seat 0 and sets the level; the second sits against them', [room.members.map(m => [m.seat, m.name]), room.level, Core.roomView(room, T[0]).host, Core.roomView(room, T[1]).host], [[[0, 'Ana Maria'], [1, 'Bia']], 'dificil', true, false]);
+  eq('the room as each one sees it: themselves at seat 0', [Core.roomView(room, T[1]).members, Core.roomView(room, 'nobody')], [[{ seat: 0, name: 'Bia', online: true }, { seat: 3, name: 'Ana Maria', online: true }], null]);
+  eq('only the host starts; strangers are refused', [Core.handle(room, T[1], { t: 'start' }, roll).error, Core.handle(room, 'token-stranger', { t: 'start' }, roll).error], ['Só quem criou a sala começa a partida.', 'Você não está nessa sala.']);
+  const left = Core.handle(join(room, T[2], 'Caio').room, T[2], { t: 'leave' }, roll).room;
+  eq('before the game, leaving frees the seat', left.members.length, 2);
+  room = Core.handle(room, T[0], { t: 'start' }, roll).room;
+  const rg = room.game;
+  eq('the game: the people at their seats, the computer at the others, with the bar\'s names', [rg.humans, rg.names[0], rg.names[1], rg.names[2], rg.names[3], rg.level], [[0, 1], 'Ana Maria', 'Bia', 'Cida', 'Toinho', 'dificil']);
+  eq('once the game is on, nobody new comes in, and it cannot start twice', [join(room, T[3], 'Duda').error, Core.handle(room, T[0], { t: 'start' }, roll).error], ['Essa partida já começou.', 'A partida já está rolando.']);
+  const offline = Core.handle(room, T[1], { t: 'leave' }, roll).room;
+  eq('during the game, leaving keeps the seat; coming back with the same token takes it again', [offline.members[1].online, join(offline, T[1], 'qualquer').room.members[1], offline.game.humans], [false, { seat: 1, name: 'Bia', token: T[1], online: true }, [0, 1]]);
+  const botted = Core.handle(offline, T[0], { t: 'bot', seat: 1 }, roll).room;
+  eq('the host can put the computer in the seat of someone who left', [botted.game.humans, botted.members.length, Core.handle(room, T[0], { t: 'bot', seat: 1 }, roll).error], [[0], 1, 'Esse jogador ainda está na sala.']);
+  // play out the game through the room: people move only on their turn, the computer when aiDelay says so
+  let steps = 0, refused = 0;
+  while (room.game.phase !== 'over' && steps < 4000) {
+    steps++;
+    const g = room.game, who = Core.whoActs(g);
+    if (who === null) { room = Core.handle(room, T[1], { t: 'act', a: 'next' }, roll).room; continue; }
+    if (!Core.isHuman(g, who)) { const d = Core.aiDelay(room); if (d === null) break; room = Core.aiStep(room, roll); continue; }
+    const tk = T[who], other = T[1 - who];
+    if (Core.handle(room, other, { t: 'act', a: 'play', k: 0 }, roll).error) refused++;
+    const msg = g.phase === 'eleven' ? { t: 'act', a: 'eleven', v: true } : g.phase === 'truco' ? { t: 'act', a: 'answer', v: 'accept' } : { t: 'act', a: 'play', k: 0 };
+    room = Core.handle(room, tk, msg, roll).room;
+  }
+  eq('a whole game in a room ends; nobody can move out of turn', [room.game.phase, Math.max(...room.game.score), refused > 10, Core.aiDelay(room), Core.aiStep(room, roll) === room], ['over', 12, true, null, true]);
+  eq('the host starts another game with the same people', [Core.handle(room, T[0], { t: 'again' }, roll).room.game.phase !== 'over', Core.handle(room, T[0], { t: 'again' }, roll).room.game.score], [true, [0, 0]]);
+  let full = Core.newRoom('ABCDE');
+  for (let i = 0; i < 4; i++) full = join(full, T[i], 'P' + i).room;
+  eq('four people fill the room', [full.members.map(m => m.seat), join(full, T[4], 'Eva').error], [[0, 1, 2, 3], 'A sala está cheia.']);
+  eq('the computer waits longer after a round closes', [Core.aiDelay({ ...room, game: { ...base, humans: [0], turn: 1, table: [], last: null } }), Core.aiDelay({ ...room, game: { ...base, humans: [0], turn: 1, table: [], last: { plays: [], winner: 0 } } })], [Core.ROOM_THINK, Core.ROOM_THINK + Core.ROOM_ROUND_PAUSE]);
+  eq('messages over the wire: read field by field, anything else is null', [Core.readMsg('{"t":"act","a":"play","k":2}'), Core.readMsg({ t: 'act', a: 'answer', v: 'raise' }), Core.readMsg({ t: 'join', name: 'A', token: 'tttttttt', level: 'x' }), Core.readMsg({ t: 'bot', seat: 2 }), Core.readMsg({ t: 'act', a: 'eleven', v: false }), Core.readMsg({ t: 'act', a: 'next' }), Core.readMsg({ t: 'start' })],
+    [{ t: 'act', a: 'play', k: 2 }, { t: 'act', a: 'answer', v: 'raise' }, { t: 'join', name: 'A', token: 'tttttttt' }, { t: 'bot', seat: 2 }, { t: 'act', a: 'eleven', v: false }, { t: 'act', a: 'next' }, { t: 'start' }]);
+  eq('bad messages read as null; unknown ones are refused', [['{', null, 'x', { t: 'act', a: 'play', k: 'x' }, { t: 'act', a: 'answer', v: 'dance' }, { t: 'zzz' }, { t: 'act', a: 'eleven', v: 1 }].map(Core.readMsg), Core.handle(room, T[0], { t: 'zzz' }, roll).error, Core.handle(Core.newRoom('ABCDE'), T[0], { t: 'act', a: 'next' }, roll).error], [[null, null, null, null, null, null, null], 'Mensagem desconhecida.', 'Você não está nessa sala.']);
+  eq('a move before the game, or one the rules refuse', [Core.handle({ ...full, game: null }, T[0], { t: 'act', a: 'truco' }, roll).error, Core.handle({ ...room, game: { ...base, humans: [0, 1], turn: 0, raisedBy: 0 } , members: room.members }, T[0], { t: 'act', a: 'truco' }, roll).error, Core.handle({ ...room, game: { ...base, humans: [0, 1], phase: 'truco', ask: { by: 1, value: 3 } } }, T[0], { t: 'act', a: 'answer', v: 'dance' }, roll).error], ['A partida ainda não começou.', 'Agora não é a sua vez.', 'Agora não é a sua vez.']);
+  eq('a saved room reads back; what does not hold together is null', [Core.readRoom(JSON.parse(JSON.stringify(room))).members.length, [null, {}, { ...room, code: 'x' }, { ...room, members: [{ seat: 'a' }] }].map(Core.readRoom)], [2, [null, null, null, null]]);
+
   /* what is saved */
   const st = { v: 1, game: h, tally: { w: 2, l: 1 }, level: 'dificil', train: { ok: 3, total: 4, best: 2 }, real: rt, theme: 'dark', speed: 'rapida', quiet: true, hints: false, team: 'flamengo', rival: 'palmeiras', custom: { flamengo: ['A', 'B', 'C'] } };
   eq('read state: a saved state comes back as it was', Core.readState(JSON.parse(JSON.stringify(st))), st);

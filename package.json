@@ -1,7 +1,7 @@
 {
   "name": "truco",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Truco paulista contra três IAs, com níveis, blefe, treino e assistente para a mesa real.",
   "type": "module",
   "engines": {
@@ -10,11 +10,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260930.2",
     "typescript": "7.0.2",
-    "vite": "8.3.3"
+    "vite": "8.3.3",
+    "ws": "8.22.0"
   }
 }

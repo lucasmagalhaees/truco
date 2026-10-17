@@ -10,6 +10,7 @@ Feito a partir do [secret-game](https://github.com/lucasmagalhaees/secret-game),
 - **Rodinhas**: manilhas marcadas, lugar de cada carta no ranking, quem está levando a rodada, por que ela foi ganha. Tira quando quiser.
 - **Treino**: "Qual é a manilha?" e "Quem ganha a rodada?", com duelos de manilha pelo naipe e cangadas, e a explicação de cada resposta.
 - **Ranking e glossário**: escolha a vira e veja da mais forte para a mais fraca; zap, copas, espadilha, picafumo, cangar, mão de onze, mão de ferro, pé e mão.
+- **Jogar online**: crie uma sala e mande o link; você e uma IA contra um amigo e outra IA (ou até 4 pessoas), cada um no seu celular.
 - **Mesa real**: para partidas de verdade. Diga a vira e suas cartas por toque (grade com as 40 cartas) ou por voz, e o app mostra manilha, a força de cada carta, o que ainda ganha dela e qual carta joga.
 - Animações, som e vibração; tema claro e escuro; abre sem internet depois da primeira vez e avisa quando sai versão nova.
 
@@ -21,7 +22,8 @@ Para rodar: `npm install` e `npm run dev`. Para testar tudo: `scripts/verify.sh`
 
 1. Em vercel.com: **Add New → Project → Import** o repositório `truco`. O `vercel.json` já diz o que fazer (`npm ci`, `npm run build`, publicar `dist/`); não precisa mexer em nada.
 2. Produção: https://turco-six.vercel.app. Se mudar, defina a variável `APP_PROD_URL` no GitHub (Settings → Secrets and variables → Actions → Variables) com o endereço que a Vercel deu.
-3. No GitHub, proteja a `main`: exigir PR e os checks `checks`, `e2e (dark)` e `e2e (light)`. A Vercel publica o que chega na `main` sem olhar o CI; é essa proteção que segura código não testado.
+3. Para jogar online: crie uma conta na Cloudflare, gere um token com "Edit Cloudflare Workers" e ponha `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` nos secrets do GitHub. O workflow `Salas` publica o servidor; o endereço dele (`wss://truco-salas.<conta>.workers.dev`) vai na variável `VITE_ROOM_URL` do projeto na Vercel.
+4. No GitHub, proteja a `main`: exigir PR e os checks `checks`, `e2e (dark)` e `e2e (light)`. A Vercel publica o que chega na `main` sem olhar o CI; é essa proteção que segura código não testado.
 
 ## Estrutura
 
@@ -47,6 +49,11 @@ tests/e2e.py
 tests/pwa.py
 tests/cov.py
 tests/fixtures/source/
+tests/e2e_online.py
+tests/room_server.mjs
+server/worker.ts
+wrangler.toml
+.github/workflows/salas.yml
 .github/workflows/ci.yml
 .github/workflows/producao.yml
 .claude/settings.json

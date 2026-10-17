@@ -4,6 +4,7 @@ import { $, esc, part } from './format';
 import { S, applyClub, ui } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
+import { canPlayOnline, inRoom, net, roomLink } from './net';
 
 /* ================= the screen =================
    Rendering is innerHTML from the state. Every text that did not come from the code goes through esc().
@@ -16,13 +17,13 @@ let seenHand = -1, seenPlayed = 0, seenLast = '', seenScore = '';
 export function render(): void {
   const view = part('view'), active = document.activeElement;
   if (active && view.contains(active) && active.matches('input')) return;        // never throw away what is being typed
-  const g = S.game;
-  applyClub();
+  const online = inRoom(), g = online ? (net.view?.game ?? null) : S.game;
+  applyClub(online ? g : undefined);
   seatNames = g ? g.names : Core.lineup(S.team, S.rival, S.custom).names;
   const sc = g ? `${g.score[0]}-${g.score[1]}` : '';
   const bump = !!g && seenScore !== '' && sc !== seenScore; seenScore = sc;
   part('score').innerHTML = g ? `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>` : '';
-  view.innerHTML = g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
+  view.innerHTML = online ? (g ? vNet() + vGame(g) : vLobby()) : g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
 }
 
 /* ---------- cards ---------- */
@@ -60,6 +61,7 @@ function vHome(): string {
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>
     <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p></section>
+  ${vOnline()}
   ${vClub()}
   <section class="card" id="train"><span class="label">Treino</span>
     <p>Exercícios rápidos pra ver na hora o que manda na mesa.</p>
@@ -69,6 +71,47 @@ function vHome(): string {
     <p>Jogando de verdade? Diga a vira e suas cartas (num toque ou falando) e o app mostra o ranking, as manilhas, o que ainda pode ganhar de você e qual carta joga.</p>
     <button class="btn ghost block" data-act="real">Abrir o assistente</button></section>
   ${vGloss()}${vRules()}${vSettings()}`;
+}
+
+/* ---------- playing online ---------- */
+/** The code in the address of an invitation link (?sala=ABCDE), if any. */
+const invited = (): string => { const c = new URLSearchParams(location.search).get('sala') || ''; return Core.isCode(c.toUpperCase()) ? c.toUpperCase() : ''; };
+function vOnline(): string {
+  const off = !canPlayOnline(), inv = invited();
+  return `<section class="card" id="online"><span class="label">Jogar online</span>
+    <p>Você e uma IA contra um amigo e outra IA, cada um no seu celular. Cabem até 4 pessoas; lugar vazio fica com a IA.</p>
+    ${inv ? `<p class="explain" id="invite">Você foi chamado para a sala <b>${inv}</b>. Escreva seu nome e toque em Entrar.</p>` : ''}
+    <div class="field"><input id="oname" maxlength="16" autocomplete="nickname" placeholder="seu nome" value="${esc(S.myName || '')}" aria-label="Seu nome"></div>
+    <button class="btn block" data-act="createroom"${off ? ' disabled' : ''}>Criar sala</button>
+    <div class="row"><div class="field"><input id="ocode" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="código" value="${esc(inv)}" aria-label="Código da sala"></div><button class="btn ghost" data-act="joinroom"${off ? ' disabled' : ''}>Entrar</button></div>
+    ${off ? '<p class="hint" id="onlineoff">O servidor de salas ainda não está ligado neste endereço.</p>' : '<p class="hint">Quem cria a sala escolhe o nível das IAs (o de “Nova partida”).</p>'}</section>`;
+}
+/** Who sits where in the room, as this person sees it: themselves at the bottom, the partner in front. */
+function seatsOf(): { seat: Seat; label: string; human: boolean; online: boolean }[] {
+  const v = net.view as NonNullable<typeof net.view>;
+  return [0, 1, 2, 3].map(s => { const m = v.members.find(x => x.seat === s); return { seat: s, label: m ? m.name : `IA (${Core.DEFAULT_NAMES[(s + v.seat) % 4]})`, human: !!m, online: !!m && m.online }; });
+}
+function vLobby(): string {
+  const v = net.view;
+  if (!v) return `<section class="card" id="lobby"><span class="label">Sala ${esc(S.online?.code || '')}</span><p class="thinking">${net.status === 'caiu' ? 'Sem conexão com o servidor, tentando de novo…' : 'Entrando na sala…'}</p><button class="btn ghost block" data-act="leaveroom">Cancelar</button></section>`;
+  const seats = seatsOf(), at = (s: Seat): string => { const x = seats[s]; return `<div class="lseat${x.human ? ' human' : ''}${x.human && !x.online ? ' gone' : ''}" id="lseat${s}"><small>${s === 0 ? 'Você' : s === 2 ? 'Sua dupla' : 'Adversário'}</small><b>${esc(x.label)}</b></div>`; };
+  const link = roomLink(v.code);
+  return `<section class="card" id="lobby"><span class="label">Sala</span>
+    <p class="code" id="code">${v.code}</p>
+    <p class="hint">Mande o link para quem vai jogar. Quem entrar senta na ordem: o primeiro contra você, depois sua dupla, depois a dupla dele.</p>
+    <p class="link" id="link">${esc(link)}</p>
+    <div class="pick"><button class="btn ghost" data-act="copylink">Copiar link</button>${typeof navigator.share === 'function' ? '<button class="btn ghost" data-act="sharelink">Compartilhar</button>' : ''}</div>
+    <div class="lseats">${at(2)}<div class="lrow">${at(3)}${at(1)}</div>${at(0)}</div>
+    ${v.host ? `<p class="hint">Nível das IAs: <b>${LEVEL[v.level][0]}</b>.</p><button class="btn block" data-act="startroom">Começar ${v.members.length === 1 ? 'só com as IAs' : `com ${v.members.length} pessoas`}</button>` : `<p class="thinking">Esperando quem criou a sala começar…</p>`}
+    <button class="btn ghost block" data-act="leaveroom">Sair da sala</button></section>`;
+}
+/** During a game in a room: the connection, and who dropped out (the host may hand their seat to the computer). */
+function vNet(): string {
+  const v = net.view;
+  if (net.status === 'caiu') return '<p class="explain" id="netstatus">Sem conexão com a sala. Tentando de novo…</p>';
+  const gone = v ? v.members.filter(m => !m.online) : [];
+  if (!gone.length || !v) return '';
+  return `<p class="explain" id="netstatus">${gone.map(m => `<b>${esc(m.name)}</b> saiu da sala`).join(', ')}. A partida espera voltar.${v.host ? gone.map(m => ` <button class="btn ghost" data-act="botseat" data-s="${m.seat}">IA no lugar de ${esc(m.name)}</button>`).join('') : ''}</p>`;
 }
 
 /* ---------- the club ---------- */
@@ -190,7 +233,9 @@ function vGame(g: Game): string {
   const glow = lastKey !== '' && lastKey !== seenLast; seenLast = lastKey;
   return vStatus(g) + vTable(g, fresh, glow) + vHand(g, deal) + vAction(g) + (g.phase === 'over' ? vSummary(g) : '')
     + (hints() ? `<details class="card" id="rank"><summary class="label">Ranking com esta vira</summary>${vRanking(g.vira, 'gamerank')}</details>` : '')
-    + vLog(g) + (g.phase === 'over' ? '' : `<section class="card"><button class="btn ghost block" data-act="end">${ui.confirmEnd ? 'Toque de novo para encerrar a partida' : 'Encerrar partida'}</button></section>`);
+    + vLog(g) + (g.phase === 'over' ? '' : inRoom()
+      ? `<section class="card"><button class="btn ghost block" data-act="leaveroom">${ui.confirmEnd ? 'Toque de novo para sair da sala' : 'Sair da sala'}</button></section>`
+      : `<section class="card"><button class="btn ghost block" data-act="end">${ui.confirmEnd ? 'Toque de novo para encerrar a partida' : 'Encerrar partida'}</button></section>`);
 }
 function vStatus(g: Game): string {
   const dots = [0, 1, 2].map(i => { const r = g.rounds[i]; return `<i class="${r === undefined ? '' : r === -1 ? 'tie' : r === 0 ? 'nos' : 'eles'}" title="${i + 1}ª rodada"></i>`; }).join('');
@@ -241,10 +286,12 @@ function vAction(g: Game): string {
   }
   if (g.phase === 'truco' && g.ask) {
     if (who !== 0) return `<p class="thinking" id="action">${name(who as Seat)} está pensando no seu ${WORD[g.ask.value].toLowerCase()}…</p>`;
-    const tip = Core.aiAnswer(g, 2), tipTxt = { accept: 'aceita', run: 'corre', raise: `pede ${WORD[Core.nextValue(g.ask.value)].toLowerCase()}` }[tip];
+    // the partner whispers only when the partner is the computer and its cards are known here (not in a room)
+    const tip = g.hands[2].some(c => c === '??') || Core.isHuman(g, 2) ? null : Core.aiAnswer(g, 2);
+    const tipTxt = tip ? { accept: 'aceita', run: 'corre', raise: `pede ${WORD[Core.nextValue(g.ask.value)].toLowerCase()}` }[tip] : '';
     return `<section class="card ask" id="action"><span class="label">${name(g.ask.by)} pediu ${WORD[g.ask.value].toLowerCase()}</span><p class="big">Se aceitar, a mão vale <b>${g.ask.value}</b>. Se correr, eles levam <b>${g.value}</b>.</p>
       <div class="pick"><button class="btn" data-act="answer" data-v="accept">Aceito</button><button class="btn ghost" data-act="answer" data-v="run">Corro</button>${g.ask.value < Core.WIN_POINTS ? `<button class="btn truco" data-act="answer" data-v="raise">${WORD[Core.nextValue(g.ask.value)]}!</button>` : ''}</div>
-      <p class="hint" id="tip">${(name(2))} cochicha: “eu ${tipTxt}”.</p></section>`;
+      ${tip ? `<p class="hint" id="tip">${(name(2))} cochicha: “eu ${tipTxt}”.</p>` : ''}</section>`;
   }
   if (g.phase === 'eleven') {
     if (who !== 0) return `<p class="thinking" id="action">Eles estão com ${Core.ELEVEN}: decidindo se jogam…</p>`;
@@ -257,7 +304,8 @@ function vAction(g: Game): string {
   const head = r.team === null ? 'Ninguém marcou' : `${r.team === 0 ? 'Nós' : 'Eles'} +${r.points}`;
   if (g.phase === 'handEnd') return `<section class="card result t${r.team ?? 'x'}" id="action"><span class="label">Fim da mão</span><p class="big"><b>${head}</b></p><p>${esc(r.why)}</p>${shown}<button class="btn block" data-act="next">Próxima mão</button></section>`;
   return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : 'Eles venceram.'}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score[0]} a ${g.score[1]}.</p>${shown}
-    <button class="btn block" data-act="again">Jogar de novo</button><button class="btn ghost block" data-act="home">Início</button></section>`;
+    ${inRoom() ? (net.view?.host ? '<button class="btn block" data-act="againroom">Jogar de novo com a mesma sala</button>' : `<p class="hint">Quem criou a sala pode começar outra.</p>`) + '<button class="btn ghost block" data-act="leaveroom">Sair da sala</button>'
+      : '<button class="btn block" data-act="again">Jogar de novo</button><button class="btn ghost block" data-act="home">Início</button>'}</section>`;
 }
 function vSummary(g: Game): string {
   const items = g.hist.map((h, i) => `<li class="t${h.team ?? 'x'}"><b>Mão ${i + 1}</b> · ${h.team === null ? 'ninguém' : h.team === 0 ? `nós +${h.points}` : `eles +${h.points}`} · ${esc(h.how)}</li>`).join('');

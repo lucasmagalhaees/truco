@@ -2,6 +2,15 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). Versões: [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.3.0]
+
+### Adicionado
+- Jogar online: sala com código e link, até 4 pessoas, IA nos lugares vazios (você + IA contra um amigo + IA). Cada celular só recebe as próprias cartas; quem cai volta ao mesmo lugar.
+- Servidor de salas na Cloudflare (`server/worker.ts`), publicado pelo workflow `Salas`.
+
+### Corrigido
+- A frase da mão de onze dizia "nós decidimos se jogam".
+
 ## [0.2.0]
 
 ### Adicionado

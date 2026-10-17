@@ -5,8 +5,9 @@ import { initEvents } from './app/events';
 import { render } from './app/render';
 import { S, ui } from './app/state';
 import { initUpdates } from './app/update';
+import { net } from './app/net';
 
 initEvents();
-window.__APP = { Core, ui, get S() { return S; } };
+window.__APP = { Core, ui, get S() { return S; }, get room() { return net.view; } };
 render();
 initUpdates();

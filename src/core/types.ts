@@ -45,6 +45,8 @@ export interface Shown { seat: Seat; cards: Card[]; bluff: boolean }
 export interface Game {
   /** The names at the four seats (0 is always "Você"), and the club of each pair (null: none). */
   names: string[]; sides: [string | null, string | null];
+  /** The seats played by people; the others are computer players. On one phone, only seat 0; in a room, each person's. */
+  humans: Seat[];
   /** How well the computer players play in this game. */
   level: Level;
   /** A hand of iron (both pairs with 11): everyone plays blind, without seeing their own cards. */
@@ -104,6 +106,8 @@ export interface AppState {
   theme?: Theme; speed?: Speed; quiet?: true; hints?: false;
   /** The person's club, the rival club in the rivals mode, and the player names the person changed, by club. */
   team?: string; rival?: string; custom?: Record<string, string[]>;
+  /** The name the person plays under online, and the room they are in (code and the token that keeps their seat). */
+  myName?: string; online?: { code: string; token: string };
 }
 
 /** An entry as the source describes it, once read by `normEntry`. */
