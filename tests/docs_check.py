@@ -55,6 +55,8 @@ CONSTANTS = [
     (r"export const THINK: Record<Speed, number> = \{ calma: 1500, normal: 900, rapida: 400 \};", 'calma 1,5 s, normal 0,9 s, rápida 0,4 s (`THINK`)'),
     (r'export const ROUND_PAUSE = 700;', 'mais 0,7 s depois de uma rodada fechada (`ROUND_PAUSE`)'),
     (r"export const TEAMS_CHECKED = '14/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
+    (r'export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;', 'depois de 0,9 s (`ROOM_THINK`), mais 0,7 s depois de uma rodada fechada (`ROOM_ROUND_PAUSE`)'),
+    (r'export const NAME_MAX = 16, CODE_LEN = 5;', 'um código de 5 letras (`CODE_LEN`)'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
 ]
 for pattern, phrase in CONSTANTS:
@@ -113,7 +115,7 @@ check('a new version waits for the tap', "event.data === 'activate'" in sw and '
 
 # 14. the test handle, and the checks the branch protection asks for
 main = read('src/main.ts')
-check('window.__APP is what the spec says', 'window.__APP = { Core, ui, get S() { return S; } };' in main and '`{Core, ui, S}`' in spec)
+check('window.__APP is what the spec says', 'window.__APP = { Core, ui, get S() { return S; }, get room() { return net.view; } };' in main and '`{Core, ui, S, room}`' in spec)
 ci = read('.github/workflows/ci.yml')
 check('the checks the main branch requires exist in CI', 'name: checks' in ci and "name: e2e (${{ matrix.theme }})" in ci and 'theme: [dark, light]' in ci and '`checks`, `e2e (dark)` e `e2e (light)`' in spec)
 

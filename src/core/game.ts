@@ -72,16 +72,16 @@ export const nextValue = (v: number): number => VALUES[Math.min(VALUES.length - 
 
 /* ---------- a game ---------- */
 /** Deals a new hand on top of what the game already has: score, history, log and the next dealer. */
-function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level' | 'names' | 'sides'>, rand: () => number): Game {
+function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level' | 'names' | 'sides' | 'humans'>, rand: () => number): Game {
   const d = shuffle(deck(), rand), starter = nextSeat(base.dealer);
   const at = [base.score[0] === ELEVEN, base.score[1] === ELEVEN];
   const eleven: Team | null = at[0] !== at[1] ? (at[0] ? 0 : 1) : null;
   const vira = d[HAND_SIZE * 4];
   const log = [...base.log, `Mão ${base.n}: ${say(base, base.dealer)} deu as cartas. Vira: ${cardName(vira)}.`];
-  if (eleven !== null) log.push(`Mão de onze: ${eleven === 0 ? 'nós' : 'eles'} ${eleven === 0 ? 'decidimos' : 'decidem'} se jogam.`);
+  if (eleven !== null) log.push(`Mão de onze: ${eleven === 0 ? 'nós' : 'eles'} ${eleven === 0 ? 'decidimos se jogamos' : 'decidem se jogam'}.`);
   else if (at[0] && at[1]) log.push('Mão de ferro: os dois com 11. Todo mundo joga às cegas, sem ver as próprias cartas; quem levar a mão leva o jogo.');
   return {
-    names: base.names, sides: base.sides, level: base.level, blind: at[0] && at[1], played: [],
+    names: base.names, sides: base.sides, humans: base.humans, level: base.level, blind: at[0] && at[1], played: [],
     score: base.score, dealer: base.dealer, n: base.n, hist: base.hist, log,
     hands: [0, 1, 2, 3].map(i => d.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE)), vira,
     table: [], last: null, rounds: [], starter, turn: starter, value: 1, raisedBy: null, ask: null,
@@ -89,25 +89,30 @@ function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'leve
   };
 }
 /** A new game: nobody has points, the first dealer is drawn. */
-export function newGame(rand: () => number, level: Level = 'medio', table?: { names: string[]; sides: [string | null, string | null] }): Game {
+export function newGame(rand: () => number, level: Level = 'medio', table?: { names: string[]; sides: [string | null, string | null]; humans?: Seat[] }): Game {
   const names = table && table.names.length === 4 ? table.names.map((x, i) => String(x || SEATS[i]).slice(0, 24)) : [...SEATS];
-  return deal({ score: [0, 0], dealer: Math.floor(rand() * 4), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio', names, sides: table ? table.sides : [null, null] }, rand);
+  return deal({ score: [0, 0], dealer: Math.floor(rand() * 4), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio', names, sides: table ? table.sides : [null, null], humans: table && table.humans && table.humans.length ? [...table.humans].sort() : [0] }, rand);
 }
 /** After a hand: the next one, dealt by the next seat. */
 export function nextHand(g: Game, rand: () => number): Game {
   if (g.phase !== 'handEnd') return g;
-  return deal({ score: g.score, dealer: nextSeat(g.dealer), n: g.n + 1, hist: g.hist, log: g.log, level: g.level, names: g.names, sides: g.sides }, rand);
+  return deal({ score: g.score, dealer: nextSeat(g.dealer), n: g.n + 1, hist: g.hist, log: g.log, level: g.level, names: g.names, sides: g.sides, humans: g.humans }, rand);
 }
 
-/** Who has to act now: the seat whose turn it is, the one who answers a raise (the person answers for their pair), or
- *  the pair deciding a hand of eleven (the person for theirs, Biu for the others). Null when nobody has to. */
+/** Who has to act now: the seat whose turn it is, the one who answers a raise, or the one who decides a hand of eleven
+ *  for their pair. A pair with a person in it answers and decides through that person; a pair of computer players,
+ *  through the one after who asked (on a raise) or its first seat (on a hand of eleven). Null when nobody has to. */
 export function whoActs(g: Game): Seat | null {
   if (g.phase === 'play') return g.turn;
-  if (g.phase === 'truco') return responder(g.ask as Ask);
-  if (g.phase === 'eleven') return g.eleven === 0 ? 0 : 1;
+  if (g.phase === 'truco') return responder(g, g.ask as Ask);
+  if (g.phase === 'eleven') return speaker(g, g.eleven as Team, g.eleven as Team);
   return null;
 }
-const responder = (a: Ask): Seat => (teamOf(a.by) === 1 ? 0 : nextSeat(a.by));
+/** The seat that speaks for pair `t`: its person (the first one, if both are people), or `fallback`. */
+const speaker = (g: Game, t: Team, fallback: Seat): Seat => { const h = (g.humans || [0]).filter(s => teamOf(s) === t).sort()[0]; return h === undefined ? fallback : h; };
+const responder = (g: Game, a: Ask): Seat => speaker(g, other(teamOf(a.by)), nextSeat(a.by));
+/** Whether `seat` is played by a person. */
+export const isHuman = (g: Game, seat: Seat): boolean => (g.humans || [0]).includes(seat);
 
 /** Who takes a round: the seat with the strongest card, or -1 when the strongest cards tie between the two pairs (two
  *  equal cards of the same pair are not a tie: that pair takes it). */
@@ -191,7 +196,7 @@ export type Answer = 'accept' | 'run' | 'raise';
  *  was worth before; raising accepts and asks for the next value, and then the first pair answers. */
 export function answer(g: Game, a: Answer): Game {
   if (g.phase !== 'truco' || !g.ask) return g;
-  const ask = g.ask, seat = responder(ask);
+  const ask = g.ask, seat = responder(g, ask);
   if (a === 'accept') return { ...g, phase: 'play', value: ask.value, raisedBy: teamOf(ask.by), ask: null, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(g, seat)} aceitou. Vale ${ask.value}.`] };
   if (a === 'run') {
     const end = endHand(g, teamOf(ask.by), g.value, `${say(g, seat)} correu do ${WORD[ask.value]}.`);
@@ -207,7 +212,7 @@ export function answer(g: Game, a: Answer): Game {
 /** A hand of eleven: the pair with 11 plays it (worth 3) or runs (the others get 1). */
 export function decideEleven(g: Game, play: boolean): Game {
   if (g.phase !== 'eleven' || g.eleven === null) return g;
-  const t = g.eleven, seat = t === 0 ? 0 : 1;
+  const t = g.eleven, seat = whoActs(g) as Seat;
   if (!play) return { ...endHand({ ...g, value: 1 }, other(t), 1, `${t === 0 ? 'Nós corremos' : 'Eles correram'} da mão de onze.`), shout: { seat, word: 'fujo' } };
   return { ...g, phase: 'play', value: ELEVEN_VALUE, shout: { seat, word: 'jogo' }, log: [...g.log, `${t === 0 ? 'Nós jogamos' : 'Eles jogam'} a mão de onze: vale ${ELEVEN_VALUE}.`] };
 }
@@ -309,7 +314,7 @@ export const aiEleven = (g: Game, t: Team): boolean => strength([...g.hands[t], 
 /** The move of the computer player who has to act now; the same game when it is the person's move, or nobody's. */
 export function aiAct(g: Game, rand: () => number): Game {
   const s = whoActs(g);
-  if (s === null || s === 0) return g;
+  if (s === null || isHuman(g, s)) return g;
   if (g.phase === 'eleven') return decideEleven(g, aiEleven(g, g.eleven as Team));
   if (g.phase === 'truco') return answer(g, aiAnswer(g, s, rand));
   const r = aiRaise(g, s, rand);

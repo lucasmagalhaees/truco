@@ -63,8 +63,23 @@ Modelo de uma decisão:
   - Nomes de jogadores reais só como nomes das IAs; nada é dito em nome deles além das falas genéricas da mesa ("Truco!", "Aceito!").
 - **Não sei:** quem saiu ou se machucou depois dessas datas, e os elencos de Corinthians, Remo, Vasco e Cruzeiro são de prévias de julho e agosto. Por isso os nomes podem ser trocados no app.
 
+## D7. Jogar online, com servidor de sala
+
+- **Contexto (17/10/2026):** "como eu faria pra jogar online com mais 3 amigos?", depois "quero um modo pra jogar eu + IA vs um amigo + IA" e, entre servidor de sala e um celular anfitrião, "faz o 1 1. Servidor de sala".
+- **Decisão:** um servidor de salas na Cloudflare (Workers com Durable Objects), que guarda a partida e manda a cada celular só a visão da pessoa dele. Até 4 pessoas; lugar vazio fica com a IA. O núcleo é o mesmo: as regras e as IAs rodam no servidor sem reescrever nada.
+- **Por que Cloudflare:** a Vercel não segura WebSocket aberto; um Durable Object é uma sala viva com estado e conexões, e o núcleo em TypeScript roda nele como está.
+- **Fato de terceiro (conferido em 17/10/2026, [preços dos Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing)):** no plano grátis, Durable Objects só com armazenamento SQLite; 100.000 requisições e 13.000 GB-s por dia; mensagens que chegam por WebSocket contam 20 por requisição; com a hibernação, sala parada não conta tempo. Wrangler 4.145.0 (30/09/2026).
+- **Interpretações que precisaram ser feitas:**
+  - Ordem dos lugares: quem criou, o primeiro a entrar (contra quem criou), a dupla de quem criou, a dupla do segundo. Assim, "eu + IA contra amigo + IA" é só criar a sala e o amigo entrar.
+  - Só quem criou a sala começa, recomeça e passa para a IA o lugar de quem saiu. As IAs jogam no nível de quem criou e com os nomes do bar (Biu, Cida, Toinho); o modo "seu time" fica para o jogo num celular só.
+  - Ninguém entra numa partida já começada; quem caiu volta ao mesmo lugar com o token guardado no celular.
+  - "Nós" e "Eles" nas frases do histórico trocam de lado para a outra dupla (`swapSides`).
+  - Sem login: o nome é o que a pessoa escreve, e o lugar é garantido pelo token.
+- **Não sei:** como se comporta na Cloudflare de verdade (o servidor foi testado em Node, com o mesmo núcleo; na Cloudflare, só o build e os tipos foram conferidos); a demora pelo 4G.
+
 ## Pendências
 
 | Pendência | Quem resolve |
 |---|---|
 | Proteger a `main` exigindo PR e os checks do CI | Dono do repositório |
+| Criar a conta na Cloudflare, pôr `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` nos secrets e `VITE_ROOM_URL` na Vercel | Dono do repositório |

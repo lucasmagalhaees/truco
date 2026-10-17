@@ -1,0 +1,13 @@
+# The room server (server/worker.ts) on Cloudflare Workers. Deployed by .github/workflows/salas.yml.
+name = "truco-salas"
+main = "server/worker.ts"
+compatibility_date = "2026-09-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# the free plan only has Durable Objects with SQLite storage
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -82,6 +82,8 @@ jobs:
           npm run build
       - name: End to end
         run: python tests/e2e.py ${{ matrix.theme }}
+      - name: End to end, online (two phones in a room)
+        run: python tests/e2e_online.py ${{ matrix.theme }}
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
