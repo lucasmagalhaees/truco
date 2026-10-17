@@ -7,7 +7,7 @@ Chance is taken out of the way by stacking hands through window.__APP.S (invente
 wanted, by fixing Math.random; the computer players think for a fixed 20 ms (ui.wait). The microphone is a stand-in
 that "hears" a fixed sentence. Every action of the person is a tap on the screen. Screenshots go to tests/shots/.
 """
-import json, pathlib, re, sys
+import json, os, pathlib, re, sys, traceback
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import cov
 from playwright.sync_api import sync_playwright
@@ -20,6 +20,18 @@ KEY = 'truco.v1'
 # a stand-in microphone: says what window.__say holds, then stops
 FAKE_MIC = '''window.__say = "vira sete de copas minha mão zap três de ouros e rei de espadas";
 window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { setTimeout(() => { this.onresult && this.onresult({ results: [[{ transcript: window.__say }]] }); this.onend && this.onend(); }, 30); } stop() { this.onend && this.onend(); } };'''
+
+LAST_STATE = {'game': None}
+def on_failure(kind, value, tb):
+    """On GitHub the job log lives where not every reader can reach it; the failing line, the error and the game at that
+    moment also go out as an annotation of the job, which the checks API serves."""
+    traceback.print_exception(kind, value, tb)
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        here = next((f for f in reversed(traceback.extract_tb(tb)) if f.filename.endswith('e2e.py')), None)
+        game = json.dumps(LAST_STATE['game'], ensure_ascii=False)[:900] if LAST_STATE['game'] else 'sem partida'
+        msg = f'linha {here.lineno if here else "?"}: {here.line if here else ""} -> {kind.__name__}: {str(value)[:400]} | jogo: {game}'
+        print(f'::error title=e2e {THEME}::' + msg.replace('\n', ' ').replace('%', '%25'))
+sys.excepthook = on_failure
 
 with sync_playwright() as p:
     b = p.chromium.launch()
@@ -36,7 +48,9 @@ with sync_playwright() as p:
     txt = lambda sel: pg.text_content(sel).replace('\xa0', ' ')
     overflow = lambda: pg.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
     shot = lambda name: pg.screenshot(path=str(SHOTS / name), full_page=True)
-    G = lambda: pg.evaluate('window.__APP.S.game')
+    def G():
+        g = pg.evaluate('window.__APP.S.game'); LAST_STATE['game'] = g and {k: g[k] for k in ('phase', 'turn', 'starter', 'rounds', 'table', 'hands', 'value', 'ask', 'score', 'vira')}
+        return g
     S = lambda: pg.evaluate('window.__APP.S')
     def ready():
         pg.wait_for_function('window.__APP && window.__APP.S'); pg.evaluate('window.__APP.ui.wait = 20')
