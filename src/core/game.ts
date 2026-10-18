@@ -83,7 +83,7 @@ export function ranking(vira: Card): { rank: string; cards: Card[]; manilha: boo
     ...[...RANKS].reverse().filter(r => r !== m).map(r => ({ rank: r, cards: SUITS.map(s => r + s), manilha: false }))];
 }
 /** The difficulty levels. */
-export const LEVELS: Level[] = ['facil', 'medio', 'dificil'];
+export const LEVELS: Level[] = ['facil', 'medio', 'dificil', 'extremo'];
 const say = (g: Pick<Game, 'names'>, s: Seat): string => g.names[s] || SEATS[s];
 /** A pair of a game of three pairs in words: its two names. */
 const pairSay = (g: Pick<Game, 'names' | 'teams'>, t: Team): string => `${say(g, t)} e ${say(g, partnerOf(g, t))}`;
@@ -309,7 +309,7 @@ export const RAISE_NEED: Record<number, number> = { 3: 6.5, 6: 8, 9: 9.5, 12: 11
 export const WEAK_BY = 2;
 /** How many raises (or answers) a first guess is worth before what a seat has shown counts more: little for the hard
  *  player, who learns fast, more for the medium one. */
-export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4 };
+export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4, extremo: 4 };
 /** The first guess before anything is seen: how often a raise is a bluff, and how often a seat runs from a raise. */
 export const BLUFF_GUESS = 0.2, RUN_GUESS = 0.35;
 const unread = (n: number): Read[] => Array.from({ length: n }, () => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
@@ -404,6 +404,7 @@ function sureThing(g: Game, seat: Seat): boolean {
 export function aiCard(g: Game, seat: Seat, rand: () => number): number {
   const hand = g.hands[seat], pw = (k: number): number => power(hand[k], g.vira);
   if (g.blind || (g.level === 'facil' && rand() < 1 / 3)) return Math.floor(rand() * hand.length);
+  if (g.level === 'extremo' && hand.length > 1) return extremeCard(g, seat, rand);
   const order = hand.map((_, k) => k).sort((a, b) => pw(a) - pw(b));
   const low = order[0], high = order[order.length - 1], hard = g.level === 'dificil';
   if (!g.table.length) {
@@ -427,6 +428,11 @@ export function aiCard(g: Game, seat: Seat, rand: () => number): number {
 export function aiRaise(g: Game, seat: Seat, rand: () => number): 'no' | 'yes' | 'bluff' {
   if (!canRaise(g, seat)) return 'no';
   if (sureThing(g, seat)) return 'yes';
+  if (g.level === 'extremo') {
+    const { win } = extremeOdds(g, seat, rand);
+    if (win >= RAISE_FOR) return 'yes';
+    return win >= 0.15 && rand() < bluffOdds(g, seat) ? 'bluff' : 'no';
+  }
   if (g.level === 'dificil') {
     // the hard player raises for value when the hand looks won more often than not
     if (handOdds(g, seat, rand).win >= RAISE_FOR) return 'yes';
@@ -447,7 +453,7 @@ export function bluffOdds(g: Game, seat: Seat): number {
 /** The most a hard player bluffs, however much the others run. */
 export const BLUFF_MAX = 0.45;
 /** How many deals of the unseen cards a player imagines before answering a raise. */
-export const SAMPLES: Record<Level, number> = { facil: 0, medio: 40, dificil: 120 };
+export const SAMPLES: Record<Level, number> = { facil: 0, medio: 40, dificil: 120, extremo: 120 };
 /** The chance of taking the hand from which the hard player raises. */
 export const RAISE_FOR = 0.62;
 /** The chance of taking the hand from which a player raises back instead of only accepting. */
@@ -512,15 +518,15 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
   const t = tm(g, seat), m = g.score[t], o = Math.max(...g.score.filter((_, i) => i !== t));      // the pair closest to 12
   const run = gameChance(m, o + g.value);
   if (run === 0) return { a: 'accept', bluff: false };                   // running ends the game: play it
-  const { win, lose } = handOdds(g, seat, roll);
+  const { win, lose } = g.level === 'extremo' ? extremeOdds(g, seat, roll) : handOdds(g, seat, roll);
   if (ask.value < WIN_POINTS && win >= RAISE_BACK) return { a: 'raise', bluff: false };
   // the hard player now and then raises back on a weak hand, against a seat that runs a lot
-  if (g.level === 'dificil' && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
+  if ((g.level === 'dificil' || g.level === 'extremo') && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
   // points: the hand's worth now against what was asked (so a doze from nove is paid when the hand is won more than one
   // time in eight); near the end of the game the hard player weighs what each outcome does to the game instead
   // with three pairs, running only takes this pair out of the hand: the asker scores only if the other pair runs too
   const three = teamsOf(g) === 3, cost = three ? g.value / 2 : g.value;
-  const play = g.level === 'dificil' && !three && Math.max(m, o) + ask.value >= WIN_POINTS
+  const play = (g.level === 'extremo' || (g.level === 'dificil' && Math.max(m, o) + ask.value >= WIN_POINTS)) && !three
     ? win * gameChance(m + ask.value, o) + lose * gameChance(m, o + ask.value) + (1 - win - lose) * gameChance(m, o) >= run
     : (win - lose) * ask.value >= -cost;
   if (play) return { a: 'accept', bluff: false };
@@ -528,6 +534,60 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
 }
 /** How a computer player answers a raise (see answerPlan). */
 export const aiAnswer = (g: Game, seat: Seat, rand?: () => number): Answer => (g.ask ? answerPlan(g, seat, rand).a : 'accept');
+/* ---------- the extreme player ----------
+   It plays like a person who counts the cards. It looks at its own hand, the vira, every card played this hand and
+   what everyone did in plain sight (who raised, from how many cards and with the rounds standing how, and the cards
+   they played since), never at anyone's hidden cards. For each decision it deals the cards it has not seen to the
+   hidden hands many times, weighs each deal by how well it fits what was done (a raise from a hand that deserves it
+   fits fully; from a weak hand only as a bluff, as often as that seat seems to bluff), and plays each deal out. */
+/** How many deals the extreme player imagines for each decision; each card it could play is tried on the same deals.
+ *  About 6 ms for the slowest decision (three cards to choose from) in Node on this machine, 18/10/2026. */
+export const EXTREME_SAMPLES = 100;
+/** The chance per weak hand of raising anyway that makes a seat's bluff rate come out right, given how often a hand
+ *  dealt at random deserves a raise. */
+const bluffWeight = (g: Game, s: Seat): number => { const b = bluffRate(g, s); return Math.min(1, (b * FAIR_BASE) / ((1 - b) * (1 - FAIR_BASE))); };
+/** Deals of the cards `seat` has not seen to the hidden hands, each weighed by how well it fits the raises of this hand. */
+export function imagine(g: Game, seat: Seat, rand: () => number, n = EXTREME_SAMPLES): { hands: Card[][]; w: number }[] {
+  const pool = unseen(g, seat), r = seeded(Math.floor(rand() * 4294967296)), out: { hands: Card[][]; w: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = shuffle(pool, r);
+    let k = 0, w = 1;
+    const hands = Array.from({ length: seatsOf(g) }, (_, s) => (s === seat ? [...g.hands[seat]] : d.slice(k, (k += holding(g, s)))));
+    for (const x of g.watch || []) {
+      if (x.by === seat) continue;
+      // what it held when it asked: the cards it played since, and what it would still hold in this deal
+      const held = [...x.seen, ...hands[x.by]].slice(0, x.held);
+      if (strength(held, g.vira) + x.stand < DESERVE) w *= bluffWeight(g, x.by);
+    }
+    out.push({ hands, w });
+  }
+  return out;
+}
+/** The weighted chances of `seat`'s pair taking and losing the hand over these deals, from `g` as it stands. */
+function weigh(g: Game, seat: Seat, deals: { hands: Card[][]; w: number }[], move?: number): { win: number; lose: number } {
+  const t = tm(g, seat);
+  let win = 0, lose = 0, all = 0;
+  for (const d of deals) {
+    let h: Game = { ...g, hands: d.hands, phase: 'play', ask: null };
+    if (move !== undefined) h = playCard(h, seat, move);
+    const w = h.phase === 'play' ? playOut(h, h.hands, 'medio') : h.result ? h.result.team : null;
+    all += d.w; if (w === t) win += d.w; else if (w !== null) lose += d.w;
+  }
+  return all ? { win: win / all, lose: lose / all } : { win: 0, lose: 0 };
+}
+/** The extreme player's chances of taking and losing the hand. */
+export const extremeOdds = (g: Game, seat: Seat, rand: () => number): { win: number; lose: number } => weigh(g, seat, imagine(g, seat, rand), undefined);
+/** The card the extreme player plays: the one that takes the hand most often over the same deals (the cheaper on a tie). */
+function extremeCard(g: Game, seat: Seat, rand: () => number): number {
+  const deals = imagine(g, seat, rand), hand = g.hands[seat];
+  let best = 0, score = -Infinity;
+  const order = hand.map((_, k) => k).sort((a, b) => power(hand[a], g.vira) - power(hand[b], g.vira));
+  for (const k of order) {
+    const { win, lose } = weigh(g, seat, deals, k);
+    if (win - lose > score + 1e-9) { score = win - lose; best = k; }
+  }
+  return best;
+}
 /** Whether the computer pair plays a hand of eleven: both hands together, strong enough. */
 export const aiEleven = (g: Game, t: Team): boolean => strength([...g.hands[t], ...g.hands[partnerOf(g, t)]], g.vira) >= (g.level === 'facil' ? 6 : 7.5);
 /** The move of the computer player who has to act now; the same game when it is the person's move, or nobody's. */

@@ -138,6 +138,21 @@ export default function cases(Core) {
   eq('aiAct: nothing when it is the person\'s move or nobody\'s', [Core.aiAct(base, rand) === base, Core.aiAct(h, rand) === h], [true, true]);
   eq('aiAct: plays, answers, decides', [Core.aiAct(ai([[], ['4e', '3e', 'Ke'], [], []]), never).table.length, Core.aiAct({ ...Core.raise(base, 0), hands: [[], ['5p', '5c', '3e'], [], []] }, never).ask.value, Core.aiAct({ ...them11 }, never).phase !== 'eleven'], [1, 6, true]);
   eq('aiAct: raises with a strong hand, bluff flagged', [Core.aiAct(strong, never).phase, Core.aiAct(weak, always).ask.bluff], ['truco', true]);
+  // the extreme player never looks at hidden cards: swapping the others' hidden cards for others that fit what is
+  // public (same counts, cards it has not seen) changes none of its moves
+  {
+    const xr = Core.seeded(41); let same = 0, tried = 0;
+    for (let i = 0; i < 12; i++) {
+      let g = { ...Core.newGame(xr, 'extremo'), humans: [] };
+      for (let k = 0; k < i % 5; k++) if (Core.whoActs(g) !== null) g = Core.aiAct(g, xr);
+      const s = Core.whoActs(g); if (s === null || g.phase === 'eleven') continue;
+      const hidden = Core.shuffle(g.hands.flatMap((h, j) => (j === s ? [] : h)), Core.seeded(i + 100));
+      let k = 0; const swapped = { ...g, hands: g.hands.map((h, j) => (j === s ? h : hidden.slice(k, (k += h.length)))) };
+      const a = Core.aiAct(g, Core.seeded(i)), b = Core.aiAct(swapped, Core.seeded(i));
+      tried++; if (a.phase === b.phase && JSON.stringify(a.ask) === JSON.stringify(b.ask) && JSON.stringify(a.table) === JSON.stringify(b.table) && a.value === b.value) same++;
+    }
+    eq('the extreme player decides the same whatever the hidden cards are (it never reads them)', [tried > 5, same === tried], [true, true]);
+  }
   // whole games between computer players end, at every level
   for (const level of Core.LEVELS) {
     const rr = Core.seeded(11); let g = Core.newGame(rr, level), k = 0;
@@ -429,6 +444,34 @@ export default function cases(Core) {
     // a game can end in two hands once the stakes go up (doze is paid now): what counts is that the hands add up
     const sums = [0, 1, 2].map(t => Math.min(12, g.hist.filter(h => h.team === t).reduce((x, h) => x + h.points, 0)));
     eq(`three pairs: a whole game of six computer players at ${level} ends with one pair at 12, the hands adding up to the score`, [g.phase, g.score.filter(x => x === 12).length, g.score.length, g.hist.length >= 1, sums.every((x, t) => x >= g.score[t])], ['over', 1, 3, true, true]);
+  }
+  // the extreme player at a table of six also never reads hidden cards: swapping them changes none of its moves
+  {
+    const xr = Core.seeded(43); let same = 0, tried = 0;
+    for (let i = 0; i < 10; i++) {
+      let g = { ...Core.newGame(xr, 'extremo', { names: Core.SEATS6, sides: [null, null], humans: [0], teams: 3 }), humans: [] };
+      for (let k = 0; k < i % 7; k++) if (Core.whoActs(g) !== null) g = Core.aiAct(g, xr);
+      const s = Core.whoActs(g); if (s === null || g.phase === 'eleven') continue;
+      const hidden = Core.shuffle(g.hands.flatMap((h, j) => (j === s ? [] : h)), Core.seeded(i + 200));
+      let k = 0; const swapped = { ...g, hands: g.hands.map((h, j) => (j === s ? h : hidden.slice(k, (k += h.length)))) };
+      const a = Core.aiAct(g, Core.seeded(i)), b = Core.aiAct(swapped, Core.seeded(i));
+      tried++; if (a.phase === b.phase && JSON.stringify(a.ask) === JSON.stringify(b.ask) && JSON.stringify(a.table) === JSON.stringify(b.table) && a.value === b.value) same++;
+    }
+    eq('three pairs: the extreme player decides the same whatever the hidden cards are', [tried > 4, same === tried], [true, true]);
+  }
+  // online: a room made at the extreme level plays its computer players at that level on the server
+  {
+    const xr = Core.seeded(44), tk = 'token-extremo-0001';
+    let r = Core.handle(Core.newRoom('XTRMO'), tk, { t: 'join', name: 'Ana', token: tk, level: 'extremo' }, xr).room;
+    r = Core.handle(r, tk, { t: 'start' }, xr).room;
+    let steps = 0;
+    for (let i = 0; i < 400 && r.game.phase !== 'over'; i++) {
+      const g = r.game, who = Core.whoActs(g);
+      if (who === null) { r = { ...r, game: Core.nextHand(g, xr) }; continue; }
+      if (Core.isHuman(g, who)) { r = { ...r, game: { ...g, humans: [] } }; continue; }
+      r = Core.aiStep(r, xr); steps++;
+    }
+    eq('online: a room at the extreme level plays its game at that level on the server', [r.level, r.game.level, steps > 10], ['extremo', 'extremo', true]);
   }
   }
   eq('source: an entry read', Core.normEntry({ id: 7, name: ' Um ', value: '2.5', extra: true }), { id: '7', name: 'Um', value: 2.5 });

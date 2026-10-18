@@ -62,6 +62,7 @@ with sync_playwright() as p:
     assert pg.locator('#start').count() == 1 and pg.locator('select').count() == 0, 'no select of the system'
     assert 'Nenhuma partida terminada' in txt('#tally') and 'Nenhum exercício' in txt('#trainstats')
     pg.click('[data-act=level][data-v=dificil]'); assert S()['level'] == 'dificil' and 'Lembra de cada carta' in txt('#leveltext')
+    pg.click('[data-act=level][data-v=extremo]'); assert S()['level'] == 'extremo' and 'Conta as cartas' in txt('#leveltext') and overflow() == 0
     pg.click('[data-act=level][data-v=facil]'); assert 'quase não blefa' in txt('#leveltext')
     pg.click('[data-act=level][data-v=medio]')
     assert overflow() == 0; shot(f'e1-inicio-{THEME}.png')

@@ -62,7 +62,8 @@ const WORD: Record<number, string> = { 3: 'Truco', 6: 'Seis', 9: 'Nove', 12: 'Do
 const LEVEL: Record<string, [string, string]> = {
   facil: ['Fácil', 'Joga às vezes sem pensar, quase não blefa e cai em blefe.'],
   medio: ['Médio', 'Joga como gente de bar: carta certa, truco com mão boa, um blefe de vez em quando.'],
-  dificil: ['Difícil', 'Lembra de cada carta que saiu, sabe quando uma carta não perde mais, guarda a garantida, blefa na hora certa e paga blefe.']
+  dificil: ['Difícil', 'Lembra de cada carta que saiu, sabe quando uma carta não perde mais, guarda a garantida, blefa na hora certa e paga blefe.'],
+  extremo: ['Extremo', 'Conta as cartas como gente: pelo que saiu e pelo que cada um pediu, faz a conta do que pode estar na mão de quem, e escolhe carta, truco, aceite e blefe por ela. Nunca espia carta de ninguém.']
 };
 function vHome(): string {
   const lv = S.level, t = S.tally, tr = S.train;
