@@ -281,18 +281,10 @@ details.card .log,details.card .ranking{margin-top:12px}
 .confetti i:nth-child(7n){background:#1f6b45}
 @keyframes fall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:1;transform:translateY(105vh) rotate(var(--r,360deg)) translateX(30px)}}
 
-/* the clubs: a button in each club's colours, a stripe of the second colour */
-.clubs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.clubbtn{min-height:44px;padding:4px;border-radius:10px;border:2px solid var(--line);background:var(--c);color:var(--ci);box-shadow:inset 0 -5px 0 var(--c2);font:800 13px/1.1 var(--display);letter-spacing:.02em;min-width:0}
-.clubbtn.on{outline:3px solid var(--accent-bg);outline-offset:2px}
-/* the theme pickers: tabs of the kinds, the name of each pack, a team's three characters in a row, the three seats */
-.kinds,.modes{flex-wrap:wrap}
-.modes button{flex:1 1 40%}
-.packname{font:800 13px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px}
-.charrow{display:flex;flex-direction:column;gap:4px}
-.charrow>span{font-size:13px;color:var(--muted)}
+/* the theme pickers: tabs of the kinds and of the universes */
+.kinds{flex-wrap:wrap}
 .slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:64px;padding:6px 4px;border-radius:12px;border:2px solid var(--line);background:var(--c,var(--surface));color:var(--ci,var(--fg));box-shadow:inset 0 -5px 0 var(--c2,var(--line));min-width:0;overflow-wrap:anywhere;text-align:center}
+.slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:64px;padding:6px 4px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--fg);min-width:0;overflow-wrap:anywhere;text-align:center}
 .slot small{font-size:11px;opacity:.85}
 .slot b{font:800 14px/1.1 var(--display)}
 .slot.on{outline:3px solid var(--accent-bg);outline-offset:2px}
@@ -392,9 +384,10 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .sw{flex:none;width:10px;align-self:stretch;min-height:28px;border-radius:999px;background:linear-gradient(var(--a) 0 55%,var(--b) 55%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
 .sw.none{background:var(--cardline)}
 .slot .sw{width:100%;min-height:6px;height:6px}
-.list .charrow{display:flex;align-items:center;gap:10px;padding:10px 12px}
-.charrow>span:not(.sw){flex:none;width:30%;font:700 14px/1.2 var(--display)}
-.chars{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
-.chip-btn{min-height:36px;padding:0 10px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 14px/1 var(--font)}
+.list .charrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:7px 10px}
+.charrow .sw{align-self:center;min-height:0;height:16px;width:8px}
+.charrow>span:not(.sw){flex:1;min-width:0;font:700 13px/1.2 var(--display);color:var(--muted)}
+.chars{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%;min-width:0}
+.chip-btn{min-height:34px;padding:0 9px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 13px/1 var(--font)}
 .chip-btn.on{background:var(--fg);color:var(--surface)}
 .linkbtn{text-decoration:underline;font-weight:700;color:var(--fg);padding:0 2px}

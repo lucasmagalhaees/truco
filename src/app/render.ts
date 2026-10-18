@@ -236,8 +236,9 @@ function vNet(): string {
   return `<p class="explain" id="netstatus">${gone.map(m => `<b>${esc(m.name)}</b> saiu da sala`).join(', ')}. A partida espera voltar.${v.host ? gone.map(m => ` <button class="btn ghost" data-act="botseat" data-s="${m.seat}">IA no lugar de ${esc(m.name)}</button>`).join('') : ''}</p>`;
 }
 
-/* ---------- the theme: a ready team, rivals, or a table put together seat by seat ----------
-const colorVars = (c: [string, string, string] | null): string => (c ? ` style="--c:${c[0]};--c2:${c[1]};--ci:${c[2]}"` : '');
+/* ---------- the theme: a table put together seat by seat ----------
+   Everything here comes from the catalogue (Core.kinds, Core.PACKS): no pack or kind is named in the screen. The
+   catalogue's colours only show as a small strip (swatch); buttons and lists keep the app's neutral palette. */
 /** The tabs of the kinds (Futebol, Animes, Jogos…), for the picker `k`; the open one is ui.kind[k], or the kind of `cur`. */
 function kindOf(k: string, cur?: string | null): string {
   const all = Core.kinds(), want = ui.kind[k] || (cur ? (Core.charById(cur)?.team.pack.kind || Core.teamById(cur)?.pack.kind) : '') || all[0].id;

@@ -217,6 +217,8 @@ with sync_playwright() as p:
     pg.click(f'#drill [data-act=guess][data-v="{wrong}"]'); assert 'Não foi dessa vez' in txt('#verdict') and S()['train']['total'] == 2
     assert pg.locator('#drill .is-right').count() == 1 and pg.locator('#drill .is-wrong').count() == 1
     pg.click('[data-act=home]'); assert route() == 'treinar', 'out of a drill, back on Treinar'
+    pg.click('[data-act=drill][data-k=manilha]'); assert pg.locator('#drill').count() == 1 and '#treinar/exercicio' in pg.url
+    pg.go_back(); pg.wait_for_selector('#train'); assert route() == 'treinar' and pg.is_visible('#tabs'), 'the browser\'s back closes a drill'
     pg.click('[data-act=drill][data-k=round]')
     d = pg.evaluate('window.__APP.ui.drill'); assert pg.locator('#drill .dp').count() == 4
     pg.click(f'#drill [data-act=guess][data-v="{d["answer"]}"]'); assert 'Isso!' in txt('#verdict') and pg.locator('#drillrank li').count() == 13
@@ -248,6 +250,8 @@ with sync_playwright() as p:
     pg.evaluate('window.__say = "bom dia"'); pg.click('[data-act=listen]'); pg.wait_for_function('!document.getElementById("toast").hidden')
     assert 'Não entendi' in txt('#toast')
     pg.click('#real [data-act=home]'); assert pg.locator('#realcard').count() == 1
+    pg.click('[data-act=real]'); assert pg.locator('#real').count() == 1
+    pg.go_back(); pg.wait_for_selector('#realcard'); assert route() == 'real' and S()['real']['hand'], 'the browser\'s back closes the assistant, which keeps the table'
     tab('jogar')
 
     # ---------- a game: a random start, played through the screen until the hand ends ----------
@@ -366,6 +370,18 @@ with sync_playwright() as p:
         h = pg.evaluate('document.documentElement.scrollHeight'); tall[r] = round(h / 852, 1)
         assert h <= 3 * 852 and overflow() == 0, (r, h)
         shot(f'e0-{r.replace("/", "-")}-{THEME}.png')
+    # the table seat by seat and heroes against villains in use: the picker, a kind and a universe at a time, stays short
+    for r, mode in (('equipe/montar', 'seats'), ('equipe/hv', 'hv')):
+        pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]'); pg.click(f'#panel [data-act=mode][data-v={mode}]')
+        assert pg.locator('#picker').count() == 1, r
+        h = pg.evaluate('document.documentElement.scrollHeight'); tall[r + ' (em uso)'] = round(h / 852, 1)
+        assert h <= 3 * 852 and overflow() == 0, (r, h)
+        shot(f'e0-{r.replace("/", "-")}-em-uso-{THEME}.png')
+    pg.click('#panel [data-act=mode][data-v=own]'); assert 'seats' not in S()
+    # the team lists keep the app's colours: a team's colours only in the small strip of each line
+    pg.evaluate('location.hash = "#equipe/time/futebol"'); pg.wait_for_selector('#panel[data-route="equipe/time/futebol"]')
+    bgs = pg.evaluate('[...new Set([...document.querySelectorAll("#teams .item")].map(e => getComputedStyle(e).backgroundColor))]')
+    assert len(bgs) == 1, ('one background for every team line', bgs)
     print('alturas (em telas de 852 px):', tall)
     cov.stop(pg, f'e2e-{THEME}')
     assert not errs, errs
@@ -391,4 +407,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')

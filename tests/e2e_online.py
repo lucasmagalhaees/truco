@@ -63,10 +63,18 @@ with sync_playwright() as p:
         pg.on('pageerror', lambda e: errs.append(str(e)))
         cov.start(pg)
         return pg
+    def to_online(pg):
+        """Jogar → Jogar online, through the tree: the tab, then the line that opens the screen."""
+        pg.click('#tabs [data-act=tab][data-v=jogar]'); pg.wait_for_selector('#panel[data-route="jogar"]')
+        pg.click('#panel [data-act=go][data-v="jogar/online"]'); pg.wait_for_selector('#panel[data-route="jogar/online"] #online')
     def at(pg, url=PAGE):
         pg.goto(url); pg.wait_for_function('window.__APP && window.__APP.S')
         pg.evaluate(f'window.__APP.ui.server = "{SERVER}"')
+        if '?sala=' in url:                                      # an invitation opens Jogar → Jogar online by itself
+            assert pg.get_attribute('#panel', 'data-route') == 'jogar/online' and pg.is_visible('#tabs')
+            pg.click('#panel [data-act=back]'); pg.wait_for_selector('#panel[data-route="jogar"]')
         pg.click('[data-act=level][data-v=medio]')              # a repaint, now that the server is known
+        to_online(pg)
     txt = lambda pg, sel: pg.text_content(sel).replace('\xa0', ' ')
     V = lambda pg: pg.evaluate('window.__APP.room')
     G = lambda pg: (V(pg) or {}).get('game')
@@ -75,6 +83,12 @@ with sync_playwright() as p:
 
     # ---------- without a server, the card says so ----------
     off = phone(); off.goto(PAGE); off.wait_for_function('window.__APP && window.__APP.S')
+    assert off.get_attribute('#panel', 'data-route') == 'jogar' and off.locator('#online').count() == 0, 'online is a screen of its own, under Jogar'
+    to_online(off)
+    off.go_back(); off.wait_for_selector('#panel[data-route="jogar"]')            # the browser's back goes one screen back
+    off.go_forward(); off.wait_for_selector('#panel[data-route="jogar/online"]')
+    assert '#jogar/online' in off.url and off.is_visible('#tabs') and off.get_attribute('#tab-jogar', 'aria-selected') == 'true'
+    off.screenshot(path=str(SHOTS / f'o0-online-{TAG}.png'))
     assert off.locator('#onlineoff').count() == 1 and off.locator('[data-act=createroom]').is_disabled()
     cov.stop(off, f'e2e-online-off-{TAG}'); off.context.close()
 
@@ -213,6 +227,7 @@ with sync_playwright() as p:
     # ---------- the friend leaves for good: the computer takes the seat at once ----------
     guest.click('[data-act=leaveroom]'); assert 'Toque de novo' in txt(guest, '[data-act=leaveroom]')
     guest.click('[data-act=leaveroom]'); guest.wait_for_selector('#online')
+    assert guest.get_attribute('#panel', 'data-route') == 'jogar/online' and guest.is_visible('#tabs'), 'out of the room, back on Jogar → Jogar online, with the tabs'
     host.wait_for_function('window.__APP.room.game.humans.length === 1')
     assert G(host)['humans'] == [0] and host.locator('#netstatus').count() == 0 and host.locator('[data-act=botseat]').count() == 0
     assert any('saiu; a IA joga no lugar.' in x for x in G(host)['log']), G(host)['log'][-3:]
@@ -228,6 +243,7 @@ with sync_playwright() as p:
         if host.locator('#netbar.off [data-act=retryroom]').count(): host.click('#netbar [data-act=retryroom]')
         host.wait_for_timeout(250)
     host.wait_for_selector('#online')
+    assert host.get_attribute('#panel', 'data-route') == 'jogar/online'
     assert 'A sala anterior acabou.' in txt(host, '#toast') and V(host) is None
     assert host.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None
     # ---------- three pairs: three phones, each person with a computer partner, six at the table ----------
@@ -282,4 +298,4 @@ with sync_playwright() as p:
     assert not errs, errs
     b.close()
 srv.kill()
-print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, três duplas pela tela com o pedido respondido pelas duas duplas e uma saindo da mão, sem estouro de largura e sem erro de script')
+print(f'e2e online ok ({TAG}): Jogar → Jogar online pela árvore (e o voltar do navegador), convite abrindo direto em Jogar online, sair da sala de volta lá, sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, três duplas pela tela com o pedido respondido pelas duas duplas e uma saindo da mão, sem estouro de largura e sem erro de script')
