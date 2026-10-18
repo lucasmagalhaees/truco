@@ -127,6 +127,16 @@ export default function cases(Core) {
   const pays = reads => { let k = 0; for (let i = 0; i < 40; i++) if (Core.aiAnswer(at(['Ke', 'Ao', '7e'], 1, 3, 'dificil', { reads }), 1, Core.seeded(i)) !== 'run') k++; return k; };
   const pb = pays(bluffer), ph = pays(honest);
   eq('the hard player pays a known bluffer more than a seat that only raises with a hand', [pb > ph, Core.bluffRate({ ...base, level: 'dificil', reads: bluffer }, 0) > 0.6, Core.bluffRate({ ...base, level: 'dificil', reads: honest }, 0) < 0.1], [true, true, true]);
+  // the extreme player bluffs where it works and against a pair that runs, hardly ever against one that always pays
+  {
+    const xb = { ...base, level: 'extremo', phase: 'play', turn: 0 };
+    const reads = runs => [0, 1, 2, 3].map(s => ({ shown: 0, weak: 0, answers: s === 1 ? 10 : 0, runs: s === 1 ? runs : 0 }));
+    const runner = Core.extremeBluff({ ...xb, reads: reads(9) }, 0), payer = Core.extremeBluff({ ...xb, reads: reads(0) }, 0);
+    const ahead = Core.extremeBluff({ ...xb, rounds: [0], hands: [['5p', '3o'], ['5c', '2o'], ['Ke', 'Ac'], ['Jo', 'Qe']] }, 0), first = Core.extremeBluff(xb, 0);
+    eq('the extreme player: bluffs more against a pair that runs, almost never against one that pays, more with a round taken, never past its cap', [runner > 4 * payer, payer < 0.01, ahead > 2 * first, runner <= Core.EXTREME_BLUFF.max], [true, true, true, true]);
+    const won = { ...xb, hands: [['5p', '5c', '3o'], ['4e', '6o', '7e'], ['Ke', 'Ac', '7o'], ['Jo', 'Qe', '6c']] };
+    eq('the extreme player: a won hand is sometimes kept quiet in the first round, and raised otherwise', [Core.aiRaise(won, 0, always), Core.aiRaise(won, 0, never), Core.aiRaise({ ...won, rounds: [0], hands: [['5p', '5c'], ['4e', '6o'], ['Ke', 'Ac'], ['Jo', 'Qe']] }, 0, always)], ['no', 'yes', 'yes']);
+  }
   // what the table sees: a weak raise shown when the others run counts as a bluff, and the run is counted too
   const seen = Core.answer(Core.raise({ ...base, hands: [['4e', '6o', '7e'], ['3e', '2o', 'Ae'], ['Qe', 'Je', 'Ke'], ['4c', '6p', '7c']] }, 0), 'run');
   eq('reads: a weak raise shown when the others run is a bluff seen; the one who ran is counted', [seen.reads[0], seen.reads[1]], [{ shown: 1, weak: 1, answers: 0, runs: 0 }, { shown: 0, weak: 0, answers: 1, runs: 1 }]);
