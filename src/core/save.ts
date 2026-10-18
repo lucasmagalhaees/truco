@@ -8,28 +8,31 @@ const PHASES: Phase[] = ['eleven', 'play', 'truco', 'handEnd', 'over'];
 const SPEEDS: Speed[] = ['calma', 'normal', 'rapida'];
 const isCard = (x: unknown): x is string => typeof x === 'string' && /^[4567QJKA23][oecp]$/.test(x);
 const isCards = (x: unknown, max: number): x is string[] => Array.isArray(x) && x.length <= max && x.every(isCard);
-const isSeat = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= 3;
-const isTeam = (x: unknown): x is 0 | 1 => x === 0 || x === 1;
 const isPts = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= WIN_POINTS;
-const isPlays = (x: unknown): boolean => Array.isArray(x) && x.length <= 4 && x.every(p => p && typeof p === 'object' && isSeat(p.seat) && isCard(p.card));
 
-/** A saved game, or null if it does not hold together. */
+/** A saved game, or null if it does not hold together. A game of four, or one of three pairs (`teams: 3`, six seats). */
 export function readGame(x: unknown): Game | null {
   const g = x as Game;
-  if (!g || typeof g !== 'object' || !Array.isArray(g.names) || g.names.length !== 4 || !g.names.every(x => typeof x === 'string' && x.length <= 24)) return null;
+  if (!g || typeof g !== 'object' || !(g.teams === undefined || g.teams === 3)) return null;
+  const T = g.teams === 3 ? 3 : 2, N = T * 2;
+  const isSeat = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) < N;
+  const isTeam = (x: unknown): x is 0 | 1 | 2 => Number.isInteger(x) && (x as number) >= 0 && (x as number) < T;
+  const isPlays = (x: unknown): boolean => Array.isArray(x) && x.length <= N && x.every(p => p && typeof p === 'object' && isSeat(p.seat) && isCard(p.card));
+  if (!Array.isArray(g.names) || g.names.length !== N || !g.names.every(x => typeof x === 'string' && x.length <= 24)) return null;
+  if (!(g.out === undefined || (T === 3 && Array.isArray(g.out) && g.out.length < T && g.out.every(isTeam)))) return null;
   if (g.humans === undefined) g.humans = [0];                                   // saved before rooms existed
-  if (!Array.isArray(g.humans) || !g.humans.length || g.humans.length > 4 || !g.humans.every(isSeat) || new Set(g.humans).size !== g.humans.length) return null;
+  if (!Array.isArray(g.humans) || !g.humans.length || g.humans.length > N || !g.humans.every(isSeat) || new Set(g.humans).size !== g.humans.length) return null;
   if (!Array.isArray(g.sides) || g.sides.length !== 2) return null;
   const sides = g.sides.map(x => (x === null ? null : qualify(x)));            // a bare club id was saved before themes
   if (!sides.every((x, i) => x !== null ? !!colorsOf(x) : g.sides[i] === null)) return null;
   g.sides = sides as [string | null, string | null];
-  if (!LEVELS.includes(g.level) || typeof g.blind !== 'boolean' || !isCards(g.played, 12)) return null;
-  if (!Array.isArray(g.score) || g.score.length !== 2 || !g.score.every(isPts) || !isSeat(g.dealer) || !Number.isInteger(g.n) || g.n < 1) return null;
-  if (!Array.isArray(g.hands) || g.hands.length !== 4 || !g.hands.every(h => isCards(h, 3)) || !isCard(g.vira)) return null;
+  if (!LEVELS.includes(g.level) || typeof g.blind !== 'boolean' || !isCards(g.played, 3 * N)) return null;
+  if (!Array.isArray(g.score) || g.score.length !== T || !g.score.every(isPts) || !isSeat(g.dealer) || !Number.isInteger(g.n) || g.n < 1) return null;
+  if (!Array.isArray(g.hands) || g.hands.length !== N || !g.hands.every(h => isCards(h, 3)) || !isCard(g.vira)) return null;
   if (!isPlays(g.table) || !(g.last === null || (g.last && isPlays(g.last.plays) && (g.last.winner === -1 || isSeat(g.last.winner))))) return null;
   if (!Array.isArray(g.rounds) || g.rounds.length > 3 || !g.rounds.every(r => r === -1 || isTeam(r)) || !isSeat(g.starter) || !isSeat(g.turn)) return null;
   if (!VALUES.includes(g.value) || !(g.raisedBy === null || isTeam(g.raisedBy)) || !(g.eleven === null || isTeam(g.eleven)) || !PHASES.includes(g.phase)) return null;
-  if (!(g.ask === null || (g.ask && isSeat(g.ask.by) && VALUES.includes(g.ask.value)))) return null;
+  if (!(g.ask === null || (g.ask && isSeat(g.ask.by) && VALUES.includes(g.ask.value) && (g.ask.wait === undefined || (T === 3 && Array.isArray(g.ask.wait) && g.ask.wait.length && g.ask.wait.every(isTeam)))))) return null;
   if (g.phase === 'truco' && !g.ask) return null;
   if (g.phase === 'eleven' && g.eleven === null) return null;
   if (!(g.shout === null || (g.shout && isSeat(g.shout.seat) && typeof g.shout.word === 'string'))) return null;

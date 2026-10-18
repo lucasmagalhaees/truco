@@ -98,11 +98,28 @@ Modelo de uma decisão:
 ## D9. Sala com 3 pessoas: quem criou escolhe o formato
 
 - **Contexto (18/10/2026):** pedido do Lucas: com número ímpar de pessoas numa sala (na prática, 3), dar a opção de jogar "2 humanos contra 1 humano com uma IA" ou "3 duplas, cada humano com uma IA". Ele escolheu oferecer as duas e deixar quem criou a sala escolher. Nas 3 duplas, ele decidiu: quando alguém pede, as duas outras duplas respondem (quem corre sai da mão; se as duas correm, quem pediu leva o valor de antes) e, no 1 a 1 a 1, leva quem fez a 1ª.
-- **Decisão:** a sala ganha o campo `format` (`'duplas'`, o padrão, ou `'tres'`), escolhido por quem criou só antes de começar e só com 3 pessoas; com 2 ou 4 pessoas ele não é olhado. No "2 contra 1", quem criou toca no nome de quem joga com a IA; os outros dois sentam de frente. As regras de 6 lugares das 3 duplas são feitas à parte; até o núcleo jogar esse formato (`SUPPORTS_THREE`), o botão aparece como "em breve" e começar com ele é recusado.
+- **Decisão:** a sala ganha o campo `format` (`'duplas'`, o padrão, ou `'tres'`), escolhido por quem criou só antes de começar e só com 3 pessoas; com 2 ou 4 pessoas ele não é olhado. No "2 contra 1", quem criou toca no nome de quem joga com a IA; os outros dois sentam de frente. As regras de 6 lugares das 3 duplas estão na D10; `SUPPORTS_THREE` liga o formato (ligado desde 18/10/2026). Ao começar as 3 duplas, as pessoas vão para os lugares 0, 1 e 2 (quem criou no 0, os outros na ordem em que entraram).
 - **Interpretações que precisaram ser feitas (minhas, não do Lucas):** sem escolha, fica como a ordem de entrada já dava: quem criou e o terceiro a entrar de dupla, o segundo com a IA. Quem criou fica sempre no lugar 0 (é assim que a sala sabe quem criou): se ele mesmo escolhe jogar com a IA, os outros dois vão para os lugares 1 e 3 e a IA senta no 2. A escolha de quem fica com a IA é por toque nos nomes, num grupo de botões, e só quem criou vê os botões; os outros veem o formato escolhido em texto.
 - **Não sei:** se 3 pessoas preferem, na prática, o "2 contra 1" ou as 3 duplas.
 
-## D10. Temas: futebol, animes e jogos, mesa montada e cores por personagem
+## D10. Três duplas (6 na mesa), o núcleo
+
+- **Contexto (18/10/2026, pedido do Lucas):** numa sala com 3 pessoas, poder jogar em 3 duplas, cada pessoa com uma IA de parceira, cada dupla contra as outras duas. O núcleo de regras está em `src/core/game.ts`; a escolha do formato na sala é a D9; a mesa de 6 na tela entrou junto com a sala (18/10/2026).
+- **Decidido pelo Lucas (18/10/2026):**
+  - Pedido (truco, seis, nove, doze): as duas outras duplas respondem, cada uma aceita, corre ou aumenta. Quem corre sai da mão: não marca e as cartas dela saem do jogo. Se as duas correm, quem pediu leva o valor de antes; se uma corre e a outra aceita, a mão segue entre as duas no valor novo.
+  - 1 a 1 a 1 (cada dupla fez uma rodada): leva quem fez a 1ª. O resto dos desempates é o do truco paulista; quem fizer 2 rodadas leva.
+- **Decidido pelo agente, confirmar com o Lucas:**
+  - Lugares: 6 em roda, parceiros de frente (lugar `s` e `s + 3`), as duplas se alternando (dupla `s % 3`); baralho de 40, 3 cartas para cada um (18) e a vira. Nomes padrão: Você, Biu, Zé, Cida, Toinho, Nena (`SEATS6`).
+  - A ordem de quem responde a um pedido é a ordem da roda depois de quem pediu. Quem aumenta pede para todas as duplas ainda na mão (inclusive a que tinha pedido); a dupla que já tinha aceitado responde de novo.
+  - Uma dupla que corre perde as rodadas que já tinha feito: contam como empatadas. Se isso já decide a mão, ela acaba na hora, no valor aceito.
+  - Quem fez a última rodada empatada e saiu da mão: começa a próxima rodada o seguinte na roda que ainda está na mão.
+  - Mão de onze com uma dupla em 11: ela decide (vale `ELEVEN_VALUE`); se corre, cada uma das outras duas leva 1. Com duas ou três duplas em 11: mão de ferro (vale 1, às cegas, sem pedidos). Com alguém em 11, ninguém pede.
+  - Responde por cada dupla a pessoa dela; numa dupla só de IAs, o primeiro dela a jogar depois de quem pediu.
+  - O placar tem três números; vence quem chega a 12 (`WIN_POINTS`). As frases do histórico dizem os nomes da dupla, não "Nós" e "Eles".
+  - Na tela: o placar diz "Nós" e, de cada outra dupla, o nome da pessoa nela; a mesa de 6 põe você embaixo, o parceiro em cima e as outras quatro cadeiras duas de cada lado, na ordem da roda; quem correu fica com "saiu da mão" na cadeira; a dupla não cochicha conselho com 3 duplas (a IA de 6 é a de 4 adaptada). A cor da terceira dupla é roxa (`--t2`).
+- **Não sei:** se a IA joga bem com 6 (é a de 4 adaptada); se o jogo fica bom de jogar assim. Ninguém jogou ainda.
+
+## D11. Temas: futebol, animes e jogos, mesa montada e cores por personagem
 
 - **Contexto (18/10/2026):** o Lucas pediu, além do futebol, um tema de animes (Blue Lock, Naruto Clássico, Dragon Ball), com equipes de um anime contra as de outro, e que nada ficasse "chumbado" no futebol: "se amanhã eu quiser adicionar filmes, isso precisa estar escalável, tanto na tela quanto na lógica". No mesmo dia pediu a categoria Jogos (Street Fighter e Mortal Kombat), montar a mesa com personagens de packs diferentes, em ordens diferentes, e cores da interface por jogo ou por personagem.
 - **Decisão:** um catálogo genérico em `src/core/teams.ts`, com os dados em `src/core/packs/`, um arquivo por pack:
@@ -113,6 +130,7 @@ Modelo de uma decisão:
   - Cores, nos Ajustes (`S.colorBy`): as do tema, as da equipe (padrão) ou as do personagem que é a dupla. "Eles" segue o primeiro adversário do mesmo jeito; no modo Equipe sem rival, "Eles" fica nas cores do app, porque os dois lados seriam da mesma equipe.
   - Toda cor declarada precisa de texto com contraste de 4,5 ou mais sobre a cor principal (caso do `unit.cases.mjs`). Por isso o azul do Grêmio ficou um pouco mais escuro (`#0a72ad` no lugar de `#0d80bf`): com texto branco ou preto, o original não passava.
   - Online, quem cria a sala manda a mesa dela no `start` (os nomes das IAs e as cores das duplas), lida por `readMsg`; sem ela, a mesa de bar.
+  - Na sala de 3 duplas (D10), por enquanto, a mesa de quem criou não vale: as IAs ficam com os nomes de bar (`SEATS6`) e o app com as cores dele, porque a mesa montada tem 4 lugares e cada pessoa escolheria a própria equipe. Fica para depois, se o Lucas quiser.
 - **Como acrescentar um tema novo (filmes, por exemplo):**
   1. Criar `src/core/packs/<id>.ts` com um `Pack` (copie um dos animes), com `kind: 'filmes'` e `kindName: 'Filmes'` se for uma categoria nova.
   2. Registrar no `PACKS` de `src/core/packs/index.ts`, na posição em que deve aparecer.
@@ -124,7 +142,7 @@ Modelo de uma decisão:
   - As cores são inspiradas nas roupas e nas equipes; nenhuma imagem, logotipo ou desenho.
 - **Não sei:** se os nomes estão como o Lucas conhece em todos os casos (por exemplo "Rikum" ou "Recoome", "Exoterra" ou "Outworld"); se as cores agradam. Os nomes podem ser trocados no app.
 
-## D11. Heróis x Vilões
+## D12. Heróis x Vilões
 
 - **Contexto (18/10/2026):** o Lucas pediu um modo "Heróis x Vilões" (protagonistas contra antagonistas), onde fizer sentido.
 - **Decisão:** cada personagem pode ter `side: 'heroi' | 'vilao'` nos dados do pack; a equipe pode ter um padrão, e o personagem sobrescreve. O modo só aparece se algum pack tiver pelo menos dois heróis e dois vilões (`sidedPacks`). Na tela, "Heróis x Vilões" escolhe o universo (um pack, ou "Misturado" entre todos os que têm lados) e o lado da pessoa (heróis por padrão, ou vilões); a dupla sai do lado dela e os dois adversários do outro, sorteados (`drawSided`), com "Sortear de novo", e a mesa pode ser editada como no Montar. "Eles" fica nas cores dos adversários, como nos outros modos. Guardado em `S.hv` junto com `S.seats`.

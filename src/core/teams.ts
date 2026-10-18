@@ -47,7 +47,7 @@ export function kinds(): { id: string; name: string; packs: Pack[] }[] {
 }
 export const packById = (id: string | undefined | null): Pack | null => PACKS.find(p => p.id === id) || null;
 export const teamById = (id: string | undefined | null): Team | null => TEAMS.find(t => t.id === id) || null;
-export const teamsOf = (pack: Pack): Team[] => TEAMS.filter(t => t.pack === pack);
+export const packTeams = (pack: Pack): Team[] => TEAMS.filter(t => t.pack === pack);
 /** A character by id: its team, its place in it, its name and its own colours (if any). */
 export function charById(id: string | undefined | null): { id: string; team: Team; i: number; name: string; colors?: Colors; side?: Side } | null {
   const m = typeof id === 'string' ? id.match(/^(.+)\/([012])$/) : null;

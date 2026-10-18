@@ -3,12 +3,12 @@
    viewFor: the table turned so that they sit at seat 0 (the bottom of their screen), with nobody else's cards in it.
    Pure, like the rest of the core: the server (server/worker.ts on Cloudflare, tests/room_server.mjs in the tests)
    only moves messages in and out and keeps the time. */
-import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS } from './game';
+import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS, SEATS6, teamOf, teamsOf } from './game';
 import type { Answer } from './game';
 import { colorsOf, DEFAULT_NAMES } from './teams';
 import type { Game, Level, Seat, Team } from './types';
 
-/** Seats in the order people take them: the first is the host, the second sits against them (each with a computer
+/** Seats in the order people take them (at the table of four; with three pairs, see start): the first is the host, the second sits against them (each with a computer
  *  partner), the third is the host's partner and the fourth the second one's. */
 export const SEAT_ORDER: Seat[] = [0, 1, 2, 3];
 /** How long the computer players think on the server, and the extra pause after a round closes, in ms. */
@@ -50,7 +50,7 @@ export interface Member { seat: Seat; name: string; token: string; online: boole
 export type Format = 'duplas' | 'tres';
 export const FORMATS: Format[] = ['duplas', 'tres'];
 /** Whether the core plays the 'tres' format. Until it does, the lobby shows it as coming soon and start refuses it. */
-export const SUPPORTS_THREE = false;
+export const SUPPORTS_THREE = true;
 export interface Room { code: string; level: Level; members: Member[]; game: Game | null; format: Format }
 export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; v: Answer } | { a: 'eleven'; v: boolean } | { a: 'next' };
 /** What a phone may send. */
@@ -86,20 +86,23 @@ export function swapSides(text: string): string {
  *  as "??", so their number still shows). In a hand of eleven, the pair deciding sees both its hands, as the rules say.
  *  A computer player's bluff is not told until it is shown. */
 export function viewFor(g: Game, seat: Seat): Game {
-  const r = (s: number): number => (s - seat + 4) % 4, flip = seat % 2 === 1;
-  const tm = <T extends Team | null>(t: T): T => (t === null || !flip ? t : ((1 - (t as number)) as T));
-  const turn = <T>(xs: T[]): T[] => [0, 1, 2, 3].map(v => xs[(v + seat) % 4]);
+  // with three pairs (six seats) the table turns the same way; the log names the pairs, so it needs no swapping
+  const T = teamsOf(g), N = T * 2, mine = teamOf(seat, T), flip = T === 2 && mine === 1;
+  const r = (s: number): number => (s - seat + N) % N;
+  const tm = <X extends Team | null>(t: X): X => (t === null ? t : (((t as number) - mine + T) % T) as X);
+  const turn = <X>(xs: X[]): X[] => Array.from({ length: N }, (_, v) => xs[(v + seat) % N]);
   const say = (s: string): string => (flip ? swapSides(s) : s);
   const eleven = tm(g.eleven);
-  const hands = turn(g.hands).map((h, v) => (v === 0 || (v === 2 && g.phase === 'eleven' && eleven === 0) ? [...h] : h.map(() => '??')));
+  const hands = turn(g.hands).map((h, v) => (v === 0 || (v === T && g.phase === 'eleven' && eleven === 0) ? [...h] : h.map(() => '??')));
   return {
     ...g, hands, names: turn(g.names), sides: flip ? [g.sides[1], g.sides[0]] : [...g.sides] as [string | null, string | null],
-    humans: g.humans.map(r).sort(), score: flip ? [g.score[1], g.score[0]] : [...g.score] as [number, number],
+    humans: g.humans.map(r).sort(), score: Array.from({ length: T }, (_, v) => g.score[(v + mine) % T]),
+    ...(g.out ? { out: g.out.map(tm) } : {}),
     dealer: r(g.dealer), starter: r(g.starter), turn: r(g.turn),
     table: g.table.map(p => ({ seat: r(p.seat), card: p.card })),
     last: g.last ? { plays: g.last.plays.map(p => ({ seat: r(p.seat), card: p.card })), winner: g.last.winner === -1 ? -1 : r(g.last.winner) } : null,
     rounds: g.rounds.map(x => (x === -1 ? -1 : tm(x))), raisedBy: tm(g.raisedBy),
-    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value } : null, eleven,
+    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value, ...(g.ask.wait ? { wait: g.ask.wait.map(tm) } : {}) } : null, eleven,
     shout: g.shout ? { seat: r(g.shout.seat), word: g.shout.word } : null,
     result: g.result ? { team: tm(g.result.team), points: g.result.points, why: say(g.result.why), ...(g.result.shown ? { shown: { ...g.result.shown, seat: r(g.result.shown.seat) } } : {}) } : null,
     winner: tm(g.winner), hist: g.hist.map(h => ({ ...h, team: tm(h.team), how: say(h.how) })), log: g.log.map(say)
@@ -109,7 +112,7 @@ export function viewFor(g: Game, seat: Seat): Game {
 export function roomView(room: Room, token: string): RoomView | null {
   const me = room.members.find(m => m.token === token);
   if (!me) return null;
-  const r = (s: number): number => (s - me.seat + 4) % 4;
+  const N = room.game ? teamsOf(room.game) * 2 : 4, r = (s: number): number => (s - me.seat + N) % N;
   return {
     t: 'room', code: room.code, host: host(room) === me, seat: me.seat, level: room.level, format: room.format,
     members: room.members.map(m => ({ seat: r(m.seat), name: m.name, online: m.online })).sort((a, b) => a.seat - b.seat),
@@ -157,6 +160,11 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     if (!isHost) return { room, error: 'Só quem criou a sala começa a partida.' };
     if (room.game && room.game.phase !== 'over') return { room, error: 'A partida já está rolando.' };
     if (threeOf(room) && !SUPPORTS_THREE) return { room, error: 'As 3 duplas ainda não estão prontas. Escolha 2 contra 1.' };
+    if (threeOf(room)) {
+      // three pairs: the three people take seats 0, 1 and 2 (the host keeps 0), each facing a computer partner (s + 3)
+      const order = [host(room) as Member, ...room.members.filter(m => m !== host(room))], members = room.members.map(m => ({ ...m, seat: order.indexOf(m) }));
+      return { room: { ...room, members, game: startGame({ ...room, members }, rand) } };
+    }
     return { room: { ...room, game: startGame(room, rand, msg.table, isHost.seat) } };
   }
   if (msg.t === 'bot') {
@@ -189,12 +197,14 @@ function toComputer(room: Room, gone: Member): Room {
   const g = room.game as Game;
   return { ...room, members: room.members.filter(m => m !== gone), game: { ...g, humans: g.humans.filter(s => s !== gone.seat), log: [...g.log, `${g.names[gone.seat]} saiu; a IA joga no lugar.`] } };
 }
-/** A new game for the people in the room; the empty seats are computer players with the names of the host's table
- *  (turned from where the host sits), or the bar's, and the pairs take the colours of the host's table. */
+/** A new game for the people in the room. With four seats, the empty ones are computer players with the names of the
+ *  host's table (turned from where the host sits), or the bar's, and the pairs take the colours of that table. With three
+ *  pairs, for now, the bar's names and the app's colours: the host's table has four seats (D11). */
 function startGame(room: Room, rand: () => number, table?: Table, hostSeat: Seat = 0): Game {
-  const names = [0, 1, 2, 3].map(s => room.members.find(m => m.seat === s)?.name || table?.names[(s - hostSeat + 4) % 4] || DEFAULT_NAMES[s]);
-  const sides: [string | null, string | null] = table ? (hostSeat % 2 ? [table.sides[1], table.sides[0]] : [table.sides[0], table.sides[1]]) : [null, null];
-  return newGame(rand, room.level, { names, sides, humans: room.members.map(m => m.seat) });
+  const three = threeOf(room), base = three ? SEATS6 : DEFAULT_NAMES, turned = !three && table ? table : null;
+  const names = base.map((d, s) => room.members.find(m => m.seat === s)?.name || turned?.names[(s - hostSeat + 4) % 4] || d);
+  const sides: [string | null, string | null] = turned ? (hostSeat % 2 ? [turned.sides[1], turned.sides[0]] : [turned.sides[0], turned.sides[1]]) : [null, null];
+  return newGame(rand, room.level, { names, sides, humans: room.members.map(m => m.seat), ...(three ? { teams: 3 as const } : {}) });
 }
 /** A person's move, only when it is theirs to make; anyone may deal the next hand. */
 function act(g: Game, seat: Seat, x: Action, rand: () => number): Game {
