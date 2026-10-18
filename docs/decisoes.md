@@ -102,6 +102,22 @@ Modelo de uma decisão:
 - **Interpretações que precisaram ser feitas (minhas, não do Lucas):** sem escolha, fica como a ordem de entrada já dava: quem criou e o terceiro a entrar de dupla, o segundo com a IA. Quem criou fica sempre no lugar 0 (é assim que a sala sabe quem criou): se ele mesmo escolhe jogar com a IA, os outros dois vão para os lugares 1 e 3 e a IA senta no 2. A escolha de quem fica com a IA é por toque nos nomes, num grupo de botões, e só quem criou vê os botões; os outros veem o formato escolhido em texto.
 - **Não sei:** se 3 pessoas preferem, na prática, o "2 contra 1" ou as 3 duplas.
 
+## D10. Três duplas (6 na mesa), o núcleo
+
+- **Contexto (18/10/2026, pedido do Lucas):** numa sala com 3 pessoas, poder jogar em 3 duplas, cada pessoa com uma IA de parceira, cada dupla contra as outras duas. Esta parte é só o núcleo de regras (`src/core/game.ts`); a escolha do formato na sala e a mesa desenhada para 6 vêm depois.
+- **Decidido pelo Lucas (18/10/2026):**
+  - Pedido (truco, seis, nove, doze): as duas outras duplas respondem, cada uma aceita, corre ou aumenta. Quem corre sai da mão: não marca e as cartas dela saem do jogo. Se as duas correm, quem pediu leva o valor de antes; se uma corre e a outra aceita, a mão segue entre as duas no valor novo.
+  - 1 a 1 a 1 (cada dupla fez uma rodada): leva quem fez a 1ª. O resto dos desempates é o do truco paulista; quem fizer 2 rodadas leva.
+- **Decidido pelo agente, confirmar com o Lucas:**
+  - Lugares: 6 em roda, parceiros de frente (lugar `s` e `s + 3`), as duplas se alternando (dupla `s % 3`); baralho de 40, 3 cartas para cada um (18) e a vira. Nomes padrão: Você, Biu, Zé, Cida, Toinho, Nena (`SEATS6`).
+  - A ordem de quem responde a um pedido é a ordem da roda depois de quem pediu. Quem aumenta pede para todas as duplas ainda na mão (inclusive a que tinha pedido); a dupla que já tinha aceitado responde de novo.
+  - Uma dupla que corre perde as rodadas que já tinha feito: contam como empatadas. Se isso já decide a mão, ela acaba na hora, no valor aceito.
+  - Quem fez a última rodada empatada e saiu da mão: começa a próxima rodada o seguinte na roda que ainda está na mão.
+  - Mão de onze com uma dupla em 11: ela decide (vale `ELEVEN_VALUE`); se corre, cada uma das outras duas leva 1. Com duas ou três duplas em 11: mão de ferro (vale 1, às cegas, sem pedidos). Com alguém em 11, ninguém pede.
+  - Responde por cada dupla a pessoa dela; numa dupla só de IAs, o primeiro dela a jogar depois de quem pediu.
+  - O placar tem três números; vence quem chega a 12 (`WIN_POINTS`). As frases do histórico dizem os nomes da dupla, não "Nós" e "Eles".
+- **Não sei:** se a IA joga bem com 6 (é a de 4 adaptada); se o jogo fica bom de jogar assim. Ninguém jogou ainda.
+
 ## Pendências
 
 | Pendência | Quem resolve |

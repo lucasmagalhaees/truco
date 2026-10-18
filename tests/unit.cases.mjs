@@ -319,6 +319,51 @@ export default function cases(Core) {
   eq('read real table: what does not hold together is empty', [Core.readReal({ ...rt, hand: ['3o', '4o', '5o', '6o'] }), Core.readReal({ ...rt, target: 'x' }), Core.readReal(null)], [Core.emptyTable(), Core.emptyTable(), Core.emptyTable()]);
 
   /* the reader of the source: invented data here; real answers go in tests/fixtures/source/ and through tests/contract.py */
+  {
+  /* three pairs: six seats, partners facing (s and s + 3), each pair against the other two (online) */
+  const sixG = (over = {}) => ({ ...Core.newGame(Core.seeded(5), 'medio', { names: Core.SEATS6, sides: [null, null], humans: [0, 1, 2], teams: 3 }), phase: 'play', eleven: null, dealer: 5, starter: 0, turn: 0, vira: '4o', hands: [['3o', 'Ke', '6o'], ['3e', 'Je', '6e'], ['2c', 'Qc', '6c'], ['Ap', 'Kp', '7p'], ['2o', 'Jo', '7o'], ['Ac', 'Kc', '7c']], ...over });
+  const g3p = Core.newGame(Core.seeded(3), 'medio', { names: Core.SEATS6, sides: [null, null], humans: [0, 1, 2], teams: 3 });
+  const dealt3 = [...g3p.hands.flat(), g3p.vira];
+  eq('three pairs: six hands of three and a vira, all different, three scores, pairs by s % 3, partner facing', [g3p.teams, g3p.hands.length, g3p.hands.every(h => h.length === 3), new Set(dealt3).size, g3p.score, [0, 1, 2, 3, 4, 5].map(s => Core.teamOf(s, 3)), [0, 1, 2].map(s => Core.partnerOf(g3p, s)), Core.seatsOf(g3p), Core.seatsOf(Core.newGame(Core.seeded(3)))],
+    [3, 6, true, 19, [0, 0, 0], [0, 1, 2, 0, 1, 2], [3, 4, 5], 6, 4]);
+  const P6x = (...cs) => cs.map((card, seat) => ({ seat, card }));
+  eq('three pairs, a round: equal top cards of two different pairs tie (cangou); of partners, that pair takes it', [Core.roundWinner(P6x('3o', '3e', 'Ko', '2c', '4o', '6e'), '7o', 3), Core.roundWinner(P6x('3o', 'Ke', 'Ko', '3c', '4o', '6e'), '7o', 3), Core.roundWinner(P6x('Qo', 'Qe', 'Ko', '3c', 'Qp', '6e'), '7o', 3)], [-1, 0, 4]);
+  eq('three pairs, the hand: one round each (1 a 1 a 1) goes to whoever took the first; two rounds still win it', [Core.handWinner([0, 1, 2]), Core.handWinner([2, 0, 1]), Core.handWinner([1, 2, 1]), Core.handWinner([1, 2, -1]), Core.handWinner([2, -1]), Core.handWinner([-1, -1, 2])], [0, 2, 1, 1, 2, 2]);
+  const ask3 = Core.raise(sixG(), 0);
+  eq('three pairs, a raise: both other pairs answer, in the order they play after who asked', [ask3.phase, ask3.ask.wait, Core.whoActs(ask3)], ['truco', [1, 2], 1]);
+  const run1 = Core.answer(ask3, 'run'), bothRan = Core.answer(run1, 'run');
+  eq('three pairs: the first pair runs: it is out of the hand, its cards leave the game, the next pair answers', [run1.phase, run1.out, run1.hands[1], run1.hands[4], Core.whoActs(run1), Core.inHand(run1, 4), Core.inHand(run1, 5)], ['truco', [1], [], [], 2, false, true]);
+  eq('three pairs: both run: whoever asked takes what the hand was worth before, and shows the cards', [bothRan.phase, bothRan.score, bothRan.result.points, bothRan.result.shown.seat, bothRan.out], ['handEnd', [1, 0, 0], 1, 0, [1, 2]]);
+  const onlyTwo = Core.answer(run1, 'accept');
+  eq('three pairs: one runs and the other accepts: the hand goes on between the two at the new value, skipping the seats out', [onlyTwo.phase, onlyTwo.value, onlyTwo.raisedBy, onlyTwo.turn, Core.playCard(onlyTwo, 0, 0).turn], ['play', 3, 0, 0, 2]);
+  const acceptRun = Core.answer(Core.answer(ask3, 'accept'), 'run');
+  eq('three pairs: one accepts and the next runs: the same, the other way round', [acceptRun.phase, acceptRun.value, acceptRun.out], ['play', 3, [2]]);
+  // a round between the two pairs left: four cards close it
+  let two = onlyTwo; for (const s of [0, 2, 3, 5]) two = Core.playCard(two, s, 0);
+  eq('three pairs: with a pair out, the four cards of the others close the round', [two.rounds, two.table.length, two.last.plays.length], [[0], 0, 4]);
+  const back3 = Core.answer(ask3, 'raise');
+  eq('three pairs: raising back asks the pairs still in the hand, the asking one too', [back3.ask.by, back3.ask.value, back3.ask.wait, Core.whoActs(back3), back3.value], [1, 6, [2, 0], 2, 3]);
+  // a pair that ran loses the rounds it took: they count as tied, and that may decide the hand at once
+  const took = sixG({ rounds: [0, 1], hands: [['3o', 'Ke'], ['3e', 'Je'], ['2c', 'Qc'], ['Ap', 'Kp'], ['2o', 'Jo'], ['Ac', 'Kc']] });
+  const decided = Core.answer(Core.answer(Core.raise(took, 0), 'run'), 'accept');
+  eq('three pairs: the rounds of a pair that ran count as tied; here that gives the hand to whoever took the first', [decided.phase, decided.score, decided.result.points], ['handEnd', [3, 0, 0], 3]);
+  // hands of eleven and iron with three pairs
+  const at11 = Core.nextHand({ ...sixG(), phase: 'handEnd', score: [3, 11, 4] }, Core.seeded(2));
+  const fled = Core.decideEleven(at11, false);
+  eq('three pairs, a hand of eleven: the pair with 11 decides; running gives a point to each of the other two', [at11.phase, at11.eleven, Core.whoActs(at11), fled.score, Core.canRaise(Core.decideEleven(at11, true), Core.decideEleven(at11, true).turn)], ['eleven', 1, 1, [4, 11, 5], false]);
+  const iron3 = Core.nextHand({ ...sixG(), phase: 'handEnd', score: [11, 11, 4] }, Core.seeded(2));
+  eq('three pairs, a hand of iron: two pairs (or three) with 11, everyone plays blind, no raises', [iron3.phase, iron3.blind, iron3.eleven, Core.nextHand({ ...sixG(), phase: 'handEnd', score: [11, 11, 11] }, Core.seeded(2)).blind], ['play', true, null, true]);
+  // what each person sees in a room of six: their seat at the bottom, their pair as 0, nobody else's cards
+  const v3p = Core.viewFor({ ...ask3, score: [1, 2, 3] }, 1);
+  eq('three pairs, viewFor: the table turned to the person, the pairs too, the others\' cards hidden', [v3p.hands[0], v3p.hands.slice(1).every(h => h.every(c => c === '??')), v3p.names[0], v3p.score, v3p.ask.by, v3p.ask.wait, v3p.turn],
+    [['3e', 'Je', '6e'], true, 'Biu', [2, 3, 1], 5, [0, 1], 5]);
+  eq('three pairs: a saved game reads back; one with seven names or a fourth pair does not', [!!Core.readGame(JSON.parse(JSON.stringify(run1))), Core.readGame({ ...JSON.parse(JSON.stringify(g3p)), names: [...Core.SEATS6, 'X'] }), Core.readGame({ ...JSON.parse(JSON.stringify(g3p)), teams: 4 }), Core.readGame({ ...JSON.parse(JSON.stringify(g3p)), score: [0, 0] })], [true, null, null, null]);
+  for (const level of Core.LEVELS) {
+    const rr = Core.seeded(23); let g = { ...Core.newGame(rr, level, { names: Core.SEATS6, sides: [null, null], humans: [0], teams: 3 }), humans: [] }, k = 0, ran = 0;
+    while (g.phase !== 'over' && k < 6000) { k++; g = Core.whoActs(g) === null ? Core.nextHand(g, rr) : Core.aiAct(g, rr); if (g.out && g.out.length) ran++; }
+    eq(`three pairs: a whole game of six computer players at ${level} ends with one pair at 12`, [g.phase, g.score.filter(x => x === 12).length, g.score.length, g.hist.length > 3], ['over', 1, 3, true]);
+  }
+  }
   eq('source: an entry read', Core.normEntry({ id: 7, name: ' Um ', value: '2.5', extra: true }), { id: '7', name: 'Um', value: 2.5 });
   eq('source: what is not an entry reads as null', [null, 'x', {}, { id: 1 }, { id: 1, name: 'x', value: 'abc' }, { name: 'x', value: 1 }].map(Core.normEntry), [null, null, null, null, null, null]);
   eq('source: a list, leaving out what cannot be read', [Core.normEntries({ items: [{ id: 1, name: 'a', value: 1 }, { id: 2 }] }), Core.normEntries({}), Core.normEntries(null)], [[{ id: '1', name: 'a', value: 1 }], [], []]);
