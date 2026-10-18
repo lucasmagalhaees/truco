@@ -95,6 +95,28 @@ Modelo de uma decisão:
 - **Interpretações que precisaram ser feitas:** os números acima são escolha minha, sem medição de uso real; fechar a conexão (em vez de só ignorar a mensagem) para que um cliente com defeito apareça logo, e não fique em silêncio.
 - **Não sei:** como o celular da pessoa reage a ser cortado (ele tenta voltar sozinho, `RETRY`); não há limite de salas por endereço, só por sala.
 
+## D9. Temas: futebol, animes e jogos, mesa montada e cores por personagem
+
+- **Contexto (18/10/2026):** o Lucas pediu, além do futebol, um tema de animes (Blue Lock, Naruto Clássico, Dragon Ball), com equipes de um anime contra as de outro, e que nada ficasse "chumbado" no futebol: "se amanhã eu quiser adicionar filmes, isso precisa estar escalável, tanto na tela quanto na lógica". No mesmo dia pediu a categoria Jogos (Street Fighter e Mortal Kombat), montar a mesa com personagens de packs diferentes, em ordens diferentes, e cores da interface por jogo ou por personagem.
+- **Decisão:** um catálogo genérico em `src/core/teams.ts`, com os dados em `src/core/packs/`, um arquivo por pack:
+  - `Pack { id, kind, kindName, name, lead, colors, note?, groups }`: `kind` é a categoria (a aba da tela), `lead` o nome do primeiro da equipe ("craque", "líder"), `note` uma linha opcional mostrada sob o pack (o futebol diz quando os elencos foram conferidos).
+  - `Group { id, name, colors?, players: [3 personagens] }`, e cada personagem é um nome ou `{ name, colors? }`. Sem cor própria, o personagem herda a da equipe, e a equipe a do pack.
+  - Ids qualificados: `futebol/flamengo` (equipe), `naruto/time-7/0` (personagem, pelo lugar na equipe). Um id antigo, só de clube (`flamengo`), é lido como `futebol/flamengo`, na partida salva e nos ajustes.
+  - Três modos: Equipe (o primeiro é a dupla, os outros dois contra), Rivais (contra os dois primeiros de outra equipe, de qualquer tema) e Montar (a dupla e os dois adversários escolhidos um por um, de qualquer pack, com "Trocar a ordem" e "Sortear"; `S.seats`).
+  - Cores, nos Ajustes (`S.colorBy`): as do tema, as da equipe (padrão) ou as do personagem que é a dupla. "Eles" segue o primeiro adversário do mesmo jeito; no modo Equipe sem rival, "Eles" fica nas cores do app, porque os dois lados seriam da mesma equipe.
+  - Toda cor declarada precisa de texto com contraste de 4,5 ou mais sobre a cor principal (caso do `unit.cases.mjs`). Por isso o azul do Grêmio ficou um pouco mais escuro (`#0a72ad` no lugar de `#0d80bf`): com texto branco ou preto, o original não passava.
+  - Online, quem cria a sala manda a mesa dela no `start` (os nomes das IAs e as cores das duplas), lida por `readMsg`; sem ela, a mesa de bar.
+- **Como acrescentar um tema novo (filmes, por exemplo):**
+  1. Criar `src/core/packs/<id>.ts` com um `Pack` (copie um dos animes), com `kind: 'filmes'` e `kindName: 'Filmes'` se for uma categoria nova.
+  2. Registrar no `PACKS` de `src/core/packs/index.ts`, na posição em que deve aparecer.
+  3. Rodar `scripts/verify.sh`: os casos do catálogo conferem ids, três personagens por equipe e o contraste de toda cor; a tela gera a aba e os botões sozinha. Citar o pack no `CLAUDE.md` (o `docs_check.py` cobra).
+- **De onde vieram os personagens:** da memória do agente, em 18/10/2026, sem conferir na web; nomes como saem no Brasil (dublagem e legendas). Personagens não envelhecem como elencos, mas um nome pode estar escrito diferente do que a pessoa conhece: dá para trocar no app.
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - As equipes de cada anime e jogo: Blue Lock por time da seleção e da Liga Neo Egoísta (Time Z, Time V, Bastard München, Manshine City, PXG, Ubers, Barcha, Japão Sub-20); Naruto pelos times do Exame Chunin e outros grupos (Time 7, Time 8, Time 10, Time Gai, Irmãos da Areia, Ninjas do Som, Quarteto do Som, Jônins de Konoha, Sannin); Dragon Ball pelos grupos do clássico e do Z (Guerreiros Z, Saiyajins, Turma do Kame, Força Ginyu, Família de Freeza, Androides, Patrulha Vermelha, Majin Boo); Street Fighter (Shotokan, Shadaloo, Militares, Lutadores do Mundo, Mais do Mundo); Mortal Kombat (Shaolin, Lin Kuei, Forças Especiais, Exoterra, Netherrealm).
+  - Sugestões que mudei: "Força Aérea" virou "Militares" (a Cammy não é da Força Aérea); a Shirai Ryu virou "Netherrealm" (Scorpion, Noob Saibot, Quan Chi), por não lembrar com segurança de outros dois membros; o "Blue Lock Eleven" ficou de fora para não repetir quase todos os nomes.
+  - As cores são inspiradas nas roupas e nas equipes; nenhuma imagem, logotipo ou desenho.
+- **Não sei:** se os nomes estão como o Lucas conhece em todos os casos (por exemplo "Rikum" ou "Recoome", "Exoterra" ou "Outworld"); se as cores agradam. Os nomes podem ser trocados no app.
+
 ## Pendências
 
 | Pendência | Quem resolve |
