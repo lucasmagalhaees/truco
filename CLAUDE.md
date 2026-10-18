@@ -104,7 +104,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 | `src/app/api.ts` | `getJSON` (toda chamada passa por ele, com tempo máximo) e `loadEntries`. Sem fonte configurada, não chama nada |
 | `src/app/render.ts` | `render` e as telas (início, treino, mesa real com a grade de 40 cartas, partida), a carta desenhada (`face`), o que se mexe (só o que acabou de mudar), `stamp`, `confetti`, `toast`, `lift` |
 | `src/app/events.ts` | Um listener delegado por `data-act`; o único lugar que usa `Math.random`; o relógio das IAs (`schedule`, `THINK`, `ROUND_PAUSE`) |
-| `src/app/net.ts` | A conexão com o servidor de salas (WebSocket): `connect`, `send`, `leave`, a volta sozinha depois de cair (`RETRY`), o endereço (`ROOM_URL`, da variável `VITE_ROOM_URL` do build) |
+| `src/app/net.ts` | A conexão com o servidor de salas (WebSocket): `connect`, `send`, `leave`, a volta sozinha depois de cair (`RETRY`), o endereço (`ROOM_URL`, que o build preenche: veja Publicação) |
 | `src/app/voice.ts` | O microfone: reconhecimento de fala do navegador (`listen`, `canListen`) |
 | `src/app/fx.ts` | Som (Web Audio, sintetizado), vibração e `later` (espera a animação, ou não espera quando o aparelho pede menos movimento) |
 | `src/app/update.ts` | Registro do service worker, aviso de versão nova (`initUpdates`, `applyUpdate`, `checkNow`) e `builtFrom`, o commit da página |
@@ -190,7 +190,7 @@ A Vercel publica o que chegar na `main` sem olhar o CI. Quem garante que só ent
 - O workflow `Produção` roda `scripts/check_production.py` depois de cada push na `main`: espera a produção mostrar o carimbo do commit que entrou e **continua olhando por 5 min**. Falhou: na Vercel, promover o deploy do commit mais recente da `main`, ou fazer um novo merge. O endereço vem da variável `APP_PROD_URL` do repositório (Settings → Secrets and variables → Actions → Variables), com https://turco-six.vercel.app como padrão. Se o endereço servir outro site (página sem carimbo) ou pedir login da Vercel, o script diz isso com todas as letras em vez de só esperar.
 - Em PR o mesmo script só informa qual commit a produção está servindo (`--report`) e nunca falha. `--selftest` testa o script contra um servidor local e roda no `verify.sh`.
 
-**O servidor de salas** é publicado pelo workflow `Salas` (`.github/workflows/salas.yml`) a cada push na `main` que mexe no servidor ou no núcleo, com `wrangler deploy`. Precisa dos secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no repositório; sem eles, o job avisa e não publica. O endereço que a Cloudflare der (`wss://truco-salas.<conta>.workers.dev`) vai na variável `VITE_ROOM_URL` do projeto na Vercel; sem ela, o cartão "Jogar online" diz que o servidor não está ligado.
+**O servidor de salas** é publicado pelo workflow `Salas` (`.github/workflows/salas.yml`) a cada push na `main` que mexe no servidor ou no núcleo, com `wrangler deploy`. Precisa dos secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no repositório; sem eles, o job avisa e não publica. O endereço dele é `wss://truco-salas.lucasbarbosa1738.workers.dev` (`ROOM_SERVER` no `vite.config.js`): o build na Vercel já aponta para ele, e a variável `VITE_ROOM_URL` troca o endereço se precisar. Fora da Vercel (os testes, o `npm run dev`) não há servidor, a não ser que `VITE_ROOM_URL` diga; sem servidor, o cartão "Jogar online" diz que ele não está ligado.
 
 **Publicar não troca o app de quem já abriu.** O aparelho mostra a cópia guardada até a pessoa tocar em "Atualizar agora".
 

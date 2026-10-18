@@ -75,11 +75,11 @@ Modelo de uma decisão:
   - Ninguém entra numa partida já começada; quem caiu volta ao mesmo lugar com o token guardado no celular.
   - "Nós" e "Eles" nas frases do histórico trocam de lado para a outra dupla (`swapSides`).
   - Sem login: o nome é o que a pessoa escreve, e o lugar é garantido pelo token.
-- **Não sei:** como se comporta na Cloudflare de verdade (o servidor foi testado em Node, com o mesmo núcleo; na Cloudflare, só o build e os tipos foram conferidos); a demora pelo 4G.
+- **Servidor no ar (17/10/2026):** https://truco-salas.lucasbarbosa1738.workers.dev, publicado pelo workflow `Salas`; uma mão jogada nele por duas abas (ver `docs/verificacao.md`).
+- **Não sei:** a demora pelo 4G.
 
 ## Pendências
 
 | Pendência | Quem resolve |
 |---|---|
 | Proteger a `main` exigindo PR e os checks do CI | Dono do repositório |
-| Criar a conta na Cloudflare, pôr `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` nos secrets e `VITE_ROOM_URL` na Vercel | Dono do repositório |

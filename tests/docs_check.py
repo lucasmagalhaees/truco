@@ -57,10 +57,11 @@ CONSTANTS = [
     (r"export const TEAMS_CHECKED = '14/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
     (r'export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;', 'depois de 0,9 s (`ROOM_THINK`), mais 0,7 s depois de uma rodada fechada (`ROOM_ROUND_PAUSE`)'),
     (r'export const NAME_MAX = 16, CODE_LEN = 5;', 'um código de 5 letras (`CODE_LEN`)'),
+    (r"export const ROOM_SERVER = 'wss://truco-salas.lucasbarbosa1738.workers.dev';", 'O endereço dele é `wss://truco-salas.lucasbarbosa1738.workers.dev` (`ROOM_SERVER` no `vite.config.js`)'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
 ]
 for pattern, phrase in CONSTANTS:
-    check(f'code has {pattern}', re.search(pattern, code + read('src/sw.js')) is not None)
+    check(f'code has {pattern}', re.search(pattern, code + read('src/sw.js') + read('vite.config.js')) is not None)
     check(f'spec says "{phrase}"', phrase in spec)
 verify = read('scripts/verify.sh')
 check('the coverage minimums are the ones the spec gives', '--min-functions 95 --min-chars 90' in verify and '95% das funções e 90% do código' in spec)

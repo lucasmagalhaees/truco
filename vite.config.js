@@ -56,7 +56,13 @@ function serviceWorker() {
   };
 }
 
+/** The room server's address for the page. On Vercel, the one published by the Salas workflow, unless VITE_ROOM_URL says
+ *  otherwise; anywhere else (the tests, npm run dev) none, unless VITE_ROOM_URL is given. */
+export const ROOM_SERVER = 'wss://truco-salas.lucasbarbosa1738.workers.dev';
+const roomUrl = () => process.env.VITE_ROOM_URL ?? (process.env.VERCEL ? ROOM_SERVER : '');
+
 export default defineConfig({
+  define: { 'import.meta.env.VITE_ROOM_URL': JSON.stringify(roomUrl()) },
   plugins: [
     { name: 'truco:commit', transformIndexHtml: html => html.replace('__APP_COMMIT__', commit()) },
     singleFile(),

@@ -123,7 +123,7 @@ with sync_playwright() as p:
         if whose(guest) and G(guest)['phase'] == 'play' and guest.locator('[data-act=truco]').count():
             guest.click('[data-act=truco]'); asked = True
             host.wait_for_function('(() => { const g = window.__APP.room.game; return g.phase === "truco" && g.ask && g.ask.by === 1; })()')
-            assert 'Amigo' in txt(host, '#action') and 'pediu truco' in txt(host, '#action') and host.locator('#tip').count() == 0, ('no whisper from a partner whose cards are hidden', txt(host, '#action'))
+            assert 'Amigo' in txt(host, '#action') and re.search(r'pediu (truco|seis|nove|doze)', txt(host, '#action')) and host.locator('#tip').count() == 0, ('no whisper from a partner whose cards are hidden', txt(host, '#action'))
             host.click('[data-act=answer][data-v=run]'); break
         move(host if whose(host) else guest)
     host.wait_for_function('["handEnd", "over"].includes(window.__APP.room.game.phase)'); guest.wait_for_function('["handEnd", "over"].includes(window.__APP.room.game.phase)')
