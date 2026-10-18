@@ -299,8 +299,24 @@ export default function cases(Core) {
     eq('the host alone: the computer is the host’s partner, and the host still starts the game', [ga.game.humans, ga.game.names[2], Core.roomView(ga, T[0]).host], [[0, 1, 3], Core.DEFAULT_NAMES[2], true]);
     eq('choosing is for the host, before the game, with three people, someone in the room', [fmt(r3, T[1], { format: 'duplas', alone: 1 }).error, fmt(Core.handle(r3, T[0], { t: 'start' }, roll).room, T[0], { format: 'duplas' }).error, fmt(Core.handle(r3, T[2], { t: 'leave' }, roll).room, T[0], { format: 'tres' }).error, fmt(r3, T[0], { format: 'duplas', alone: 3 }).error],
       ['Só quem criou a sala escolhe como vão jogar.', 'A partida já começou.', 'Isso é só para sala com 3 pessoas.', 'Essa pessoa não está na sala.']);
-    const tres = fmt(r3, T[0], { format: 'tres' }).room;
-    eq('three pairs: chosen, but the core does not play it yet, so the game does not start (SUPPORTS_THREE)', [tres.format, Core.SUPPORTS_THREE, Core.handle(tres, T[0], { t: 'start' }, roll).error, seats(tres)], ['tres', false, 'As 3 duplas ainda não estão prontas. Escolha 2 contra 1.', seats(r3)]);
+    const tres = fmt(r3, T[0], { format: 'tres' }).room, t3 = Core.handle(fmt(ana, T[0], { format: 'tres' }).room, T[0], { t: 'start' }, roll).room;
+    const vC = Core.roomView(t3, T[2]);
+    eq('three pairs: the three people take seats 0, 1 and 2 (the host keeps 0), each facing a computer partner', [tres.format, Core.SUPPORTS_THREE, seats(t3), t3.game.teams, t3.game.humans, t3.game.names, t3.game.score],
+      ['tres', true, { Ana: 0, Bia: 1, Caio: 2 }, 3, [0, 1, 2], ['Ana', 'Bia', 'Caio', 'Cida', 'Toinho', 'Nena'], [0, 0, 0]]);
+    eq('three pairs, as each person sees it: themselves at 0, the computer partner at 3, the others turned around the six seats, no one else’s cards', [vC.seat, vC.game.names, vC.game.humans, vC.members.map(m => [m.name, m.seat]), vC.game.hands.map(h => h.every(c => c !== '??')), vC.game.score.length],
+      [2, ['Caio', 'Cida', 'Toinho', 'Nena', 'Ana', 'Bia'], [0, 4, 5], [['Caio', 0], ['Ana', 4], ['Bia', 5]], [true, false, false, false, false, false], 3]);
+    // a whole game of three pairs through the room: people play their first card and accept (Bia runs from every raise)
+    let rr = t3, n3 = 0;
+    const tk = s => T[[0, 1, 2].indexOf(s)];
+    while (rr.game.phase !== 'over' && n3++ < 6000) {
+      const g = rr.game, who = Core.whoActs(g);
+      if (who === null) { rr = Core.handle(rr, T[0], { t: 'act', a: 'next' }, roll).room; continue; }
+      if (!Core.isHuman(g, who)) { rr = Core.aiStep(rr, roll); continue; }
+      const msg = g.phase === 'truco' ? { t: 'act', a: 'answer', v: who === 1 ? 'run' : 'accept' } : g.phase === 'eleven' ? { t: 'act', a: 'eleven', v: true } : g.phase === 'play' && who === 2 && Core.canRaise(g, 2) && g.value === 1 ? { t: 'act', a: 'truco' } : { t: 'act', a: 'play', k: 0 };
+      const out = Core.handle(rr, tk(who), msg, roll); if (out.error) break; rr = out.room;
+      if ([0, 1, 2].some(s => Core.roomView(rr, tk(s)).game.hands.slice(1).some(h => h.some(c => c !== '??')) && !(rr.game.phase === 'eleven'))) break;
+    }
+    eq('a whole game of three pairs through the room ends, with somebody at 12 and nobody seeing anyone else’s cards', [rr.game.phase, Math.max(...rr.game.score), rr.game.score.length, rr.game.log.some(l => l.includes('saem da mão'))], ['over', 12, 3, true]);
     const four = Core.handle(tres, T[3], { t: 'join', name: 'Duda', token: T[3] }, roll).room;
     eq('with a fourth person the format is not looked at: the table of four starts', [Core.handle(four, T[0], { t: 'start' }, roll).room.game.humans], [[0, 1, 2, 3]]);
     eq('the format over the wire, and in a saved room (an old room without it plays as before)', [Core.readMsg({ t: 'format', format: 'tres' }), Core.readMsg(JSON.stringify({ t: 'format', format: 'duplas', alone: 2 })), Core.readMsg({ t: 'format', format: 'seis' }), Core.readMsg({ t: 'format', format: 'duplas', alone: 'a' }), Core.readRoom(JSON.parse(JSON.stringify(tres))).format, Core.readRoom({ ...r3, format: undefined }).format, Core.readRoom({ ...r3, format: 'x' }).format],

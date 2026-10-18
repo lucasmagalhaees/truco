@@ -3,12 +3,12 @@
    viewFor: the table turned so that they sit at seat 0 (the bottom of their screen), with nobody else's cards in it.
    Pure, like the rest of the core: the server (server/worker.ts on Cloudflare, tests/room_server.mjs in the tests)
    only moves messages in and out and keeps the time. */
-import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS, teamOf, teamsOf } from './game';
+import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS, SEATS6, teamOf, teamsOf } from './game';
 import type { Answer } from './game';
 import { DEFAULT_NAMES } from './teams';
 import type { Game, Level, Seat, Team } from './types';
 
-/** Seats in the order people take them: the first is the host, the second sits against them (each with a computer
+/** Seats in the order people take them (at the table of four; with three pairs, see start): the first is the host, the second sits against them (each with a computer
  *  partner), the third is the host's partner and the fourth the second one's. */
 export const SEAT_ORDER: Seat[] = [0, 1, 2, 3];
 /** How long the computer players think on the server, and the extra pause after a round closes, in ms. */
@@ -50,7 +50,7 @@ export interface Member { seat: Seat; name: string; token: string; online: boole
 export type Format = 'duplas' | 'tres';
 export const FORMATS: Format[] = ['duplas', 'tres'];
 /** Whether the core plays the 'tres' format. Until it does, the lobby shows it as coming soon and start refuses it. */
-export const SUPPORTS_THREE = false;
+export const SUPPORTS_THREE = true;
 export interface Room { code: string; level: Level; members: Member[]; game: Game | null; format: Format }
 export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; v: Answer } | { a: 'eleven'; v: boolean } | { a: 'next' };
 /** What a phone may send. */
@@ -109,7 +109,7 @@ export function viewFor(g: Game, seat: Seat): Game {
 export function roomView(room: Room, token: string): RoomView | null {
   const me = room.members.find(m => m.token === token);
   if (!me) return null;
-  const r = (s: number): number => (s - me.seat + 4) % 4;
+  const N = room.game ? teamsOf(room.game) * 2 : 4, r = (s: number): number => (s - me.seat + N) % N;
   return {
     t: 'room', code: room.code, host: host(room) === me, seat: me.seat, level: room.level, format: room.format,
     members: room.members.map(m => ({ seat: r(m.seat), name: m.name, online: m.online })).sort((a, b) => a.seat - b.seat),
@@ -157,6 +157,11 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     if (!isHost) return { room, error: 'Só quem criou a sala começa a partida.' };
     if (room.game && room.game.phase !== 'over') return { room, error: 'A partida já está rolando.' };
     if (threeOf(room) && !SUPPORTS_THREE) return { room, error: 'As 3 duplas ainda não estão prontas. Escolha 2 contra 1.' };
+    if (threeOf(room)) {
+      // three pairs: the three people take seats 0, 1 and 2 (the host keeps 0), each facing a computer partner (s + 3)
+      const order = [host(room) as Member, ...room.members.filter(m => m !== host(room))], members = room.members.map(m => ({ ...m, seat: order.indexOf(m) }));
+      return { room: { ...room, members, game: startGame({ ...room, members }, rand) } };
+    }
     return { room: { ...room, game: startGame(room, rand) } };
   }
   if (msg.t === 'bot') {
@@ -191,8 +196,9 @@ function toComputer(room: Room, gone: Member): Room {
 }
 /** A new game for the people in the room; the empty seats are computer players with the bar's names. */
 function startGame(room: Room, rand: () => number): Game {
-  const names = [0, 1, 2, 3].map(s => room.members.find(m => m.seat === s)?.name || DEFAULT_NAMES[s]);
-  return newGame(rand, room.level, { names, sides: [null, null], humans: room.members.map(m => m.seat) });
+  const three = threeOf(room), base = three ? SEATS6 : DEFAULT_NAMES;
+  const names = base.map((d, s) => room.members.find(m => m.seat === s)?.name || d);
+  return newGame(rand, room.level, { names, sides: [null, null], humans: room.members.map(m => m.seat), ...(three ? { teams: 3 as const } : {}) });
 }
 /** A person's move, only when it is theirs to make; anyone may deal the next hand. */
 function act(g: Game, seat: Seat, x: Action, rand: () => number): Game {
