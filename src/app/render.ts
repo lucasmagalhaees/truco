@@ -81,10 +81,12 @@ function vOnline(): string {
   return `<section class="card" id="online"><span class="label">Jogar online</span>
     <p>Você e uma IA contra um amigo e outra IA, cada um no seu celular. Cabem até 4 pessoas; lugar vazio fica com a IA.</p>
     ${inv ? `<p class="explain" id="invite">Você foi chamado para a sala <b>${inv}</b>. Escreva seu nome e toque em Entrar.</p>` : ''}
-    <div class="field"><input id="oname" maxlength="16" autocomplete="nickname" placeholder="seu nome" value="${esc(S.myName || '')}" aria-label="Seu nome"></div>
+    <div class="field"><input id="oname" maxlength="16" autocomplete="nickname" placeholder="seu nome" value="${esc(S.myName || '')}" aria-label="Seu nome" aria-describedby="oname-err"></div>
+    <p class="fielderr" id="oname-err" hidden></p>
     <button class="btn block" data-act="createroom"${off ? ' disabled' : ''}>Criar sala</button>
     <div class="or" aria-hidden="true">ou entre com o código</div>
-    <div class="row"><div class="field"><input id="ocode" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="código" value="${esc(inv)}" aria-label="Código da sala"></div><button class="btn ghost" data-act="joinroom"${off ? ' disabled' : ''}>Entrar</button></div>
+    <div class="row"><div class="field"><input id="ocode" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="código" value="${esc(inv)}" aria-label="Código da sala" aria-describedby="ocode-err"></div><button class="btn ghost" data-act="joinroom"${off ? ' disabled' : ''}>Entrar</button></div>
+    <p class="fielderr" id="ocode-err" hidden></p>
     ${off ? '<p class="hint" id="onlineoff">O servidor de salas ainda não está ligado neste endereço.</p>' : '<p class="hint">Quem cria a sala escolhe o nível das IAs (o de “Nova partida”).</p>'}</section>`;
 }
 /** Who sits where in the room, as this person sees it: themselves at the bottom, the partner in front. */
@@ -94,10 +96,10 @@ function seatsOf(): { seat: Seat; label: string; human: boolean; online: boolean
 }
 function vLobby(): string {
   const v = net.view;
-  if (!v) return `<section class="card" id="lobby"><span class="label">Sala ${esc(S.online?.code || '')}</span><p class="thinking">${net.status === 'caiu' ? 'Sem conexão com o servidor, tentando de novo…' : 'Entrando na sala…'}</p><button class="btn ghost block" data-act="leaveroom">Cancelar</button></section>`;
+  if (!v) return `${vConn()}<section class="card" id="lobby"><span class="label">Sala ${esc(S.online?.code || '')}</span><p class="thinking">Entrando na sala…</p><button class="btn ghost block" data-act="leaveroom">Cancelar</button></section>`;
   const seats = seatsOf(), at = (s: Seat): string => { const x = seats[s]; return `<div class="lseat${x.human ? ' human' : ''}${x.human && !x.online ? ' gone' : ''}" id="lseat${s}"><small>${s === 0 ? 'Você' : s === 2 ? 'Sua dupla' : 'Adversário'}</small><b>${esc(x.label)}</b></div>`; };
   const link = roomLink(v.code);
-  return `<section class="card" id="lobby"><span class="label">Sala</span>
+  return `${vConn()}<section class="card" id="lobby"><span class="label">Sala</span>
     <p class="code" id="code">${v.code}</p>
     <p class="hint">Mande o link para quem vai jogar. Quem entrar senta na ordem: o primeiro contra você, depois sua dupla, depois a dupla dele.</p>
     <p class="link" id="link">${esc(link)}</p>
@@ -106,10 +108,16 @@ function vLobby(): string {
     ${v.host ? `<p class="hint">Nível das IAs: <b>${LEVEL[v.level][0]}</b>.</p><button class="btn block" data-act="startroom">Começar ${v.members.length === 1 ? 'só com as IAs' : `com ${v.members.length} pessoas`}</button>` : `<p class="thinking">Esperando quem criou a sala começar…</p>`}
     <button class="btn ghost block" data-act="leaveroom">Sair da sala</button></section>`;
 }
+/** A strip at the top while the connection to the room is down: coming back by itself, or given up with a button. */
+function vConn(): string {
+  if (net.status === 'parado') return '<p class="netbar off" id="netbar" role="status"><span>Sem conexão.</span><button class="btn ghost" data-act="retryroom">Tentar de novo</button></p>';
+  if (net.status === 'caiu' || (net.status === 'conectando' && (net.tries > 0 || net.view))) return '<p class="netbar" id="netbar" role="status"><span>Caiu a conexão, voltando…</span></p>';
+  return '';
+}
 /** During a game in a room: the connection, and who dropped out (the host may hand their seat to the computer). */
 function vNet(): string {
   const v = net.view;
-  if (net.status === 'caiu') return '<p class="explain" id="netstatus">Sem conexão com a sala. Tentando de novo…</p>';
+  if (net.status !== 'na sala') return vConn();
   const gone = v ? v.members.filter(m => !m.online) : [];
   if (!gone.length || !v) return '';
   return `<p class="explain" id="netstatus">${gone.map(m => `<b>${esc(m.name)}</b> saiu da sala`).join(', ')}. A partida espera voltar.${v.host ? gone.map(m => ` <button class="btn ghost" data-act="botseat" data-s="${m.seat}">IA no lugar de ${esc(m.name)}</button>`).join('') : ''}</p>`;

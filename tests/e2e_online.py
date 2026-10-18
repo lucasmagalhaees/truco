@@ -20,13 +20,15 @@ SLEEP = 'dormindo' in sys.argv[2:]
 TAG = THEME + ('-dormindo' if SLEEP else '')             # names of screenshots and coverage files, so runs do not overwrite each other
 PAGE = (ROOT / 'dist' / 'index.html').as_uri()
 
-srv = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), '0', '30'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                       env={**os.environ, 'HIBERNATE': '1' if SLEEP else '0'})
-line = srv.stdout.readline()
-m = re.search(r'ws://127\.0\.0\.1:(\d+)', line)
-if not m or SLEEP != ('(hibernando)' in line):
-    srv.kill(); sys.exit(f'o servidor de salas não subiu como devia (dormindo={SLEEP}): {line}{srv.stdout.read()}')
-SERVER = m.group(0)
+def serve(port=0):
+    proc = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), str(port), '30'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                            env={**os.environ, 'HIBERNATE': '1' if SLEEP else '0'})
+    line = proc.stdout.readline()
+    m = re.search(r'ws://127\.0\.0\.1:(\d+)', line)
+    if not m or SLEEP != ('(hibernando)' in line):
+        proc.kill(); sys.exit(f'o servidor de salas não subiu como devia (dormindo={SLEEP}): {line}{proc.stdout.read()}')
+    return proc, m.group(0), int(m.group(1))
+srv, SERVER, PORT = serve()
 
 def on_failure(kind, value, tb):
     traceback.print_exception(kind, value, tb)
@@ -41,9 +43,22 @@ sys.excepthook = on_failure
 with sync_playwright() as p:
     b = p.chromium.launch()
     errs = []
-    def phone():
+    # the friend's phone goes through a switch on its connection to the room: on, it passes; cut, every attempt is held
+    # and then closed by cut_off() (a handler cannot close the socket itself: the sync API would wait on itself)
+    line_ = dict(cut=False, open=[], held=[])
+    def through(ws):
+        if line_['cut']: line_['held'].append(ws); return
+        ws.connect_to_server(); line_['open'].append(ws)
+    def cut_off(pg, until, timeout=20000):
+        for _ in range(timeout // 100):
+            while line_['held']: line_['held'].pop().close()
+            if pg.evaluate(until): return
+            pg.wait_for_timeout(100)
+        raise AssertionError(f'never: {until}')
+    def phone(switch=False):
         ctx = b.new_context(viewport=dict(width=393, height=852), device_scale_factor=2, color_scheme=THEME, locale='pt-BR', has_touch=True, is_mobile=True, reduced_motion='reduce')
         ctx.route('**/*', lambda r: r.abort() if r.request.url.startswith('http') else r.continue_())
+        if switch: ctx.route_web_socket(re.compile(r'^ws://127\.0\.0\.1:\d+/salas/'), through)
         pg = ctx.new_page()
         pg.on('pageerror', lambda e: errs.append(str(e)))
         cov.start(pg)
@@ -64,8 +79,15 @@ with sync_playwright() as p:
 
     # ---------- the host creates a room ----------
     host = phone(); at(host)
-    host.click('[data-act=createroom]'); assert 'Escreve seu nome' in txt(host, '#toast')
-    host.fill('#oname', 'Lucas'); host.click('[data-act=createroom]')
+    # no name: the field says so right there, with the focus in it, and nothing connects; typing takes the mark away
+    host.click('[data-act=createroom]')
+    assert txt(host, '#oname-err') == 'Escreve seu nome.' and host.is_visible('#oname-err') and host.get_attribute('#oname', 'aria-invalid') == 'true'
+    assert host.evaluate('document.activeElement.id') == 'oname' and host.locator('.field.bad #oname').count() == 1
+    assert host.locator('#lobby').count() == 0 and host.evaluate('JSON.parse(localStorage.getItem("truco.v1") || "{}").online') is None
+    host.screenshot(path=str(SHOTS / f'o0-sem-nome-{TAG}.png'))
+    host.click('[data-act=joinroom]'); assert txt(host, '#oname-err') == 'Escreve seu nome.' and host.locator('#ocode-err').is_hidden()
+    host.type('#oname', 'Lucas'); assert host.locator('#oname-err').is_hidden() and host.get_attribute('#oname', 'aria-invalid') is None and host.locator('.field.bad').count() == 0
+    host.click('[data-act=createroom]')
     host.wait_for_selector('#lobby #code')
     code = txt(host, '#code'); assert re.fullmatch(r'[A-Z0-9]{5}', code), code
     assert f'?sala={code}' in txt(host, '#link') and 'Começar só com as IAs' in txt(host, '[data-act=startroom]')
@@ -74,7 +96,7 @@ with sync_playwright() as p:
     host.click('[data-act=copylink]'); host.wait_for_function('!document.getElementById("toast").hidden')
 
     # ---------- the friend opens the link and joins ----------
-    guest = phone(); at(guest, f'{PAGE}?sala={code}')
+    guest = phone(switch=True); at(guest, f'{PAGE}?sala={code}')
     assert code in txt(guest, '#invite') and guest.input_value('#ocode') == code
     guest.fill('#oname', '<b>Amigo</b>'); guest.click('[data-act=joinroom]')
     guest.wait_for_selector('#lobby #code')
@@ -88,7 +110,9 @@ with sync_playwright() as p:
 
     # a wrong code, and a room that is already playing, are refused
     third = phone(); at(third)
-    third.fill('#oname', 'Zé'); third.fill('#ocode', 'AB'); third.click('[data-act=joinroom]'); assert 'tem 5 letras' in txt(third, '#toast')
+    third.fill('#oname', 'Zé'); third.fill('#ocode', 'AB'); third.click('[data-act=joinroom]')
+    assert txt(third, '#ocode-err') == 'O código tem 5 letras.' and third.get_attribute('#ocode', 'aria-invalid') == 'true' and third.evaluate('document.activeElement.id') == 'ocode'
+    assert third.locator('#lobby').count() == 0 and third.locator('#oname-err').is_hidden()
 
     # ---------- the game: each sees only their own cards, from their own seat ----------
     host.click('[data-act=startroom]')
@@ -149,22 +173,46 @@ with sync_playwright() as p:
     assert G(guest)['humans'] == [0, 3] and G(guest)['names'][0] == '<b>Amigo</b>', 'back at the same seat'
     host.wait_for_function('!document.getElementById("netstatus") || !document.getElementById("netstatus").textContent.includes("saiu")')
 
-    # ---------- the friend leaves for good; the host hands the seat to the computer ----------
+    # ---------- the friend's connection drops: a strip says it is coming back, then that it gave up, with a button ----------
+    line_['cut'] = True
+    for ws in line_['open']: ws.close()
+    line_['open'].clear()
+    guest.wait_for_selector('#netbar:not(.off)')
+    _bar = (txt(guest, '#netbar'), overflow(guest)); assert _bar == ('Caiu a conexão, voltando…', 0), _bar
+    guest.screenshot(path=str(SHOTS / f'o3-caiu-{TAG}.png'))
+    host.wait_for_selector('#netstatus [data-act=botseat]')            # the seat is kept; the host could hand it over
+    assert 'Amigo' in txt(host, '#netstatus') and 'saiu da sala' in txt(host, '#netstatus')
+    cut_off(guest, '!!document.querySelector("#netbar.off [data-act=retryroom]")')
+    assert 'Sem conexão.' in txt(guest, '#netbar') and 'Tentar de novo' in txt(guest, '#netbar [data-act=retryroom]')
+    guest.screenshot(path=str(SHOTS / f'o4-sem-conexao-{TAG}.png'))
+    line_['cut'] = False
+    guest.click('#netbar [data-act=retryroom]')
+    guest.wait_for_function('window.__APP.room && !document.getElementById("netbar")', timeout=10000)
+    assert G(guest)['humans'] == [0, 3], 'back at the same seat'
+    host.wait_for_function('!document.getElementById("netstatus")')
+
+    # ---------- the friend leaves for good: the computer takes the seat at once ----------
     guest.click('[data-act=leaveroom]'); assert 'Toque de novo' in txt(guest, '[data-act=leaveroom]')
     guest.click('[data-act=leaveroom]'); guest.wait_for_selector('#online')
-    host.wait_for_selector('#netstatus [data-act=botseat]')
-    assert 'Amigo' in txt(host, '#netstatus') and 'saiu da sala' in txt(host, '#netstatus')
-    host.click('#netstatus [data-act=botseat]')
     host.wait_for_function('window.__APP.room.game.humans.length === 1')
-    assert G(host)['humans'] == [0] and host.locator('#netstatus').count() == 0
+    assert G(host)['humans'] == [0] and host.locator('#netstatus').count() == 0 and host.locator('[data-act=botseat]').count() == 0
+    assert any('saiu; a IA joga no lugar.' in x for x in G(host)['log']), G(host)['log'][-3:]
     settle()                                                   # the computer plays the friend's seat now
     assert host.evaluate('(g) => window.__APP.Core.whoActs(g)', G(host)) in (0, None)
 
-    # ---------- the host leaves too ----------
-    host.click('[data-act=leaveroom]'); host.click('[data-act=leaveroom]'); host.wait_for_selector('#online')
-    assert host.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None and V(host) is None
+    # ---------- the server forgets the room (as Cloudflare does after a day with nobody): the phone says so and goes home ----------
+    srv.kill(); srv.wait()
+    host.wait_for_selector('#netbar')
+    srv, _, _ = serve(PORT)
+    for _ in range(40):
+        if host.locator('#online').count(): break
+        if host.locator('#netbar.off [data-act=retryroom]').count(): host.click('#netbar [data-act=retryroom]')
+        host.wait_for_timeout(250)
+    host.wait_for_selector('#online')
+    assert 'A sala anterior acabou.' in txt(host, '#toast') and V(host) is None
+    assert host.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None
     cov.stop(host, f'e2e-online-host-{TAG}'); cov.stop(guest, f'e2e-online-guest-{TAG}')
     assert not errs, errs
     b.close()
 srv.kill()
-print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, cair e voltar ao mesmo lugar, sair, IA no lugar de quem saiu{", com a sala indo e voltando do armazenamento a cada passo" if SLEEP else ""}, sem estouro de largura e sem erro de script')
+print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, sem estouro de largura e sem erro de script')

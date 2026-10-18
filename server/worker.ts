@@ -77,7 +77,7 @@ export class Room extends DurableObject<Env> {
     // the same person may have another phone (or a new tab) still connected
     const still = this.ctx.getWebSockets().some(o => o !== ws && (o.deserializeAttachment() as Tag).token === tag.token);
     if (still) return;
-    const room = await this.load(tag.code), out = Core.handle(room, tag.token, { t: 'leave' }, Math.random);
+    const room = await this.load(tag.code), out = Core.handle(room, tag.token, { t: 'drop' }, Math.random);
     if (out.room === room) return;
     await this.save(out.room);
     this.tell(out.room);

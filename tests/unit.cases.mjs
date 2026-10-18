@@ -225,11 +225,19 @@ export default function cases(Core) {
   const rg = room.game;
   eq('the game: the people at their seats, the computer at the others, with the bar\'s names', [rg.humans, rg.names[0], rg.names[1], rg.names[2], rg.names[3], rg.level], [[0, 1], 'Ana Maria', 'Bia', 'Cida', 'Toinho', 'dificil']);
   eq('once the game is on, nobody new comes in, and it cannot start twice', [join(room, T[3], 'Duda').error, Core.handle(room, T[0], { t: 'start' }, roll).error], ['Essa partida já começou.', 'A partida já está rolando.']);
-  const offline = Core.handle(room, T[1], { t: 'leave' }, roll).room;
-  eq('during the game, leaving keeps the seat; coming back with the same token takes it again', [offline.members[1].online, join(offline, T[1], 'qualquer').room.members[1], offline.game.humans], [false, { seat: 1, name: 'Bia', token: T[1], online: true }, [0, 1]]);
+  const offline = Core.handle(room, T[1], { t: 'drop' }, roll).room;
+  eq('during the game, a dropped connection keeps the seat; coming back with the same token takes it again', [offline.members[1].online, join(offline, T[1], 'qualquer').room.members[1], offline.game.humans], [false, { seat: 1, name: 'Bia', token: T[1], online: true }, [0, 1]]);
   const botted = Core.handle(offline, T[0], { t: 'bot', seat: 1 }, roll).room;
   eq('the host can put the computer in the seat of someone who left', [botted.game.humans, botted.members.length, Core.handle(room, T[0], { t: 'bot', seat: 1 }, roll).error], [[0], 1, 'Esse jogador ainda está na sala.']);
   const started = room;
+  const quit = Core.handle(room, T[1], { t: 'leave' }, roll).room, hostQuit = Core.handle(room, T[0], { t: 'leave' }, roll).room;
+  eq('during the game, leaving for good puts the computer in the seat at once, and says so', [quit.game.humans, quit.members.map(m => m.name), quit.game.log.at(-1), Core.roomView(quit, T[0]).members.length], [[0], ['Ana Maria'], 'Bia saiu; a IA joga no lugar.', 1]);
+  eq('the host leaving: the next person in the room is the host now', [hostQuit.game.humans, Core.roomView(hostQuit, T[1]).host, Core.handle(hostQuit, T[1], { t: 'bot', seat: 0 }, roll).error], [[1], true, 'Esse jogador ainda está na sala.']);
+  const turnOf = Core.whoActs(room.game), mover = Core.handle(room, T[turnOf === 1 ? 1 : 0], { t: 'leave' }, roll).room, nobody = Core.handle(hostQuit, T[1], { t: 'leave' }, roll).room;
+  eq('the computer moves for whoever left on their turn; with nobody left in the room, it stops', [Core.aiDelay(mover) !== null, nobody.members.length, nobody.game.humans, Core.aiDelay(nobody), Core.aiStep(nobody, roll) === nobody, Core.readMsg({ t: 'drop' })], [true, 0, [], null, true, null]);
+  const back = (r, tk) => Core.handle(r, tk, { t: 'join', name: 'Bia', token: tk, back: true }, roll);
+  eq('coming back to a game: the seat if it is there; a room the server deleted ends; a seat the computer took is said; before any game it is a plain join', [back(offline, T[1]).room.members[1].online, back(Core.newRoom(room.code), T[1]).error, back(botted, T[1]).error, back(Core.newRoom(room.code), T[1]).room.members.length, back({ ...left, game: null }, T[3]).room.members.length, Core.readMsg({ t: 'join', name: 'A', token: 'tttttttt', back: true }).back, 'back' in Core.readMsg({ t: 'join', name: 'A', token: 'tttttttt', back: 'yes' })],
+    [true, Core.ROOM_GONE, Core.SEAT_GONE, 0, 3, true, false]);
   // play out the game through the room: people move only on their turn, the computer when aiDelay says so
   let steps = 0, refused = 0;
   while (room.game.phase !== 'over' && steps < 4000) {

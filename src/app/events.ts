@@ -2,11 +2,11 @@ import { Core } from '../core';
 import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } from '../core';
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
-import { valOf } from './format';
+import { $, valOf } from './format';
 import { S, applyTheme, saveS, setS, ui } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
-import { connect, inRoom, leave, net, rawSeat, roomLink, send } from './net';
+import { connect, inRoom, leave, net, rawSeat, retryNow, roomLink, send } from './net';
 
 /* ================= events =================
    One listener for every tap, by data-act. Chance comes from Math.random here: the core only ever gets it as a
@@ -109,6 +109,8 @@ function club(a: string, v: string): void {
 /* ---------- a room on the server ---------- */
 /** Refusals that end the attempt to join: the room is full, already playing, or the name is missing. */
 const FATAL = ['Essa partida já começou.', 'A sala está cheia.', 'Escreve seu nome.', 'Não deu pra entrar: recarregue a página.'];
+/** Refusals that end it even with a game on the screen: coming back to a room that is gone, or to a seat the computer took. */
+const GONE = [Core.ROOM_GONE, Core.SEAT_GONE];
 /** A new view of the room came: painted, with the moment that goes with it; a game that just ended counts in the tally. */
 function onRoom(before: typeof net.view): void {
   const was = before?.game ?? null, now = net.view?.game ?? null;
@@ -119,13 +121,27 @@ function onRoom(before: typeof net.view): void {
 }
 function onRoomError(why: string): void {
   toast(why);
-  if (FATAL.includes(why) && !net.view?.game) { leave(); render(); }
+  if (GONE.includes(why) || (FATAL.includes(why) && !net.view?.game)) { ui.confirmEnd = false; leave(); render(); window.scrollTo(0, 0); }
+}
+/** A field of the online card marked wrong, with the reason under it, and the focus there to fix it. */
+function fieldError(id: 'oname' | 'ocode', why: string): void {
+  const input = $<HTMLInputElement>(`#${id}`), err = $<HTMLElement>(`#${id}-err`);
+  if (!input || !err) return;
+  err.textContent = why; err.hidden = false;
+  input.setAttribute('aria-invalid', 'true'); input.parentElement?.classList.add('bad');
+  input.focus();
+}
+/** Typing in a field marked wrong takes the mark away. */
+function fieldOk(e: Event): void {
+  const input = e.target as HTMLInputElement, err = $<HTMLElement>(`#${input.id}-err`);
+  if (!err || input.getAttribute('aria-invalid') !== 'true') return;
+  err.hidden = true; input.removeAttribute('aria-invalid'); input.parentElement?.classList.remove('bad');
 }
 function joinRoom(code: string): void {
   const name = valOf('#oname').replace(/\s+/g, ' ').trim().slice(0, 16);
+  if (!name) { fieldError('oname', 'Escreve seu nome.'); return; }
+  if (!Core.isCode(code)) { fieldError('ocode', 'O código tem 5 letras.'); return; }
   (document.activeElement as HTMLElement | null)?.blur?.();
-  if (!name) { toast('Escreve seu nome antes.'); return; }
-  if (!Core.isCode(code)) { toast('O código da sala tem 5 letras.'); return; }
   ui.drill = null; ui.real = false; ui.confirmEnd = false;
   connect(code, name, onRoom, onRoomError);
   render(); window.scrollTo(0, 0);
@@ -147,6 +163,7 @@ function room(a: string, d: DOMStringMap): void {
   else if (a === 'startroom') send({ t: 'start' });
   else if (a === 'againroom') send({ t: 'again' });
   else if (a === 'botseat') send({ t: 'bot', seat: rawSeat(Number(d.s)) });
+  else if (a === 'retryroom') retryNow();
   else if (a === 'leaveroom') {
     if (net.view?.game && net.view.game.phase !== 'over' && !ui.confirmEnd) { ui.confirmEnd = true; render(); return; }
     ui.confirmEnd = false; leave(); render(); window.scrollTo(0, 0);
@@ -167,6 +184,7 @@ function setting(a: string, v: string): void {
 }
 
 export function initEvents(): void {
+  document.addEventListener('input', fieldOk);
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
@@ -186,7 +204,7 @@ export function initEvents(): void {
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
-    else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'leaveroom', 'copylink', 'sharelink'].includes(a)) room(a, d);
+    else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
     else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);
     else if (a === 'update') applyUpdate();
     else if (a === 'checkupdate') void checkNow();
