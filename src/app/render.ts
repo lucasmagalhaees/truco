@@ -20,9 +20,11 @@ export function render(): void {
   const online = inRoom(), g = online ? (net.view?.game ?? null) : S.game;
   applyClub(online ? g : undefined);
   seatNames = g ? g.names : Core.lineup(S.team, S.rival, S.custom).names;
-  const sc = g ? `${g.score[0]}-${g.score[1]}` : '';
+  const sc = g ? g.score.join('-') : '';
   const bump = !!g && seenScore !== '' && sc !== seenScore; seenScore = sc;
-  part('score').innerHTML = g ? `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>` : '';
+  part('score').innerHTML = !g ? '' : Core.teamsOf(g) === 3
+    ? g.score.map((p, t) => `<span class="chip ${TEAM_CLS[t]}${bump ? ' bump' : ''}" id="chip${t}"><span class="nm">${t === 0 ? 'Nós' : esc(pairName(g, t as Team))}</span> ${p}</span>`).join('')
+    : `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>`;
   view.innerHTML = online ? (g ? vNet() + vGame(g) : vLobby()) : g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
 }
 
@@ -32,6 +34,15 @@ const hints = (): boolean => S.hints !== false;
 /** The names at the table: the game's, or the ones the chosen club gives. */
 let seatNames: string[] = Core.SEATS;
 const name = (s: Seat): string => esc(seatNames[s]);
+/** The class of each pair's colour: ours, theirs and, with three pairs, the third one. */
+const TEAM_CLS = ['nos', 'eles', 't2'];
+/** A pair, in words, as it shows in the score of three pairs: the person in it, or its first seat if nobody is. */
+function pairName(g: Game, t: Team): string {
+  const p = Core.partnerOf(g, t);
+  return g.names[g.humans.includes(p) && !g.humans.includes(t) ? p : t];
+}
+/** Who a pair is, in a sentence: "nós", or (with three pairs) the pair's name; "eles" with two. */
+const pairSay = (g: Game, t: Team | null): string => (t === 0 ? 'Nós' : Core.teamsOf(g) === 3 && t !== null ? esc(pairName(g, t)) : 'Eles');
 /** Where a card stands with this vira: 1 for the zap, 2 for copas… down to the 4s. */
 const place = (c: Card, vira: Card): number => Core.ranking(vira).findIndex(r => r.cards.includes(c)) + 1;
 /** A card face. With `vira`, a manilha gets its nickname, and with rodinhas every card gets its place in the ranking. */
@@ -104,7 +115,7 @@ function vLobby(): string {
     <p class="hint">Mande o link para quem vai jogar. Quem entrar senta na ordem: o primeiro contra você, depois sua dupla, depois a dupla dele.</p>
     <p class="link" id="link">${esc(link)}</p>
     <div class="pick"><button class="btn ghost" data-act="copylink">Copiar link</button>${typeof navigator.share === 'function' ? '<button class="btn ghost" data-act="sharelink">Compartilhar</button>' : ''}</div>
-    <div class="lseats">${at(2)}<div class="lrow">${at(3)}${at(1)}</div>${at(0)}</div>
+    ${v.format === 'tres' && v.members.length === 3 ? '' : `<div class="lseats">${at(2)}<div class="lrow">${at(3)}${at(1)}</div>${at(0)}</div>`}
     ${vFormat()}
     ${v.host ? `<p class="hint">Nível das IAs: <b>${LEVEL[v.level][0]}</b>.</p><button class="btn block" data-act="startroom">Começar ${v.members.length === 1 ? 'só com as IAs' : `com ${v.members.length} pessoas`}</button>` : `<p class="thinking">Esperando quem criou a sala começar…</p>`}
     <button class="btn ghost block" data-act="leaveroom">Sair da sala</button></section>`;
@@ -122,7 +133,7 @@ function vFormat(): string {
   const soon = !Core.SUPPORTS_THREE;
   return `<div id="format"><p class="hint">Como vão jogar?</p>
     <div class="segm" role="group" aria-label="Como vão jogar"><button class="${three ? '' : 'on'}" data-act="roomformat" data-f="duplas" aria-pressed="${!three}">2 contra 1</button><button class="${three ? 'on' : ''}" data-act="roomformat" data-f="tres" aria-pressed="${three}"${soon ? ' disabled' : ''}>3 duplas${soon ? ' (em breve)' : ''}</button></div>
-    ${three ? '<p class="hint">Cada um com uma IA, três duplas na mesa.</p>' : `<p class="hint">Quem joga com a IA? Os outros dois fazem dupla.</p>
+    ${three ? `<p class="hint">Cada um com uma IA de parceira, seis na mesa: ${v.members.map(m => `<b>${who(m)}</b>`).join(', ')}.</p>` : `<p class="hint">Quem joga com a IA? Os outros dois fazem dupla.</p>
     <div class="segm small" role="group" aria-label="Quem joga com a IA">${v.members.map(m => `<button class="${m === alone ? 'on' : ''}" data-act="roomalone" data-s="${m.seat}" aria-pressed="${m === alone}">${who(m)}</button>`).join('')}</div>`}</div>`;
 }
 /** A strip at the top while the connection to the room is down: coming back by itself, or given up with a button. */
@@ -264,24 +275,27 @@ function vGame(g: Game): string {
       : `<section class="card"><button class="btn ghost block" data-act="end">${ui.confirmEnd ? 'Toque de novo para encerrar a partida' : 'Encerrar partida'}</button></section>`);
 }
 function vStatus(g: Game): string {
-  const dots = [0, 1, 2].map(i => { const r = g.rounds[i]; return `<i class="${r === undefined ? '' : r === -1 ? 'tie' : r === 0 ? 'nos' : 'eles'}" title="${i + 1}ª rodada"></i>`; }).join('');
+  const dots = [0, 1, 2].map(i => { const r = g.rounds[i]; return `<i class="${r === undefined ? '' : r === -1 ? 'tie' : TEAM_CLS[r]}" title="${i + 1}ª rodada"></i>`; }).join('');
   return `<div class="status" id="status"><span><small>Vale</small><b id="value">${g.value}</b></span><span><small>Mão</small><b>${g.n}</b></span><span><small>Rodadas</small><b class="dots">${dots}</b></span><span><small>Nível</small><b>${LEVEL[g.level][0]}</b></span></div>`;
 }
 const POS = ['p-bottom', 'p-right', 'p-top', 'p-left'];
+/** With three pairs: you at the bottom, your partner at the top, the others two on each side, in the order of play. */
+const POS6 = ['p-bottom', 'p-right p-rb', 'p-right p-rt', 'p-top', 'p-left p-lt', 'p-left p-lb'];
+const posOf = (g: Game, s: Seat): string => (Core.teamsOf(g) === 3 ? POS6 : POS)[s];
 function vSeat(g: Game, s: Seat): string {
-  const acting = Core.whoActs(g) === s, n = g.hands[s].length;
+  const acting = Core.whoActs(g) === s, n = g.hands[s].length, out = !Core.inHand(g, s);
   const bubble = g.shout && g.shout.seat === s ? `<span class="bubble${['truco', 'seis', 'nove', 'doze'].includes(g.shout.word) ? ' loud' : ''}">${said(g, g.shout.word)}</span>` : '';
-  return `<div class="seat ${POS[s]} t${Core.teamOf(s)}${acting ? ' acting' : ''}" id="seat${s}">${bubble}<span class="who">${name(s)}${g.dealer === s ? ' <small title="deu as cartas">pé</small>' : ''}</span>${s ? `<span class="backs">${Array.from({ length: n }, back).join('')}</span>` : ''}</div>`;
+  return `<div class="seat ${posOf(g, s)} t${Core.teamOf(s, Core.teamsOf(g))}${acting ? ' acting' : ''}${out ? ' out' : ''}" id="seat${s}">${bubble}<span class="who">${name(s)}${g.dealer === s ? ' <small title="deu as cartas">pé</small>' : ''}</span>${out ? '<span class="gone">saiu da mão</span>' : s ? `<span class="backs">${Array.from({ length: n }, back).join('')}</span>` : ''}</div>`;
 }
 function vTable(g: Game, fresh: boolean, glow: boolean): string {
   const showing: Play[] = g.table.length ? g.table : g.last ? g.last.plays : [];
   const old = !g.table.length && !!g.last, win = old && g.last ? g.last.winner : -2;
-  const lead = g.table.length ? Core.roundWinner(g.table, g.vira) : -2;
+  const T = Core.teamsOf(g), lead = g.table.length ? Core.roundWinner(g.table, g.vira, T) : -2;
   const slots = showing.map((p, i) => {
     const isNew = fresh && i === showing.length - 1;
-    return `<div class="slot ${POS[p.seat]}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
+    return `<div class="slot ${posOf(g, p.seat)}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
   }).join('');
-  return `<section class="felt" id="table">${[2, 3, 1].map(s => vSeat(g, s)).join('')}
+  return `<section class="felt${T === 3 ? ' six' : ''}" id="table">${(T === 3 ? [3, 4, 2, 5, 1] : [2, 3, 1]).map(s => vSeat(g, s)).join('')}
     <div class="center" id="center">${slots}</div>
     <div class="vira" id="vira"><small>Vira</small>${face(g.vira)}${hints() ? `<small>manilha: <b>${Core.manilhaRank(g.vira)}</b></small>` : ''}</div>
     ${vSeat(g, 0)}</section>${hints() ? vExplain(g) : ''}`;
@@ -290,7 +304,7 @@ function vTable(g: Game, fresh: boolean, glow: boolean): string {
 function vExplain(g: Game): string {
   let t = '';
   if (g.table.length) {
-    const w = Core.roundWinner(g.table, g.vira);
+    const w = Core.roundWinner(g.table, g.vira, Core.teamsOf(g));
     t = w === -1 ? 'Por enquanto a rodada está cangada (empate).' : `Por enquanto ${w === 0 ? 'você está' : `${name(w)} está`} levando, com ${Core.cardSay((g.table.find(p => p.seat === w) as Play).card, g.vira)}.`;
   } else if (g.last) {
     const w = g.last.winner, duel = Core.suitDuel(g.last.plays, g.vira);
@@ -311,30 +325,38 @@ function vAction(g: Game): string {
     return `<div class="actions" id="action"><span>Sua vez${g.table.length ? '' : ': você começa a rodada'}.</span>${Core.canRaise(g, 0) ? `<button class="btn truco" data-act="truco">${WORD[Core.nextValue(g.value)]}!</button>` : ''}</div>`;
   }
   if (g.phase === 'truco' && g.ask) {
-    if (who !== 0) return `<p class="thinking" id="action">${name(who as Seat)} está pensando no seu ${WORD[g.ask.value].toLowerCase()}…</p>`;
+    if (who !== 0) return `<div id="action"><p class="thinking">${name(who as Seat)} está pensando no ${WORD[g.ask.value].toLowerCase()} de ${g.ask.by === 0 ? 'você' : name(g.ask.by)}…</p>${Core.teamsOf(g) === 3 ? vWho(g) : ''}</div>`;
     // the partner whispers only when the partner is the computer and its cards are known here (not in a room)
-    const tip = g.hands[2].some(c => c === '??') || Core.isHuman(g, 2) ? null : Core.aiAnswer(g, 2);
+    const three = Core.teamsOf(g) === 3, mate = Core.partnerOf(g, 0);
+    const tip = three || g.hands[mate].some(c => c === '??') || Core.isHuman(g, mate) ? null : Core.aiAnswer(g, mate);
     const tipTxt = tip ? { accept: 'aceita', run: 'corre', raise: `pede ${WORD[Core.nextValue(g.ask.value)].toLowerCase()}` }[tip] : '';
-    return `<section class="card ask" id="action"><span class="label">${name(g.ask.by)} pediu ${WORD[g.ask.value].toLowerCase()}</span><p class="big">Se aceitar, a mão vale <b>${g.ask.value}</b>. Se correr, eles levam <b>${g.value}</b>.</p>
+    return `<section class="card ask" id="action"><span class="label">${name(g.ask.by)} pediu ${WORD[g.ask.value].toLowerCase()}</span><p class="big">Se aceitar, a mão vale <b>${g.ask.value}</b>. ${three ? 'Se correr, vocês saem da mão e não marcam.' : `Se correr, eles levam <b>${g.value}</b>.`}</p>${three ? vWho(g) : ''}
       <div class="pick"><button class="btn" data-act="answer" data-v="accept">Aceito</button><button class="btn ghost" data-act="answer" data-v="run">Corro</button>${g.ask.value < Core.WIN_POINTS ? `<button class="btn truco" data-act="answer" data-v="raise">${WORD[Core.nextValue(g.ask.value)]}!</button>` : ''}</div>
       ${tip ? `<p class="hint" id="tip">${(name(2))} cochicha: “eu ${tipTxt}”.</p>` : ''}</section>`;
   }
   if (g.phase === 'eleven') {
-    if (who !== 0) return `<p class="thinking" id="action">Eles estão com ${Core.ELEVEN}: decidindo se jogam…</p>`;
-    return `<section class="card ask" id="action"><span class="label">Mão de onze</span><p>Vocês estão com ${Core.ELEVEN}. As cartas de ${(name(2))}:</p><div class="hand small" id="partner">${g.hands[2].map(c => face(c, g.vira, hints())).join('')}</div>
-      <p class="hint">Jogar: a mão vale ${Core.ELEVEN_VALUE}, sem truco. Correr: eles levam 1.</p><div class="pick"><button class="btn" data-act="eleven" data-v="1">Jogar</button><button class="btn ghost" data-act="eleven" data-v="0">Correr</button></div></section>`;
+    const mate = Core.partnerOf(g, 0), three = Core.teamsOf(g) === 3;
+    if (who !== 0) return `<p class="thinking" id="action">${three ? pairSay(g, g.eleven) : 'Eles'} estão com ${Core.ELEVEN}: decidindo se jogam…</p>`;
+    return `<section class="card ask" id="action"><span class="label">Mão de onze</span><p>Vocês estão com ${Core.ELEVEN}. As cartas de ${(name(mate))}:</p><div class="hand small" id="partner">${g.hands[mate].map(c => face(c, g.vira, hints())).join('')}</div>
+      <p class="hint">Jogar: a mão vale ${Core.ELEVEN_VALUE}, sem truco. Correr: ${three ? 'cada uma das outras duplas leva 1' : 'eles levam 1'}.</p><div class="pick"><button class="btn" data-act="eleven" data-v="1">Jogar</button><button class="btn ghost" data-act="eleven" data-v="0">Correr</button></div></section>`;
   }
   const r = g.result;
   if (!r) return '';
   const shown = r.shown ? `<div class="shown" id="shown"><p>${name(r.shown.seat)} ${r.shown.seat === 0 ? 'tinha' : 'mostrou'}:</p><div class="hand small">${r.shown.cards.map(c => face(c, g.vira, hints())).join('')}</div>${r.shown.bluff ? '<p class="bluff">Era blefe!</p>' : ''}</div>` : '';
-  const head = r.team === null ? 'Ninguém marcou' : `${r.team === 0 ? 'Nós' : 'Eles'} +${r.points}`;
+  const head = r.team === null ? 'Ninguém marcou' : `${pairSay(g, r.team)} +${r.points}`;
   if (g.phase === 'handEnd') return `<section class="card result t${r.team ?? 'x'}" id="action"><span class="label">Fim da mão</span><p class="big"><b>${head}</b></p><p>${esc(r.why)}</p>${shown}<button class="btn block" data-act="next">Próxima mão</button></section>`;
-  return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : 'Eles venceram.'}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score[0]} a ${g.score[1]}.</p>${shown}
+  return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : `${pairSay(g, g.winner)} venceram.`}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score.join(' a ')}.</p>${shown}
     ${inRoom() ? (net.view?.host ? '<button class="btn block" data-act="againroom">Jogar de novo com a mesma sala</button>' : `<p class="hint">Quem criou a sala pode começar outra.</p>`) + '<button class="btn ghost block" data-act="leaveroom">Sair da sala</button>'
       : '<button class="btn block" data-act="again">Jogar de novo</button><button class="btn ghost block" data-act="home">Início</button>'}</section>`;
 }
+/** With three pairs, on a raise: which pairs still have to answer, and which ran and are out of the hand. */
+function vWho(g: Game): string {
+  const ask = g.ask as NonNullable<Game['ask']>, wait = ask.wait || [], out = g.out || [];
+  const one = (t: Team): string => (t === 0 ? 'vocês' : pairSay(g, t));
+  return `<p class="hint" id="who3">Respondem: ${wait.length ? wait.map(one).join(' e ') : 'ninguém mais'}.${out.length ? ` Saíram da mão: ${out.map(one).join(' e ')}.` : ''}</p>`;
+}
 function vSummary(g: Game): string {
-  const items = g.hist.map((h, i) => `<li class="t${h.team ?? 'x'}"><b>Mão ${i + 1}</b> · ${h.team === null ? 'ninguém' : h.team === 0 ? `nós +${h.points}` : `eles +${h.points}`} · ${esc(h.how)}</li>`).join('');
+  const items = g.hist.map((h, i) => `<li class="t${h.team ?? 'x'}"><b>Mão ${i + 1}</b> · ${h.team === null ? 'ninguém' : `${h.team === 0 ? 'nós' : Core.teamsOf(g) === 3 ? pairSay(g, h.team) : 'eles'} +${h.points}`} · ${esc(h.how)}</li>`).join('');
   return `<section class="card" id="summary"><span class="label">Resumo da partida</span><ol class="timeline">${items}</ol></section>`;
 }
 function vLog(g: Game): string {

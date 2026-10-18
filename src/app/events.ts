@@ -37,7 +37,7 @@ function moment(before: Game | null, g: Game): void {
   if (g.played.length > before.played.length) sound('card');
   if (g.shout && g.shout !== before.shout) {
     if (LOUD.includes(g.shout.word)) {
-      stamp(`${g.shout.word.toUpperCase()}!`, Core.teamOf(g.shout.seat)); sound('truco');
+      stamp(`${g.shout.word.toUpperCase()}!`, Core.teamOf(g.shout.seat, Core.teamsOf(g))); sound('truco');
       if (Core.teamOf(g.shout.seat) === 1) buzz([50, 40, 50]);
     } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? null);
   }

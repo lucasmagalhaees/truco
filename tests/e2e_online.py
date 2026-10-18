@@ -119,12 +119,13 @@ with sync_playwright() as p:
     third.fill('#ocode', code); third.click('[data-act=joinroom]'); third.wait_for_selector('#lobby #format')
     host.wait_for_selector('#format [data-act=roomalone]')
     assert host.locator('#format [data-act=roomformat][data-f=duplas].on').count() == 1
-    assert host.locator('#format [data-act=roomformat][data-f=tres]').is_disabled() and 'em breve' in txt(host, '#format [data-f=tres]')
+    assert not host.locator('#format [data-act=roomformat][data-f=tres]').is_disabled() and txt(host, '#format [data-f=tres]') == '3 duplas'
     assert 'Zé' in txt(host, '#lseat2') and txt(guest, '#format b') == 'Você' and txt(third, '#format b') == '<b>Amigo</b>', 'by default the third sits with the host; the second plays with the computer'
     assert guest.locator('#format button').count() == 0 and third.locator('#format button').count() == 0, 'only the host chooses'
     host.click('#format [data-act=roomalone][data-s="0"]')                # the host plays with the computer: the other two pair up
     guest.wait_for_function('document.getElementById("lseat2").textContent.includes("Zé")')
     third.wait_for_function('document.getElementById("lseat2").textContent.includes("Amigo")')
+    host.wait_for_function('document.getElementById("lseat2").textContent.includes("IA")')      # the host's own screen also waits for the room to come back
     assert 'Sua dupla' in txt(guest, '#lseat2') and 'Lucas' in txt(guest, '#lseat1') + txt(guest, '#lseat3') and 'IA (Cida)' in txt(host, '#lseat2')
     assert 'Lucas' in txt(third, '#format b') and overflow(host) == 0 and overflow(third) == 0
     host.screenshot(path=str(SHOTS / f'o1b-tres-pessoas-{TAG}.png'), full_page=True)
@@ -229,8 +230,56 @@ with sync_playwright() as p:
     host.wait_for_selector('#online')
     assert 'A sala anterior acabou.' in txt(host, '#toast') and V(host) is None
     assert host.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None
+    # ---------- three pairs: three phones, each person with a computer partner, six at the table ----------
+    zed = phone(); at(zed)
+    host.fill('#oname', 'Lucas'); host.click('[data-act=createroom]'); host.wait_for_selector('#lobby #code'); code3 = txt(host, '#code')
+    for pg, nm in ((guest, 'Amigo'), (zed, 'Zé')):
+        pg.fill('#oname', nm); pg.fill('#ocode', code3); pg.click('[data-act=joinroom]'); pg.wait_for_selector('#lobby #code')
+    host.wait_for_selector('#format [data-act=roomformat][data-f=tres]:not([disabled])')
+    host.click('#format [data-act=roomformat][data-f=tres]')
+    for pg in (host, guest, zed): pg.wait_for_function('window.__APP.room && window.__APP.room.format === "tres"')
+    assert 'três duplas' in txt(guest, '#format').lower() and host.locator('.lseats').count() == 0
+    host.click('[data-act=startroom]')
+    for pg in (host, guest, zed): pg.wait_for_function('window.__APP.room && window.__APP.room.game && window.__APP.room.game.teams === 3')
+    assert G(host)['humans'] == [0, 1, 2] and G(guest)['humans'] == [0, 1, 5] and G(zed)['humans'] == [0, 4, 5], (G(host)['humans'], G(guest)['humans'], G(zed)['humans'])
+    assert [G(pg)['names'][3] for pg in (host, guest, zed)] == ['Cida', 'Toinho', 'Nena'], 'each one faces a computer partner'
+    for pg in (host, guest, zed):
+        assert pg.locator('#table.six').count() == 1 and pg.locator('#score .chip').count() == 3 and pg.locator('[data-c="??"]').count() == 0
+        assert all(c == '??' for h in G(pg)['hands'][1:] for c in h) and all(c != '??' for c in G(pg)['hands'][0]), 'only one’s own cards'
+        assert overflow(pg) == 0
+    assert 'Nós 0' in txt(host, '#chip0') and 'Amigo' in txt(host, '#chip1') and 'Zé' in txt(host, '#chip2') and 'Lucas' in txt(guest, '#chip2')
+    host.screenshot(path=str(SHOTS / f'o5-tres-duplas-{TAG}.png'), full_page=True)
+    # play through the screen: the friend asks for truco when he can; the host accepts, Zé runs (his pair leaves the hand)
+    phones, saw_wait, asked = {'host': host, 'guest': guest, 'zed': zed}, False, False
+    for _ in range(600):
+        lg = G(host)['log']
+        if any('Zé' in x and 'saem da mão' in x for x in lg) and asked and any(x.startswith('Vale 3') for x in lg): break
+        moved = False
+        for who, pg in phones.items():
+            g = G(pg)
+            if not g or g['phase'] in ('handEnd', 'over'):
+                if g and g['phase'] == 'handEnd' and who == 'host' and pg.locator('[data-act=next]').count(): pg.click('[data-act=next]'); moved = True
+                continue
+            if pg.evaluate('(g) => window.__APP.Core.whoActs(g)', g) != 0: continue
+            if g['phase'] == 'truco':
+                if pg.locator('#who3').count(): saw_wait = saw_wait or 'Respondem:' in txt(pg, '#who3')
+                pg.click(f'[data-act=answer][data-v={"run" if who == "zed" else "accept"}]')
+            elif g['phase'] == 'eleven': pg.click('[data-act=eleven][data-v="1"]')
+            elif who == 'guest' and not asked and pg.locator('[data-act=truco]').count(): pg.click('[data-act=truco]'); asked = True
+            else: pg.click('#hand [data-act=play] >> nth=0')
+            moved = True; pg.wait_for_timeout(80)
+            break
+        if not moved: host.wait_for_timeout(120)
+    else:
+        raise AssertionError(f'three pairs: never saw a raise answered by both pairs: {G(host)["log"][-6:]}')
+    assert saw_wait, 'the ask says which pairs still answer'
+    host.wait_for_function('document.querySelectorAll("#seat2 .gone, #seat5 .gone").length === 2 || window.__APP.room.game.phase !== "play"')
+    for pg in (host, guest, zed):
+        assert all(c == '??' for h in G(pg)['hands'][1:] for c in h) and overflow(pg) == 0
+    host.screenshot(path=str(SHOTS / f'o6-tres-duplas-correu-{TAG}.png'), full_page=True)
+    cov.stop(zed, f'e2e-online-zed-{TAG}')
     cov.stop(host, f'e2e-online-host-{TAG}'); cov.stop(guest, f'e2e-online-guest-{TAG}')
     assert not errs, errs
     b.close()
 srv.kill()
-print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, sem estouro de largura e sem erro de script')
+print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, três duplas pela tela com o pedido respondido pelas duas duplas e uma saindo da mão, sem estouro de largura e sem erro de script')
