@@ -106,8 +106,9 @@ export interface AppState {
   theme?: Theme; speed?: Speed; quiet?: true; hints?: false;
   /** The person's club, the rival club in the rivals mode, and the player names the person changed, by club. */
   team?: string; rival?: string; custom?: Record<string, string[]>;
-  /** The name the person plays under online, and the room they are in (code and the token that keeps their seat). */
-  myName?: string; online?: { code: string; token: string };
+  /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
+   *  a game in it has started, so coming back to an empty room means the room is gone). */
+  myName?: string; online?: { code: string; token: string; played?: true };
 }
 
 /** An entry as the source describes it, once read by `normEntry`. */

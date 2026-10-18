@@ -14,6 +14,8 @@ export const SEAT_ORDER: Seat[] = [0, 1, 2, 3];
 /** How long the computer players think on the server, and the extra pause after a round closes, in ms. */
 export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;
 export const NAME_MAX = 16, CODE_LEN = 5;
+/** What a phone coming back to its game hears when the room is gone (nobody in it for a day), or its seat went to the computer. */
+export const ROOM_GONE = 'A sala anterior acabou.', SEAT_GONE = 'Seu lugar na partida ficou com a IA.';
 /** Letters for room codes: no 0/O, 1/I/L, so a code read out loud is not mistaken. */
 export const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -46,8 +48,9 @@ export interface Room { code: string; level: Level; members: Member[]; game: Gam
 export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; v: Answer } | { a: 'eleven'; v: boolean } | { a: 'next' };
 /** What a phone may send. */
 export type ClientMsg =
-  | { t: 'join'; name: string; token: string; level?: Level }
+  | { t: 'join'; name: string; token: string; level?: Level; back?: boolean }   // back: this phone was in a game in this room
   | { t: 'start' } | { t: 'again' } | { t: 'leave' }
+  | { t: 'drop' }                                  // the connection closed: sent by the server itself, never read off the wire
   | { t: 'bot'; seat: Seat }                       // the host puts the computer in the seat of someone who left
   | ({ t: 'act' } & Action);
 /** What a phone receives: the room as that person sees it. */
@@ -111,6 +114,9 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
   const me = room.members.find(m => m.token === token);
   if (msg.t === 'join') {
     if (me) return { room: { ...room, members: room.members.map(m => (m === me ? { ...m, online: true } : m)) } };
+    // coming back to a game this phone was in, but the seat is not there: the room was deleted, or the seat went to the computer
+    if (msg.back && !room.members.length) return { room, error: ROOM_GONE };
+    if (msg.back && room.game) return { room, error: SEAT_GONE };
     const name = cleanName(msg.name);
     if (!name) return { room, error: 'Escreve seu nome.' };
     if (typeof token !== 'string' || token.length < 8 || token.length > 64) return { room, error: 'Não deu pra entrar: recarregue a página.' };
@@ -122,14 +128,11 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
   }
   if (!me) return { room, error: 'Você não está nessa sala.' };
   const isHost = host(room) === me;
-  if (msg.t === 'leave') {
-    if (!room.game) {
-      // before the game, leaving frees the seat; the next person keeps theirs, and seat 0 passes on if the host left
-      const rest = room.members.filter(m => m !== me);
-      return { room: { ...room, members: rest } };
-    }
-    return { room: { ...room, members: room.members.map(m => (m === me ? { ...m, online: false } : m)) } };
-  }
+  // before the game, leaving or dropping frees the seat; the next person keeps theirs, and the host's part passes on
+  if ((msg.t === 'leave' || msg.t === 'drop') && !room.game) return { room: { ...room, members: room.members.filter(m => m !== me) } };
+  // during it, a dropped connection keeps the seat to come back to; leaving for good puts the computer there at once
+  if (msg.t === 'drop') return { room: { ...room, members: room.members.map(m => (m === me ? { ...m, online: false } : m)) } };
+  if (msg.t === 'leave') return { room: toComputer(room, me) };
   if (msg.t === 'start' || msg.t === 'again') {
     if (!isHost) return { room, error: 'Só quem criou a sala começa a partida.' };
     if (room.game && room.game.phase !== 'over') return { room, error: 'A partida já está rolando.' };
@@ -139,8 +142,7 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     if (!isHost || !room.game) return { room, error: 'Só quem criou a sala faz isso.' };
     const gone = room.members.find(m => m.seat === msg.seat && !m.online);
     if (!gone) return { room, error: 'Esse jogador ainda está na sala.' };
-    const g = room.game;
-    return { room: { ...room, members: room.members.filter(m => m !== gone), game: { ...g, humans: g.humans.filter(s => s !== gone.seat), log: [...g.log, `${g.names[gone.seat]} saiu; a IA joga no lugar.`] } } };
+    return { room: toComputer(room, gone) };
   }
   if (msg.t === 'act') {
     const g = room.game;
@@ -149,6 +151,12 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     return next === g ? { room, error: 'Agora não é a sua vez.' } : { room: { ...room, game: next } };
   }
   return { room, error: 'Mensagem desconhecida.' };
+}
+/** Someone out of the game for good: the computer plays their seat from now on. If the host went, the next person in the
+ *  room is the host (see host). */
+function toComputer(room: Room, gone: Member): Room {
+  const g = room.game as Game;
+  return { ...room, members: room.members.filter(m => m !== gone), game: { ...g, humans: g.humans.filter(s => s !== gone.seat), log: [...g.log, `${g.names[gone.seat]} saiu; a IA joga no lugar.`] } };
 }
 /** A new game for the people in the room; the empty seats are computer players with the bar's names. */
 function startGame(room: Room, rand: () => number): Game {
@@ -167,7 +175,7 @@ function act(g: Game, seat: Seat, x: Action, rand: () => number): Game {
 /** If a computer player has to move, how long to wait first (ms); null when it is a person's move, or nobody's. */
 export function aiDelay(room: Room): number | null {
   const g = room.game, s = g ? whoActs(g) : null;
-  if (!g || s === null || isHuman(g, s)) return null;
+  if (!g || s === null || isHuman(g, s) || !room.members.length) return null;      // nobody left: the computer stops too
   return ROOM_THINK + (g.phase === 'play' && !g.table.length && g.last ? ROOM_ROUND_PAUSE : 0);
 }
 /** The computer player's move, if one has to move. */
@@ -177,7 +185,7 @@ export function readMsg(raw: unknown): ClientMsg | null {
   let o: Record<string, unknown>;
   try { o = typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>); } catch (e) { return null; }
   if (!o || typeof o !== 'object' || typeof o.t !== 'string') return null;
-  if (o.t === 'join') return { t: 'join', name: String(o.name ?? ''), token: String(o.token ?? ''), ...(LEVELS.includes(o.level as Level) ? { level: o.level as Level } : {}) };
+  if (o.t === 'join') return { t: 'join', name: String(o.name ?? ''), token: String(o.token ?? ''), ...(LEVELS.includes(o.level as Level) ? { level: o.level as Level } : {}), ...(o.back === true ? { back: true } : {}) };
   if (o.t === 'start' || o.t === 'again' || o.t === 'leave') return { t: o.t };
   if (o.t === 'bot' && Number.isInteger(o.seat)) return { t: 'bot', seat: o.seat as number };
   if (o.t === 'act') {

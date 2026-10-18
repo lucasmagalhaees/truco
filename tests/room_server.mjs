@@ -70,7 +70,7 @@ server.on('upgrade', (req, socket, head) => {
     ws.on('close', () => {
       r.sockets.delete(ws);
       if (!ws.token || [...r.sockets].some(o => o.token === ws.token)) return;
-      const room = load(r, code), out = Core.handle(room, ws.token, { t: 'leave' }, Math.random);
+      const room = load(r, code), out = Core.handle(room, ws.token, { t: 'drop' }, Math.random);
       if (out.room !== room) changed(r, out.room);
     });
   });

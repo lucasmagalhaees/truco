@@ -70,6 +70,6 @@ export function readState(x: unknown): AppState {
     ...readCustom(o.custom),
     ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),
     ...(o.online && typeof o.online === 'object' && /^[A-Z0-9]{5}$/.test(String((o.online as { code?: unknown }).code)) && /^[A-Za-z0-9-]{8,64}$/.test(String((o.online as { token?: unknown }).token))
-      ? { online: { code: String((o.online as { code: string }).code), token: String((o.online as { token: string }).token) } } : {})
+      ? { online: { code: String((o.online as { code: string }).code), token: String((o.online as { token: string }).token), ...((o.online as { played?: unknown }).played === true ? { played: true as const } : {}) } } : {})
   };
 }

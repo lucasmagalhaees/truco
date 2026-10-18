@@ -71,10 +71,16 @@ Modelo de uma decisão:
 - **Fato de terceiro (conferido em 17/10/2026, [preços dos Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing)):** no plano grátis, Durable Objects só com armazenamento SQLite; 100.000 requisições e 13.000 GB-s por dia; mensagens que chegam por WebSocket contam 20 por requisição; com a hibernação, sala parada não conta tempo. Wrangler 4.145.0 (30/09/2026).
 - **Interpretações que precisaram ser feitas:**
   - Ordem dos lugares: quem criou, o primeiro a entrar (contra quem criou), a dupla de quem criou, a dupla do segundo. Assim, "eu + IA contra amigo + IA" é só criar a sala e o amigo entrar.
-  - Só quem criou a sala começa, recomeça e passa para a IA o lugar de quem saiu. As IAs jogam no nível de quem criou e com os nomes do bar (Biu, Cida, Toinho); o modo "seu time" fica para o jogo num celular só.
+  - Só quem criou a sala começa, recomeça e passa para a IA o lugar de quem caiu (quem sai de vez, a IA assume na hora: veja abaixo). As IAs jogam no nível de quem criou e com os nomes do bar (Biu, Cida, Toinho); o modo "seu time" fica para o jogo num celular só.
   - Ninguém entra numa partida já começada; quem caiu volta ao mesmo lugar com o token guardado no celular.
   - "Nós" e "Eles" nas frases do histórico trocam de lado para a outra dupla (`swapSides`).
   - Sem login: o nome é o que a pessoa escreve, e o lugar é garantido pelo token.
+- **Sair, cair e sala apagada (17/10/2026, pedido do Lucas):**
+  - Quem toca em "Sair" no meio da partida é trocado pela IA na hora, sem esperar quem criou. Se era quem criou, a próxima pessoa da sala vira quem criou. Sem ninguém na sala, as IAs param.
+  - Quem só caiu (a conexão fechou) guarda o lugar para voltar; para esse caso fica o botão de quem criou passar o lugar para a IA. O servidor diz qual dos dois aconteceu (`leave` é a pessoa; `drop` é o próprio servidor, quando a conexão fecha).
+  - Caída a conexão, o celular tenta de novo sozinho (`RETRY`) com uma faixa na tela, e depois para e mostra "Tentar de novo", para não gastar bateria tentando para sempre (cobre também o servidor recusando conexões).
+  - O celular que já jogou numa sala avisa ao voltar (`back`); se a sala está vazia, ela foi apagada ("A sala anterior acabou."), e se a partida segue sem o lugar dele, a IA ficou com ele. Nos dois casos o celular esquece a sala e volta ao início.
+  - Nome vazio ou código errado no cartão "Jogar online" aparecem no próprio campo, não num aviso que some.
 - **Servidor no ar (17/10/2026):** https://truco-salas.lucasbarbosa1738.workers.dev, publicado pelo workflow `Salas`; uma mão jogada nele por duas abas (ver `docs/verificacao.md`).
 - **Não sei:** a demora pelo 4G.
 
