@@ -131,6 +131,24 @@ with sync_playwright() as p:
     pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
     pg.click('[data-act=drawseats]'); assert 'seats' in S() and len({S()['seats']['partner'], *S()['seats']['opp']}) == 3
     pg.click('[data-act=colorby][data-v=team]'); assert 'colorBy' not in S()
+    # the same person never sits twice: Nagi of Time V, then Nagi of Manshine City in the next seat moves the first one out
+    pg.click('[data-act=slot][data-v="0"]'); pg.click('#club [data-act=kind][data-k=seat][data-v=anime]')
+    pg.click('[data-act=seat][data-v="blue-lock/time-v/0"]'); pg.click('[data-act=seat][data-v="blue-lock/manshine-city/1"]')
+    names = pg.evaluate('window.__APP.Core.lineup(null, null, window.__APP.S.custom, window.__APP.S.seats).names')
+    assert len(set(names)) == 4 and names.count('Nagi') == 1, names
+    # heroes against villains: drawn by side, in one universe or mixed, and you may be the villain
+    side = lambda c: pg.evaluate(f'window.__APP.Core.sideOf("{c}")')
+    pg.click('[data-act=mode][data-v=hv]'); st = S()
+    assert st['hv'] == {} and side(st['seats']['partner']) == 'heroi' and all(side(o) == 'vilao' for o in st['seats']['opp']), st['seats']
+    pg.click('#hvpack [data-act=hvpack][data-v=naruto]'); st = S()
+    assert st['hv'] == {'pack': 'naruto'} and all(c.startswith('naruto/') for c in [st['seats']['partner'], *st['seats']['opp']]), st['seats']
+    pg.click('#hvside [data-act=hvside][data-v=vilao]'); st = S()
+    assert side(st['seats']['partner']) == 'vilao' and all(side(o) == 'heroi' for o in st['seats']['opp']), st['seats']
+    first = pg.evaluate('window.__APP.Core.colorsOf(window.__APP.Core.charById(window.__APP.S.seats.opp[0]).team.id)[0]')
+    assert eles_bg() == first, (eles_bg(), first)                                           # "Eles" in the opponents' colours
+    pg.click('[data-act=drawseats]'); assert 'Sortear de novo' in txt('#club') and pg.evaluate('!!window.__APP.Core.readSeats(window.__APP.S.seats)')
+    assert overflow() == 0; shot(f'e1-herois-{THEME}.png')
+    pg.click('[data-act=mode][data-v=seats]'); assert 'hv' not in S() and 'seats' in S()
     pg.click('[data-act=mode][data-v=own]'); assert 'rival' not in S() and 'seats' not in S()
     pg.click('[data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in txt('#lineup')
 
@@ -312,4 +330,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
