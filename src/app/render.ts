@@ -153,13 +153,13 @@ function equipeScreen(r: string[]): Screen {
     if (hvOn ? mode !== 'hv' : mode !== 'seats') {
       return { title, depth: 2, body: `<p>${hvOn ? 'Sua dupla do lado dos heróis (ou dos vilões), os dois adversários do outro lado, sorteados num universo.' : 'Escolha cada lugar: sua dupla e os dois adversários, de qualquer tema.'}</p><button class="btn block" data-act="mode" data-v="${hvOn ? 'hv' : 'seats'}">${hvOn ? 'Jogar Heróis x Vilões' : 'Montar a mesa'}</button>` };
     }
-    return { title, depth: 2, body: vSeats() };
+    return { title, depth: 2, body: tableNow() + vSeats() };
   }
   const p = t ? Core.playersOf(t.id, S.custom) : null;
-  const current = mode === 'own' && t && p ? `<section class="card" id="club"><p id="squad">${swatch(t.colors)} <b>${esc(t.name)}</b> (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(t.pack.lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>
+  const current = (mode === 'own' || mode === 'rivals') && t && p ? `<section class="card" id="club"><p id="squad">${swatch(t.colors)} <b>${esc(t.name)}</b> (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(t.pack.lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>
       ${ui.editing ? `<div class="edit" id="edit">${p.map((x, i) => `<div class="field"><input id="pl${i}" maxlength="24" autocomplete="off" value="${esc(x)}" aria-label="${i ? `Jogador ${i + 1}` : esc(t.pack.lead)}"></div>`).join('')}
       <div class="pick"><button class="btn" data-act="saveplayers">Salvar nomes</button><button class="btn ghost" data-act="resetplayers">Voltar aos originais</button></div></div>`
-      : `<div class="pick"><button class="btn ghost" data-act="editplayers">Trocar os nomes</button><button class="btn ghost" data-act="team" data-v="">Sem equipe</button></div>`}${t.pack.note ? `<p class="hint">${esc(t.pack.note)}</p>` : ''}</section>`
+      : `<div class="pick"><button class="btn ghost" data-act="editplayers">Trocar os nomes</button><button class="btn ghost" data-act="team" data-v="">Sem equipe</button></div>`}${rv ? `<p class="hint">Contra ${esc(rv.name)}. <button class="linkbtn" data-act="mode" data-v="own">Sem rival</button></p>` : ''}${t.pack.note ? `<p class="hint">${esc(t.pack.note)}</p>` : ''}</section>`
     : mode === 'none' ? '' : `<section class="card" id="club"><p class="hint">${mode === 'rivals' ? 'Modo rivais.' : mode === 'hv' ? 'Heróis x Vilões.' : 'Mesa montada.'}</p><button class="btn ghost block" data-act="mode" data-v="own">${t ? `Voltar só para ${esc(t.name)}` : 'Sem equipe'}</button></section>`;
   const tag = (m: string): string => (mode === m ? ' · em uso' : '');
   return { title: 'Equipe', depth: 1, body: `${tableNow()}${current}<nav class="entries" id="modes">
@@ -249,7 +249,7 @@ function kindTabs(k: string, open: string): string {
 /** Characters for the seat being filled, from one kind and one universe at a time (tabs for both), team by team. */
 function charPicker(chosen: string[]): string {
   const open = kindOf('seat', chosen[ui.slot]), packs = (Core.kinds().find(x => x.id === open) as { packs: Pack[] }).packs;
-  const want = ui.kind.seatpack || Core.charById(chosen[ui.slot])?.team.pack.id, pack = packs.find(p => p.id === want) || packs[0];
+  const pack = packs.find(p => p.id === ui.kind.seatpack) || packs.find(p => p.id === Core.charById(chosen[ui.slot])?.team.pack.id) || packs[0];
   const packTabs = packs.length > 1 ? `<div class="segm small kinds" role="tablist" aria-label="Universo" id="seatpacks">${packs.map(p => `<button role="tab" class="${p === pack ? 'on' : ''}" data-act="kind" data-k="seatpack" data-v="${esc(p.id)}" aria-selected="${p === pack}">${esc(p.name)}</button>`).join('')}</div>` : '';
   return `<div id="picker">${kindTabs('seat', open)}${packTabs}<div class="list">${Core.packTeams(pack).map(t => `<div class="charrow">${swatch(t.colors)}<span>${esc(t.name)}</span><div class="chars">${[0, 1, 2].map(i => {
     const id = `${t.id}/${i}`, on = chosen.includes(id);

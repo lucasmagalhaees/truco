@@ -397,3 +397,4 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .chars{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
 .chip-btn{min-height:36px;padding:0 10px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 14px/1 var(--font)}
 .chip-btn.on{background:var(--fg);color:var(--surface)}
+.linkbtn{text-decoration:underline;font-weight:700;color:var(--fg);padding:0 2px}
