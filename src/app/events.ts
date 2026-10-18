@@ -3,7 +3,9 @@ import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, saveS, setS, table, ui } from './state';
+import { S, applyTheme, saveS, setS, table, TABS, ui } from './state';
+import { back, backTo, closeOver, go, openOver } from './nav';
+import type { Tab } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
 import { connect, inRoom, leave, net, rawSeat, retryNow, roomLink, send } from './net';
@@ -60,14 +62,20 @@ export function schedule(): void {
 }
 
 function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
-function home(): void { clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS(); render(); window.scrollTo(0, 0); }
+/** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
+ *  on the tab they were opened from. */
+function home(): void {
+  const wasGame = !!S.game;
+  clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS();
+  if (wasGame) go(['jogar'], 'replace'); else { closeOver(); render(); window.scrollTo(0, 0); }
+}
 /** The person plays a card: it lifts off the hand, then lands on the table. Taps wait meanwhile. */
 function playMine(g: Game, k: number): void {
   if (Core.whoActs(g) !== 0 || g.phase !== 'play') return;
   ui.busy = true; lift(k);
   later(() => { ui.busy = false; play(Core.playCard(g, 0, k)); }, 180);
 }
-function drill(kind: DrillKind): void { ui.drill = Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
+function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
 function guess(v: string): void {
   if (!ui.drill || ui.picked !== null) return;
   ui.picked = v;
@@ -148,13 +156,13 @@ const GONE = [Core.ROOM_GONE, Core.SEAT_GONE];
 function onRoom(before: typeof net.view): void {
   const was = before?.game ?? null, now = net.view?.game ?? null;
   if (now && was && now.phase === 'over' && was.phase !== 'over' && now.winner !== null) { S.tally = { w: S.tally.w + (now.winner === 0 ? 1 : 0), l: S.tally.l + (now.winner === 1 ? 1 : 0) }; saveS(); }
-  if (!before && net.view && location.search.includes('sala=')) history.replaceState(null, '', location.pathname);
+  if (!before && net.view && location.search.includes('sala=')) history.replaceState(null, '', location.pathname + location.hash);
   render();
   if (now) moment(was, now);
 }
 function onRoomError(why: string): void {
   toast(why);
-  if (GONE.includes(why) || (FATAL.includes(why) && !net.view?.game)) { ui.confirmEnd = false; leave(); render(); window.scrollTo(0, 0); }
+  if (GONE.includes(why) || (FATAL.includes(why) && !net.view?.game)) { ui.confirmEnd = false; leave(); go(['jogar', 'online'], 'replace'); }
 }
 /** A field of the online card marked wrong, with the reason under it, and the focus there to fix it. */
 function fieldError(id: 'oname' | 'ocode', why: string): void {
@@ -201,7 +209,7 @@ function room(a: string, d: DOMStringMap): void {
   else if (a === 'retryroom') retryNow();
   else if (a === 'leaveroom') {
     if (net.view?.game && net.view.game.phase !== 'over' && !ui.confirmEnd) { ui.confirmEnd = true; render(); return; }
-    ui.confirmEnd = false; leave(); render(); window.scrollTo(0, 0);
+    ui.confirmEnd = false; leave(); go(['jogar', 'online'], 'replace');
   } else if (a === 'copylink') {
     const link = roomLink(code);
     navigator.clipboard.writeText(link).then(() => toast('Link copiado. Manda no grupo!'), () => toast(link));
@@ -220,17 +228,27 @@ function setting(a: string, v: string): void {
 
 export function initEvents(): void {
   document.addEventListener('input', fieldOk);
+  // the tabs: arrow keys move between them (and open the one reached), Home and End go to the ends
+  document.addEventListener('keydown', e => {
+    const tab = (e.target as HTMLElement | null)?.closest?.('[role=tab]');
+    if (!tab) return;
+    const k = TABS.indexOf(ui.route[0] as Tab), to = e.key === 'ArrowRight' ? k + 1 : e.key === 'ArrowLeft' ? k - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault(); go([TABS[(to + TABS.length) % TABS.length]]);
+    (document.getElementById(`tab-${ui.route[0]}`) as HTMLElement | null)?.focus();
+  });
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx'].includes(a)) setting(a, d.v || '');
+    else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || '', d); backTo(1); }
     else if (['team', 'mode', 'rival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
     else if (a === 'new' || a === 'again') newGame();
     else if (a === 'home') home();
-    else if (a === 'real') { ui.real = true; render(); window.scrollTo(0, 0); }
+    else if (a === 'real') { openOver('assistente'); ui.real = true; render(); window.scrollTo(0, 0); }
     else if (a === 'sheet') { ui.sheet = d.v as Target; render(); }
     else if (a === 'closesheet') { ui.sheet = null; render(); }
     else if (a === 'pickcard' && ui.sheet) { const t = Core.tell(S.real, d.c || '', ui.sheet); ui.sheet = null; sound('card'); real(t); }
@@ -238,6 +256,9 @@ export function initEvents(): void {
     else if (a === 'nextround') real(Core.nextRound(S.real));
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
+    else if (a === 'tab') go([TABS.includes(d.v as Tab) ? d.v as Tab : 'jogar']);
+    else if (a === 'go' && d.v) go(d.v.split('/'));
+    else if (a === 'back') back();
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
     else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'roomformat', 'roomalone', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
     else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);

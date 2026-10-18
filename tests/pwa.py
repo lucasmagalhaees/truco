@@ -57,6 +57,7 @@ with sync_playwright() as p:
     pg.on('pageerror', lambda e: errs.append(str(e)))
     cov.start(pg)
     pg.goto(BASE + '/index.html'); pg.wait_for_function('window.__APP && window.__APP.S')
+    pg.click('#tabs [data-act=tab][data-v=ajustes]'); pg.wait_for_selector('#version')      # the version is on the Ajustes tab
 
     # first visit: the worker installs, takes the page, and there is nothing to update from
     pg.wait_for_function('navigator.serviceWorker.controller !== null', timeout=15000)

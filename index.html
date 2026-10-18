@@ -12,6 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="Truco">
 <meta name="theme-color" content="#0b1a12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#14532d" media="(prefers-color-scheme: light)">
+<!-- the icon: a cream card with a black club on the bar's green, its own background so it reads on light and dark tabs -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314532d'/%3E%3Cg transform='rotate%288 32 32%29'%3E%3Crect x='18' y='9' width='28' height='46' rx='5' fill='%23fbf6ea' stroke='%233b2a1a' stroke-width='2'/%3E%3Ccircle cx='23.5' cy='15' r='2.4' fill='%23c62828'/%3E%3Cg fill='%231b1b1b'%3E%3Ccircle cx='32' cy='24.5' r='5.4'/%3E%3Ccircle cx='26.6' cy='32.3' r='5.4'/%3E%3Ccircle cx='37.4' cy='32.3' r='5.4'/%3E%3Cpath d='M30.6 30h2.8l3 12h-8.8z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -22,6 +25,7 @@
 <div class="update" id="update" hidden></div>
 
 <main><div class="wrap" id="view"></div></main>
+<nav class="tabbar" id="tabs" role="tablist" aria-label="Seções" hidden></nav>
 
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="stamp" id="stamp" aria-hidden="true" hidden></div>
