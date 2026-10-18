@@ -8,8 +8,10 @@
 import { PACKS } from './packs';
 
 export type Colors = [string, string, string];
-export type Character = string | { name: string; colors?: Colors };
-export interface Group { id: string; name: string; colors?: Colors; players: [Character, Character, Character] }
+/** Which side of the story a character is on, where the story has sides (none in football). */
+export type Side = 'heroi' | 'vilao';
+export type Character = string | { name: string; colors?: Colors; side?: Side };
+export interface Group { id: string; name: string; colors?: Colors; side?: Side; players: [Character, Character, Character] }
 export interface Pack {
   id: string; kind: string; kindName: string; name: string;
   /** What the first of a group is called: "craque", "líder". */
@@ -47,12 +49,13 @@ export const packById = (id: string | undefined | null): Pack | null => PACKS.fi
 export const teamById = (id: string | undefined | null): Team | null => TEAMS.find(t => t.id === id) || null;
 export const teamsOf = (pack: Pack): Team[] => TEAMS.filter(t => t.pack === pack);
 /** A character by id: its team, its place in it, its name and its own colours (if any). */
-export function charById(id: string | undefined | null): { id: string; team: Team; i: number; name: string; colors?: Colors } | null {
+export function charById(id: string | undefined | null): { id: string; team: Team; i: number; name: string; colors?: Colors; side?: Side } | null {
   const m = typeof id === 'string' ? id.match(/^(.+)\/([012])$/) : null;
   const t = m ? teamById(m[1]) : null;
   if (!m || !t) return null;
   const i = Number(m[2]), g = t.pack.groups.find(x => `${t.pack.id}/${x.id}` === t.id) as Group, c = g.players[i];
-  return { id: id as string, team: t, i, name: nameOf(c), ...(ownColors(c) ? { colors: ownColors(c) } : {}) };
+  const side = (typeof c === 'string' ? undefined : c.side) || g.side;
+  return { id: id as string, team: t, i, name: nameOf(c), ...(ownColors(c) ? { colors: ownColors(c) } : {}), ...(side ? { side } : {}) };
 }
 /** An id saved before themes existed was a bare club id: it is the football pack's. A known id stays as it is; anything
  *  else is null. Works for groups and characters. */
@@ -98,19 +101,42 @@ function keyOf(char: string, by: ColorBy): string {
   const c = charById(char) as NonNullable<ReturnType<typeof charById>>;
   return by === 'char' ? c.id : by === 'pack' ? c.team.pack.id : c.team.id;
 }
-/** A table seat by seat that holds together: three known characters, all different. */
+/** Two characters that are the same person: same name (Nagi plays for Time V and for Manshine City). */
+export const samePerson = (a: string, b: string): boolean => a === b || (charById(a)?.name ?? a) === (charById(b)?.name ?? b);
+/** A table seat by seat that holds together: three known characters, three different people. */
 export function readSeats(x: unknown): Seats | null {
   const s = x as Seats;
   if (!s || typeof s !== 'object' || !Array.isArray(s.opp) || s.opp.length !== 2) return null;
   const all = [s.partner, ...s.opp];
-  if (!all.every(c => !!charById(c)) || new Set(all).size !== 3) return null;
+  if (!all.every(c => !!charById(c)) || new Set(all.map(c => (charById(c) as { name: string }).name)).size !== 3) return null;
   return { partner: s.partner, opp: [s.opp[0], s.opp[1]] };
 }
-/** Three different characters of any pack, drawn with the given random function (0 ≤ rand() < 1). */
+const allChars = (packs: Pack[] = PACKS): string[] => TEAMS.filter(t => packs.includes(t.pack)).flatMap(t => [0, 1, 2].map(i => `${t.id}/${i}`));
+/** Pick from each pool in turn, never the same person twice. */
+function drawFrom(rand: () => number, pools: string[][]): string[] {
+  const pick: string[] = [];
+  for (const pool of pools) {
+    const free = pool.filter(c => !pick.some(p => samePerson(p, c)));
+    pick.push(free[Math.floor(rand() * free.length) % free.length]);
+  }
+  return pick;
+}
+/** Three different people of any pack, drawn with the given random function (0 ≤ rand() < 1). */
 export function drawSeats(rand: () => number): Seats {
-  const all = TEAMS.flatMap(t => [0, 1, 2].map(i => `${t.id}/${i}`)), pick: string[] = [];
-  while (pick.length < 3) { const c = all[Math.floor(rand() * all.length) % all.length]; if (!pick.includes(c)) pick.push(c); }
-  return { partner: pick[0], opp: [pick[1], pick[2]] };
+  const all = allChars(), [a, b, c] = drawFrom(rand, [all, all, all]);
+  return { partner: a, opp: [b, c] };
+}
+/** The side of a character, its own or its group's; null where the story has no sides. */
+export const sideOf = (id: string): Side | null => charById(id)?.side || null;
+/** The packs where heroes play villains: at least two of each side, so a table of either side can be drawn. */
+export const sidedPacks = (): Pack[] => PACKS.filter(p => (['heroi', 'vilao'] as Side[]).every(sd => allChars([p]).filter(c => sideOf(c) === sd).length >= 2));
+/** Heroes against villains: the partner on the person's side, the two opponents from the other, in one pack (its id) or
+ *  mixed across every pack that has sides (null); never the same person twice. */
+export function drawSided(rand: () => number, pack: string | null, mine: Side = 'heroi'): Seats {
+  const packs = pack ? sidedPacks().filter(p => p.id === pack) : sidedPacks(), pool = allChars(packs.length ? packs : sidedPacks());
+  const ours = pool.filter(c => sideOf(c) === mine), theirs = pool.filter(c => sideOf(c) && sideOf(c) !== mine);
+  const [a, b, c] = drawFrom(rand, [ours, theirs, theirs]);
+  return { partner: a, opp: [b, c] };
 }
 /** Who sits where: the names of the four seats, and the colour key of each pair (null: the app's own).
  *  - a table seat by seat: the partner and the two opponents chosen;

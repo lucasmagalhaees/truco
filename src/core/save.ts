@@ -1,7 +1,7 @@
 /* What was saved on the device, read back. A saved game that does not hold together is dropped, so a damaged state
    never breaks the page: the tally, the level and the settings still come back. */
 import { LEVELS, VALUES, WIN_POINTS } from './game';
-import { colorsOf, qualify, readSeats } from './teams';
+import { colorsOf, qualify, readSeats, sidedPacks } from './teams';
 import type { AppState, Game, Level, Phase, RealTable, Speed } from './types';
 
 const PHASES: Phase[] = ['eleven', 'play', 'truco', 'handEnd', 'over'];
@@ -59,15 +59,17 @@ function readCustom(x: unknown): { custom?: Record<string, string[]> } {
 
 /** The team, the rival, the table seat by seat and the choice of colours. Ids saved before themes existed were bare
  *  club ids: they move to the football pack. A team or rival must be a group; a rival equal to the team is none. */
-function readTeams(team: unknown, rival: unknown, seats: unknown, by: unknown): Pick<AppState, 'team' | 'rival' | 'seats' | 'colorBy'> {
+function readTeams(team: unknown, rival: unknown, seats: unknown, by: unknown, hv: unknown): Pick<AppState, 'team' | 'rival' | 'seats' | 'colorBy' | 'hv'> {
   const group = (x: unknown): string | null => { const q = qualify(x); return q && q.split('/').length === 2 ? q : null; };
   const t = group(team), r = group(rival), s = readSeats(seats);
-  return { ...(t ? { team: t } : {}), ...(r && r !== t ? { rival: r } : {}), ...(s ? { seats: s } : {}), ...(by === 'pack' || by === 'char' ? { colorBy: by } : {}) };
+  const h = hv as { pack?: unknown; side?: unknown } | null;
+  const hvOk = s && h && typeof h === 'object' ? { ...(sidedPacks().some(p => p.id === h.pack) ? { pack: h.pack as string } : {}), ...(h.side === 'vilao' ? { side: 'vilao' as const } : {}) } : null;
+  return { ...(t ? { team: t } : {}), ...(r && r !== t ? { rival: r } : {}), ...(s ? { seats: s } : {}), ...(hvOk ? { hv: hvOk } : {}), ...(by === 'pack' || by === 'char' ? { colorBy: by } : {}) };
 }
 
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; seats?: unknown; colorBy?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; seats?: unknown; colorBy?: unknown; hv?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; train?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -78,7 +80,7 @@ export function readState(x: unknown): AppState {
     ...(SPEEDS.includes(o.speed as Speed) ? { speed: o.speed as Speed } : {}),
     ...(o.quiet === true ? { quiet: true as const } : {}),
     ...(o.hints === false ? { hints: false as const } : {}),
-    ...readTeams(o.team, o.rival, o.seats, o.colorBy),
+    ...readTeams(o.team, o.rival, o.seats, o.colorBy, o.hv),
     ...readCustom(o.custom),
     ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),
     ...(o.online && typeof o.online === 'object' && /^[A-Z0-9]{5}$/.test(String((o.online as { code?: unknown }).code)) && /^[A-Za-z0-9-]{8,64}$/.test(String((o.online as { token?: unknown }).token))

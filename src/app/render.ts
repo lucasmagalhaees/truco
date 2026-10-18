@@ -152,17 +152,24 @@ function charPicker(chosen: string[]): string {
 const SLOT = ['Sua dupla', 'Adversário 1', 'Adversário 2'];
 function vClub(): string {
   const t = Core.teamById(S.team), r = Core.teamById(S.rival), seats = S.seats ? Core.readSeats(S.seats) : null;
-  const mode = seats ? 'seats' : r ? 'rivals' : 'own';
+  const mode = seats ? (S.hv ? 'hv' : 'seats') : r ? 'rivals' : 'own', sided = Core.sidedPacks();
+  const mb = (v: string, label: string): string => `<button class="${mode === v ? 'on' : ''}" data-act="mode" data-v="${v}" aria-pressed="${mode === v}">${label}</button>`;
   let h = `<section class="card" id="club"><span class="label">Sua equipe</span>
     <p class="hint">Escolha uma equipe (futebol, anime, jogo…), jogue contra outra, ou monte a mesa com quem quiser: a IA ganha os nomes e o app fica com as cores.</p>
-    <div class="segm" role="group" aria-label="Modo"><button class="${mode === 'own' ? 'on' : ''}" data-act="mode" data-v="own" aria-pressed="${mode === 'own'}">Equipe</button><button class="${mode === 'rivals' ? 'on' : ''}" data-act="mode" data-v="rivals" aria-pressed="${mode === 'rivals'}">Rivais</button><button class="${mode === 'seats' ? 'on' : ''}" data-act="mode" data-v="seats" aria-pressed="${mode === 'seats'}">Montar</button></div>`;
+    <div class="segm modes" role="group" aria-label="Modo">${mb('own', 'Equipe')}${mb('rivals', 'Rivais')}${mb('seats', 'Montar')}${sided.length ? mb('hv', 'Heróis x Vilões') : ''}</div>`;
   if (seats) {
     const chosen = [seats.partner, ...seats.opp];
-    h += `<p class="hint">Toque num lugar e depois em quem senta nele. Vale personagem de qualquer tema.</p><div class="slots" id="slots">${chosen.map((c, i) => {
+    if (S.hv) {
+      const hv = S.hv, opt = (act: string, v: string, label: string, on: boolean): string => `<button class="${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" aria-pressed="${on}">${esc(label)}</button>`;
+      h += `<p class="hint">Heróis x Vilões: sua dupla do seu lado, os dois adversários do outro. Universo:</p>
+        <div class="segm small kinds" role="group" aria-label="Universo" id="hvpack">${opt('hvpack', '', 'Misturado', !hv.pack)}${sided.map(p => opt('hvpack', p.id, p.name, hv.pack === p.id)).join('')}</div>
+        <p class="hint">Você joga do lado dos</p><div class="segm small" role="group" aria-label="Seu lado" id="hvside">${opt('hvside', 'heroi', 'Heróis', hv.side !== 'vilao')}${opt('hvside', 'vilao', 'Vilões', hv.side === 'vilao')}</div>`;
+    }
+    h += `<p class="hint">Toque num lugar e depois em quem senta nele. Vale personagem de qualquer tema; a mesma pessoa não senta em dois lugares.</p><div class="slots" id="slots">${chosen.map((c, i) => {
       const x = Core.charById(c) as NonNullable<ReturnType<typeof Core.charById>>;
       return `<button class="slot${ui.slot === i ? ' on' : ''}" data-act="slot" data-v="${i}" aria-pressed="${ui.slot === i}"${colorVars(Core.colorsOf(c))}><small>${SLOT[i]}</small><b>${esc(Core.charName(c, S.custom))}</b><small>${esc(x.team.name)}</small></button>`;
     }).join('')}</div>
-      <div class="pick"><button class="btn ghost" data-act="swapopp">Trocar a ordem</button><button class="btn ghost" data-act="drawseats">Sortear</button></div>${charPicker(chosen)}`;
+      <div class="pick"><button class="btn ghost" data-act="swapopp">Trocar a ordem</button><button class="btn ghost" data-act="drawseats">${S.hv ? 'Sortear de novo' : 'Sortear'}</button></div>${charPicker(chosen)}`;
     return h + '</section>';
   }
   h += `${teamPicker('team', 'team', S.team)}<button class="btn ghost block" data-act="team" data-v=""${t ? '' : ' disabled'}>Sem equipe</button>`;

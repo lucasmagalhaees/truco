@@ -109,6 +109,9 @@ export interface AppState {
    *  which colours the app takes (absent: the team's). */
   team?: string; rival?: string; custom?: Record<string, string[]>;
   seats?: { partner: string; opp: [string, string] }; colorBy?: 'pack' | 'char';
+  /** Heroes against villains: the table in `seats` was drawn that way, in one pack (`pack`; absent: mixed) and with the
+   *  person on the villains' side if `side` says so. */
+  hv?: { pack?: string; side?: 'vilao' };
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };
