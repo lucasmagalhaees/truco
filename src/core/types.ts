@@ -122,8 +122,14 @@ export interface Training { ok: number; total: number; best: number }
 export interface AppState {
   v: 1; game: Game | null; tally: Tally; level: Level; train: Training; real: RealTable;
   theme?: Theme; speed?: Speed; quiet?: true; hints?: false;
-  /** The person's club, the rival club in the rivals mode, and the player names the person changed, by club. */
+  /** The person's team (a group of a theme pack, `pack/group`), the rival team in the rivals mode, and the names the
+   *  person changed, by team. `seats`: a table put together seat by seat (it wins over team and rival). `colorBy`:
+   *  which colours the app takes (absent: the team's). */
   team?: string; rival?: string; custom?: Record<string, string[]>;
+  seats?: { partner: string; opp: [string, string] }; colorBy?: 'pack' | 'char';
+  /** Heroes against villains: the table in `seats` was drawn that way, in one pack (`pack`; absent: mixed) and with the
+   *  person on the villains' side if `side` says so. */
+  hv?: { pack?: string; side?: 'vilao' };
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };
