@@ -163,15 +163,18 @@ with sync_playwright() as p:
     assert eles_bg() == '#f2f2f2', eles_bg()
     shot(f'e1-anime-{THEME}.png')
     # a table seat by seat: Ryu with you, against Scorpion and Sub-Zero; then the order swapped
+    def sit(cid):
+        """A character into the seat being filled: its team's chip first (only the open team's characters show), then the character."""
+        pg.click(f'#seatteams [data-act=kind][data-v="{cid.rsplit("/", 1)[0]}"]'); pg.click(f'[data-act=seat][data-v="{cid}"]')
     def montar():
         into('equipe/mais'); into('equipe/mais/montar')
     montar(); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
     pg.click('#picker [data-act=kind][data-k=seat][data-v=jogos]')
     assert pg.locator('#seatpacks [role=tab]').count() == 2, 'the universes of the kind, as tabs: never one list of everything'
-    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=street-fighter]'); pg.click('[data-act=seat][data-v="street-fighter/shotokan/0"]')
+    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=street-fighter]'); sit('street-fighter/shotokan/0')
     assert pg.locator('[data-act=seat][data-v^="mortal-kombat/"]').count() == 0
     pg.click('#picker [data-act=kind][data-k=seatpack][data-v=mortal-kombat]')
-    pg.click('[data-act=seat][data-v="mortal-kombat/shirai-ryu/0"]'); pg.click('[data-act=seat][data-v="mortal-kombat/lin-kuei/0"]')
+    sit('mortal-kombat/shirai-ryu/0'); sit('mortal-kombat/lin-kuei/0')
     assert S()['seats'] == {'partner': 'street-fighter/shotokan/0', 'opp': ['mortal-kombat/shirai-ryu/0', 'mortal-kombat/lin-kuei/0']}, S()['seats']
     assert 'você e Ryu contra Scorpion e Sub-Zero' in lineup(), lineup()
     assert top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#facc15', (top_bg(), eles_bg())     # the teams' colours: Shotokan, Shirai Ryu
@@ -179,7 +182,7 @@ with sync_playwright() as p:
     colorby('char')                                                                         # colours of the partner himself, and of the first opponent
     assert S()['colorBy'] == 'char' and top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#1d4ed8', (top_bg(), eles_bg())
     tab('equipe'); montar()
-    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=dragon-ball]'); pg.click('[data-act=seat][data-v="dragon-ball/guerreiros-z/0"]')
+    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=dragon-ball]'); sit('dragon-ball/guerreiros-z/0')
     assert 'você e Goku contra Sub-Zero e Scorpion' in lineup() and top_bg() == 'rgb(249, 115, 22)', top_bg()
     colorby('pack'); assert S()['colorBy'] == 'pack' and top_bg() == 'rgb(234, 88, 12)' and eles_bg() == '#111111', (top_bg(), eles_bg())
     tab('equipe'); montar()
@@ -194,7 +197,7 @@ with sync_playwright() as p:
     # the same person never sits twice: Nagi of Time V, then Nagi of Manshine City in the next seat moves the first one out
     tab('equipe'); montar()
     pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=blue-lock]')
-    pg.click('[data-act=seat][data-v="blue-lock/time-v/0"]'); pg.click('[data-act=seat][data-v="blue-lock/manshine-city/1"]')
+    sit('blue-lock/time-v/0'); sit('blue-lock/manshine-city/1')
     names = pg.evaluate('window.__APP.Core.lineup(null, null, window.__APP.S.custom, window.__APP.S.seats).names')
     assert len(set(names)) == 4 and names.count('Nagi') == 1, names
     # heroes against villains: drawn by side, in one universe or mixed, and you may be the villain
@@ -350,8 +353,9 @@ with sync_playwright() as p:
     assert g['phase'] == 'truco' and g['ask'] == {'by': 1, 'value': 6} and g['value'] == 3, g['ask']
     assert txt('#asked') == 'Biu pediu SEIS de volta!' and pg.locator('#seat1.asking').count() == 1 and pg.locator('#seat0.asking').count() == 0, txt('#asked')
     assert 'Nove!' in txt('[data-act=answer][data-v=raise]')
-    pg.click('[data-act=answer][data-v=raise]')
+    pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=answer][data-v=raise]')       # Biu waits: the stamp on screen is yours
     assert txt('#stamp small') == 'Você pediu NOVE de volta!', txt('#stamp')
+    reload(); pg.evaluate('Math.random = () => 0.99')
     settle(); g = G()
     assert g['ask']['value'] == 12 and g['value'] == 9, g['ask']            # he went to doze over your nove
     assert txt('#asked') == 'Biu pediu DOZE de volta!', txt('#asked')
@@ -444,7 +448,10 @@ with sync_playwright() as p:
     mp.evaluate('Math.random = () => 0.99')                      # the same chance every run: Biu (zap in hand) accepts the truco
     mp.click('[data-act=end]')                                    # a repaint with nothing new: the hand is not dealt again
     assert mp.locator('#hand .hc.deal').count() == 0
-    mp.click('[data-act=truco]'); assert mp.locator('#stamp.go').count() == 1 and 'TRUCO' in mp.text_content('#stamp')
+    # every stamp shown is recorded: since D15 the answer is stamped too ("Aceito!"), and it may come before a look at the screen
+    mp.evaluate('''() => { window.__stamps = []; const s = document.getElementById("stamp"); new MutationObserver(() => { if (s.classList.contains("go")) window.__stamps.push(s.textContent); }).observe(s, { attributes: true, attributeFilter: ["class"] }); }''')
+    mp.click('[data-act=truco]'); mp.wait_for_function('window.__stamps.length >= 1')
+    assert mp.evaluate('window.__stamps')[0] == 'TRUCO!Você pediu TRUCO!', mp.evaluate('window.__stamps')
     mp.wait_for_function('window.__APP.S.game.phase === "play"')
     mp.evaluate('window.__APP.ui.wait = 1e6')                    # the others wait: the card on the table is yours
     mp.click('#hand [data-act=play][data-k="1"]'); assert 'out' in (mp.get_attribute('#hand [data-k="1"]', 'class') or ''), 'the card lifts off the hand'

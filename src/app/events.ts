@@ -138,8 +138,13 @@ function club(a: string, v: string, d: DOMStringMap): void {
     }
   }
   else if (a === 'rival') { S.rival = v; delete S.seats; delete S.hv; }
-  else if (a === 'kind' && d.k) ui.kind = { ...ui.kind, [d.k]: v };
-  else if (a === 'slot') ui.slot = (Number(v) % 3) as 0 | 1 | 2;
+  else if (a === 'kind' && d.k) {
+    // another kind or universe opens on its own team; the team chip opens that team
+    const k: Record<string, string> = { ...ui.kind, [d.k]: v };
+    if (d.k === 'seat' || d.k === 'seatpack') { delete k.seatteam; if (d.k === 'seat') delete k.seatpack; }
+    ui.kind = k;
+  }
+  else if (a === 'slot') { ui.slot = (Number(v) % 3) as 0 | 1 | 2; const k = { ...ui.kind }; delete k.seatteam; ui.kind = k; }      // the seat tapped shows its own team
   else if (a === 'seat' && s) {
     // the character goes to the seat being filled; if it sat elsewhere, the two swap
     const all = [s.partner, ...s.opp], was = all.findIndex((c, k) => k !== ui.slot && Core.samePerson(c, v));

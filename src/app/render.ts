@@ -289,15 +289,19 @@ function kindOf(k: string, cur?: string | null): string {
 function kindTabs(k: string, open: string): string {
   return `<div class="segm small kinds" role="tablist" aria-label="Tema">${Core.kinds().map(x => `<button role="tab" class="${x.id === open ? 'on' : ''}" data-act="kind" data-k="${k}" data-v="${esc(x.id)}" aria-selected="${x.id === open}">${esc(x.name)}</button>`).join('')}</div>`;
 }
-/** Characters for the seat being filled, from one kind and one universe at a time (tabs for both), team by team. */
+/** Characters for the seat being filled: one kind, one universe and one team at a time (tabs for the first two, small
+ *  chips for the teams of the universe), and only the open team's three characters, so even the 20 clubs stay short. The
+ *  open team is ui.kind.seatteam, else the one of whoever sits in the seat being filled, else the first of the universe. */
 function charPicker(chosen: string[]): string {
   const open = kindOf('seat', chosen[ui.slot]), packs = (Core.kinds().find(x => x.id === open) as { packs: Pack[] }).packs;
   const pack = packs.find(p => p.id === ui.kind.seatpack) || packs.find(p => p.id === Core.charById(chosen[ui.slot])?.team.pack.id) || packs[0];
   const packTabs = packs.length > 1 ? `<div class="segm small kinds" role="tablist" aria-label="Universo" id="seatpacks">${packs.map(p => `<button role="tab" class="${p === pack ? 'on' : ''}" data-act="kind" data-k="seatpack" data-v="${esc(p.id)}" aria-selected="${p === pack}">${esc(p.name)}</button>`).join('')}</div>` : '';
-  return `<div id="picker">${kindTabs('seat', open)}${packTabs}<div class="list">${Core.packTeams(pack).map(t => `<div class="charrow">${swatch(t.colors)}<span>${esc(t.name)}</span><div class="chars">${[0, 1, 2].map(i => {
-    const id = `${t.id}/${i}`, on = chosen.includes(id);
+  const teams = Core.packTeams(pack), team = teams.find(t => t.id === ui.kind.seatteam) || teams.find(t => t.id === Core.charById(chosen[ui.slot])?.team.id) || teams[0];
+  const teamChips = `<div class="teamchips" role="tablist" aria-label="Equipe" id="seatteams">${teams.map(t => `<button role="tab" class="chip-btn team${t === team ? ' on' : ''}" data-act="kind" data-k="seatteam" data-v="${esc(t.id)}" aria-selected="${t === team}">${swatch(t.colors)}${esc(t.name)}</button>`).join('')}</div>`;
+  return `<div id="picker">${kindTabs('seat', open)}${packTabs}${teamChips}<div class="list"><div class="charrow">${swatch(team.colors)}<span>${esc(team.name)}</span><div class="chars">${[0, 1, 2].map(i => {
+    const id = `${team.id}/${i}`, on = chosen.includes(id);
     return `<button class="chip-btn${on ? ' on' : ''}" data-act="seat" data-v="${esc(id)}" aria-pressed="${on}">${esc(Core.charName(id, S.custom))}</button>`;
-  }).join('')}</div></div>`).join('')}</div></div>`;
+  }).join('')}</div></div></div></div>`;
 }
 const SLOT = ['Sua dupla', 'Adversário 1', 'Adversário 2'];
 /** The table seat by seat (and Heróis x Vilões, which is the same table drawn by side): the three seats, then who sits. */

@@ -411,4 +411,8 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .chars{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%;min-width:0}
 .chip-btn{min-height:34px;padding:0 9px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 13px/1 var(--font)}
 .chip-btn.on{background:var(--fg);color:var(--surface)}
+/* the teams of the open universe as small chips: only the open one's three characters show (keeps the 20 clubs short) */
+.teamchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip-btn.team{display:inline-flex;align-items:center;gap:6px;min-height:32px;font-size:12px}
+.chip-btn.team .sw{height:14px;width:6px;min-height:0}
 .linkbtn{text-decoration:underline;font-weight:700;color:var(--fg);padding:0 2px}

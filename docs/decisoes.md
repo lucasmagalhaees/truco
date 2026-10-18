@@ -168,6 +168,23 @@ Modelo de uma decisão:
   - Durante a partida, o voltar do navegador não encerra a partida (só o "Encerrar", com dois toques).
 - **Não sei:** se o Lucas prefere outra ordem ou outros nomes de aba; se a barra embaixo atrapalha no iPhone com o app na Tela de Início (só conferido no Chromium).
 
+## D15. Quem pediu fica claro, avançar sozinho e equipe contra equipe
+
+- **Contexto (18/10/2026, o Lucas jogando):** "Na tela precisa ficar claro quem pediu truco, fale o nome do personagem." "Quando uma rodada acabar ou já puder puxar a nova rodada, faça isso automaticamente (pode colocar opções nos ajustes)." "Ainda tá confusa a escolha das equipes; seria mais fácil, em vez de misturar tudo, ser uma equipe toda contra a outra equipe toda."
+- **Decisão:**
+  - **Quem pediu:** o cartão do pedido diz "<Nome> pediu TRUCO!" (SEIS, NOVE, DOZE; "de volta" quando é um aumento sobre outro pedido) e "Responde: <Nome>" (para a pessoa: "Responde: você, pela sua dupla."); a cadeira de quem pediu fica destacada com "pediu TRUCO" enquanto o pedido está aberto, a de quem responde com "responde"; o carimbo tem o nome embaixo ("Biu pediu TRUCO!", "Biu aceitou", "Você correu"; o "Aceito!" passou a ser carimbado também); depois do aceite, uma linha "<Nome> aceitou. A mão vale 3." O nome é o da mesa (craque, personagem, nome de quem está na sala), sempre por `esc()`; o lugar da pessoa é "Você". Vale online e nas 3 duplas (lá, depois de uma dupla aceitar, o cartão diz quem aceitou e quem responde agora).
+  - **Avançar sozinho** (`S.auto`, ligado por padrão; desligado fica `false`): o fim da mão segue sozinho depois de `HAND_PAUSE` (calma 4,5 s, normal 3 s, rápida 2 s), com as cartas da última rodada na mesa, o resultado e o placar à vista, e uma barra que enche no tempo da pausa; sem botão. O fim da partida nunca segue sozinho. Desligado, como antes: "Próxima mão". O fim de rodada já não tinha botão (a carta seguinte é jogada, com `ROUND_PAUSE` antes da IA), então ficou como estava. "Reduzir movimento" tira a animação da barra, não a pausa.
+  - **Online:** o servidor dá a próxima mão depois de `ROOM_HAND_PAUSE` (3 s), pelo mesmo relógio das IAs (`aiDelay`/`aiStep`), para todos, sem botão, independente do ajuste de cada um. Se o servidor não der (por exemplo, o workflow `Salas` não publicou o servidor novo), o celular de quem criou manda o "next" depois de mais `HOST_NEXT_AFTER` (4 s): ninguém fica travado.
+  - **Montar a mesa mais curto (pedido do coordenador ao revisar o CI, 18/10/2026):** com os 20 clubes, a tela em uso passava de 3 telas no CI (2.596 px; limite do teste, 2.556). O seletor passou a mostrar as equipes do universo aberto como fichas pequenas e só os três personagens da equipe aberta (a do lugar tocado, ou a ficha tocada): 1,2 tela no Chromium daqui. O limite do teste não mudou.
+  - **Equipe contra equipe:** a raiz da aba Equipe virou dois passos (1. Sua equipe, 2. Equipe adversária, a mesma árvore categoria → universo → equipe) e um resumo "Você e <craque> (Equipe A) contra <x> e <y> (Equipe B)". Sem equipe adversária, os adversários são os outros dois da sua equipe, e o resumo diz isso. Montar a mesa e Heróis x Vilões foram para "Mais jeitos de montar a mesa" (`#equipe/mais/montar`, `#equipe/mais/hv`). Escolher sua equipe ou a adversária desfaz a mesa montada (é o caminho principal). Na partida, o placar e uma linha sobre a mesa dão o nome das equipes ("Nós: Flamengo", "Eles: Palmeiras").
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - Os tempos da pausa (4,5 / 3 / 2 s) e os 3 s online.
+  - "Fim de rodada" não tinha botão; o pedido foi lido como sendo sobre a mão. Se o Lucas quiser uma pausa maior depois de cada rodada, é o `ROUND_PAUSE`.
+  - Online o tempo é fixo e não segue o ajuste de cada celular; o "Próxima mão" sumiu online também.
+  - O nome da equipe vem da chave de cores guardada na partida (`sides`): com as cores "Do tema", o nome é o do pack ("Dragon Ball"); sem equipe adversária, "Eles" leva o nome da sua equipe (os adversários são dela).
+  - O nome da equipe no placar é cortado com reticências quando não cabe.
+- **Não sei:** se os tempos agradam; se o carimbo com o nome fica legível no iPhone (só conferido no Chromium); se o "Aceito!" carimbado cansa.
+
 ## Pendências
 
 | Pendência | Quem resolve |
