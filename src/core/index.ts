@@ -3,7 +3,7 @@ import { isHuman, aiAct, aiAnswer, aiCard, aiEleven, aiRaise, answer, canRaise, 
 import { advise, emptyTable, hear, nextRound, tableSay, tell, untell } from './assist';
 import { aiDelay, aiStep, allow, CLOSE_BIG, CLOSE_FAST, CODE_LEN, CONN_MAX, MSG_MAX, newBucket, RATE_BURST, RATE_PER_S, roomFull, tooBig, handle, isCode, newRoom, readMsg, readRoom, ROOM_GONE, ROOM_ROUND_PAUSE, ROOM_THINK, roomCode, SEAT_GONE, roomView, swapSides, viewFor } from './online';
 import { readGame, readReal, readState } from './save';
-import { DEFAULT_NAMES, lineup, playersOf, teamById, TEAMS, TEAMS_CHECKED } from './teams';
+import { accentOn, charById, charName, COLOR_BY, colorsOf, contrast, DEFAULT_NAMES, drawSeats, kinds, lineup, packById, PACKS, playersOf, qualify, readSeats, teamById, teamsOf, TEAMS, TEAMS_CHECKED } from './teams';
 import { normEntries, normEntry } from './source';
 
 export const Core = {
@@ -12,7 +12,7 @@ export const Core = {
   newGame, nextHand, whoActs, isHuman, roundWinner, handWinner, suitDuel, playCard, canRaise, raise, answer, decideEleven,
   weight, strength, unseen, sure, aiCard, aiRaise, aiAnswer, aiEleven, aiAct, drill, drillOk,
   emptyTable, tell, untell, nextRound, advise, tableSay, hear,
-  TEAMS, TEAMS_CHECKED, DEFAULT_NAMES, teamById, playersOf, lineup,
+  TEAMS, TEAMS_CHECKED, DEFAULT_NAMES, teamById, playersOf, lineup, PACKS, kinds, packById, teamsOf, charById, charName, qualify, colorsOf, contrast, accentOn, readSeats, drawSeats, COLOR_BY,
   viewFor, swapSides, newRoom, roomCode, isCode, CODE_LEN, handle, roomView, aiDelay, aiStep, readMsg, readRoom, ROOM_THINK, ROOM_ROUND_PAUSE, ROOM_GONE, SEAT_GONE,
   MSG_MAX, RATE_BURST, RATE_PER_S, CONN_MAX, CLOSE_BIG, CLOSE_FAST, newBucket, allow, tooBig, roomFull,
   readGame, readReal, readState, normEntry, normEntries
@@ -20,5 +20,5 @@ export const Core = {
 export type * from './types';
 export type { Answer, Drill, DrillKind } from './game';
 export type { CardAdvice, Target } from './assist';
-export type { Club } from './teams';
+export type { Character, Colors, ColorBy, Group, Pack, Seats, Team as Club } from './teams';
 export type { Action, Bucket, ClientMsg, Member, Room, RoomView } from './online';

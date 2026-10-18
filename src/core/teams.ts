@@ -1,56 +1,131 @@
-/* The clubs of the Série A 2026, with their colours and three players each, the first being the star. The person picks
-   their club: the computer players take those names (the star is the partner) and the app takes the club's colours. In
-   the rivals mode, the person and their club's star play against the two first names of another club.
-   Players change clubs every window: these were taken from the probable line-ups published for the Brasileirão from
-   July to October 2026 and checked on TEAMS_CHECKED (docs/decisoes.md, D6). The person can rename any of them in the
-   app. The colours are the clubs' usual shirt colours; no crest, badge or logo is drawn. */
-export interface Club {
-  id: string; name: string;
-  /** The main colour, the second one, and the colour of text on the main one. */
-  colors: [string, string, string];
-  /** Three players, the star first. */
-  players: [string, string, string];
+/* The catalogue of themes: who the computer players are and which colours the app takes. A theme is a pack (the Série A,
+   Blue Lock, Street Fighter…) of a kind (futebol, anime, jogos…); a pack has groups of three characters, the first
+   being the star. The data live in src/core/packs/, one file per pack, registered in src/core/packs/index.ts: nothing
+   here or on the screen names a pack or a kind, so a new theme is a new file there and nothing else.
+   Ids are qualified: a pack is `futebol`, a group `futebol/flamengo`, a character `futebol/flamengo/0` (by place).
+   Colours are [main, second, text on the main]; a character without colours takes its group's, a group without them
+   takes its pack's. Nothing but names and colours: no crest, logo, image or drawing. */
+import { PACKS } from './packs';
+
+export type Colors = [string, string, string];
+export type Character = string | { name: string; colors?: Colors };
+export interface Group { id: string; name: string; colors?: Colors; players: [Character, Character, Character] }
+export interface Pack {
+  id: string; kind: string; kindName: string; name: string;
+  /** What the first of a group is called: "craque", "líder". */
+  lead: string;
+  colors: Colors;
+  /** A line shown under the pack (where the names came from, when they were checked). */
+  note?: string;
+  groups: Group[];
 }
-export const TEAMS_CHECKED = '14/10/2026';
-export const TEAMS: Club[] = [
-  { id: 'athletico', name: 'Athletico-PR', colors: ['#c8102e', '#111111', '#ffffff'], players: ['Kevin Viveros', 'Luiz Gustavo', 'Kerwin Vargas'] },
-  { id: 'atletico-mg', name: 'Atlético-MG', colors: ['#111111', '#f2f2f2', '#ffffff'], players: ['Dudu', 'Bernard', 'Reinier'] },
-  { id: 'bahia', name: 'Bahia', colors: ['#0055a4', '#e30613', '#ffffff'], players: ['Luciano Juba', 'Erick Pulga', 'Kanu'] },
-  { id: 'botafogo', name: 'Botafogo', colors: ['#111111', '#f2f2f2', '#ffffff'], players: ['Arthur Cabral', 'Ziyech', 'Alex Telles'] },
-  { id: 'bragantino', name: 'Bragantino', colors: ['#f2f2f2', '#d6001c', '#111111'], players: ['Isidro Pitta', 'Tiago Volpi', 'Eric Ramires'] },
-  { id: 'chapecoense', name: 'Chapecoense', colors: ['#00843d', '#ffffff', '#ffffff'], players: ['Giovanni Augusto', 'Yago Felipe', 'Bruno Pacheco'] },
-  { id: 'corinthians', name: 'Corinthians', colors: ['#111111', '#f2f2f2', '#ffffff'], players: ['Yuri Alberto', 'Hugo Souza', 'Breno Bidon'] },
-  { id: 'coritiba', name: 'Coritiba', colors: ['#00544c', '#ffffff', '#ffffff'], players: ['Josué', 'Pedro Rocha', 'Breno Lopes'] },
-  { id: 'cruzeiro', name: 'Cruzeiro', colors: ['#003b94', '#ffffff', '#ffffff'], players: ['Kaio Jorge', 'Matheus Pereira', 'Lucas Silva'] },
-  { id: 'flamengo', name: 'Flamengo', colors: ['#c8102e', '#111111', '#ffffff'], players: ['Pedro', 'Lucas Paquetá', 'Carrascal'] },
-  { id: 'fluminense', name: 'Fluminense', colors: ['#7a1f3d', '#00613c', '#ffffff'], players: ['Hulk', 'Thiago Silva', 'Ganso'] },
-  { id: 'gremio', name: 'Grêmio', colors: ['#0d80bf', '#111111', '#ffffff'], players: ['Carlos Vinícius', 'Weverton', 'Pavón'] },
-  { id: 'internacional', name: 'Internacional', colors: ['#e2001a', '#ffffff', '#ffffff'], players: ['Alan Patrick', 'Alerrandro', 'Thiago Maia'] },
-  { id: 'mirassol', name: 'Mirassol', colors: ['#ffd200', '#00843d', '#111111'], players: ['Reinaldo', 'Edson Carioca', 'Chico Kim'] },
-  { id: 'palmeiras', name: 'Palmeiras', colors: ['#006437', '#ffffff', '#ffffff'], players: ['Vitor Roque', 'Flaco López', 'Andreas Pereira'] },
-  { id: 'remo', name: 'Remo', colors: ['#0b2346', '#ffffff', '#ffffff'], players: ['Yago Pikachu', 'Vitor Bueno', 'Alef Manga'] },
-  { id: 'santos', name: 'Santos', colors: ['#f2f2f2', '#111111', '#111111'], players: ['Neymar', 'Gabigol', 'Barreal'] },
-  { id: 'sao-paulo', name: 'São Paulo', colors: ['#e10600', '#111111', '#ffffff'], players: ['Calleri', 'Arboleda', 'Marcos Antônio'] },
-  { id: 'vasco', name: 'Vasco', colors: ['#111111', '#f2f2f2', '#ffffff'], players: ['Léo Jardim', 'Thiago Mendes', 'Andrés Gómez'] },
-  { id: 'vitoria', name: 'Vitória', colors: ['#d71920', '#111111', '#ffffff'], players: ['Matheuzinho', 'Lucas Arcanjo', 'Erick'] }
-];
-/** The default table, with no club chosen. */
+/** A group as the app uses it: qualified id, the colours it ends up with, the three names. */
+export interface Team { id: string; name: string; colors: Colors; players: [string, string, string]; pack: Pack }
+/** The table the person put together seat by seat: the partner and the two opponents, characters of any pack. */
+export interface Seats { partner: string; opp: [string, string] }
+/** Which colours the app takes: the pack's, the team's, or the partner's own. */
+export type ColorBy = 'pack' | 'team' | 'char';
+export const COLOR_BY: ColorBy[] = ['pack', 'team', 'char'];
+
+export { PACKS };
+export { TEAMS_CHECKED } from './packs';
+const nameOf = (c: Character): string => (typeof c === 'string' ? c : c.name);
+const ownColors = (c: Character): Colors | undefined => (typeof c === 'string' ? undefined : c.colors);
+
+/** Every group of every pack, in the order of the packs. */
+export const TEAMS: Team[] = PACKS.flatMap(p => p.groups.map(g => ({ id: `${p.id}/${g.id}`, name: g.name, colors: g.colors || p.colors, players: g.players.map(nameOf) as [string, string, string], pack: p })));
+/** The kinds, in the order their first pack was registered, each with its packs: the tabs of the screen. */
+export function kinds(): { id: string; name: string; packs: Pack[] }[] {
+  const out: { id: string; name: string; packs: Pack[] }[] = [];
+  for (const p of PACKS) {
+    const k = out.find(x => x.id === p.kind);
+    if (k) k.packs.push(p); else out.push({ id: p.kind, name: p.kindName, packs: [p] });
+  }
+  return out;
+}
+export const packById = (id: string | undefined | null): Pack | null => PACKS.find(p => p.id === id) || null;
+export const teamById = (id: string | undefined | null): Team | null => TEAMS.find(t => t.id === id) || null;
+export const teamsOf = (pack: Pack): Team[] => TEAMS.filter(t => t.pack === pack);
+/** A character by id: its team, its place in it, its name and its own colours (if any). */
+export function charById(id: string | undefined | null): { id: string; team: Team; i: number; name: string; colors?: Colors } | null {
+  const m = typeof id === 'string' ? id.match(/^(.+)\/([012])$/) : null;
+  const t = m ? teamById(m[1]) : null;
+  if (!m || !t) return null;
+  const i = Number(m[2]), g = t.pack.groups.find(x => `${t.pack.id}/${x.id}` === t.id) as Group, c = g.players[i];
+  return { id: id as string, team: t, i, name: nameOf(c), ...(ownColors(c) ? { colors: ownColors(c) } : {}) };
+}
+/** An id saved before themes existed was a bare club id: it is the football pack's. A known id stays as it is; anything
+ *  else is null. Works for groups and characters. */
+export function qualify(id: unknown): string | null {
+  if (typeof id !== 'string' || !id) return null;
+  if (teamById(id) || charById(id) || packById(id)) return id;
+  const old = `futebol/${id}`;
+  return teamById(old) ? old : null;
+}
+/** The colours of a pack, a team or a character id (a character without its own takes its team's). */
+export function colorsOf(id: string | null | undefined): Colors | null {
+  const c = charById(id);
+  if (c) return c.colors || c.team.colors;
+  return teamById(id)?.colors || packById(id)?.colors || null;
+}
+/** Contrast ratio between two #rrggbb colours (WCAG). */
+export function contrast(a: string, b: string): number {
+  const lum = (h: string): number => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+/** The second colour when it reads on the main one, else the text colour: for words drawn in the second colour. */
+export const accentOn = (c: Colors): string => (contrast(c[1], c[0]) >= 3 ? c[1] : c[2]);
+
+/** The default table, with no theme chosen. */
 export const DEFAULT_NAMES = ['Você', 'Biu', 'Cida', 'Toinho'];
-export const teamById = (id: string | undefined | null): Club | null => TEAMS.find(t => t.id === id) || null;
-/** The players of a club as the person sees them: the club's, with the names the person changed. */
+/** The players of a group as the person sees them: the group's, with the names the person changed. */
 export function playersOf(id: string, custom?: Record<string, string[]>): [string, string, string] {
   const t = teamById(id), own = custom && custom[id];
   const base = t ? t.players : (['', '', ''] as [string, string, string]);
   return [0, 1, 2].map(i => ((own && typeof own[i] === 'string' && own[i].trim()) ? own[i].trim().slice(0, 24) : base[i])) as [string, string, string];
 }
-/** Who sits where: the names of the four seats, and the club of each pair (null: none). With no club, the default
- *  table. With a club and no rival, the star is the partner and the other two are the opponents. With a rival, the star
- *  is the partner and the rival's first two are the opponents. */
-export function lineup(team?: string | null, rival?: string | null, custom?: Record<string, string[]>): { names: string[]; sides: [string | null, string | null] } {
+/** A character's name as the person sees it (renamed in its group, if they did). */
+export function charName(id: string, custom?: Record<string, string[]>): string {
+  const c = charById(id);
+  return c ? playersOf(c.team.id, custom)[c.i] : '';
+}
+/** The colour key of a character under a choice of colours: itself, its team, or its pack. */
+function keyOf(char: string, by: ColorBy): string {
+  const c = charById(char) as NonNullable<ReturnType<typeof charById>>;
+  return by === 'char' ? c.id : by === 'pack' ? c.team.pack.id : c.team.id;
+}
+/** A table seat by seat that holds together: three known characters, all different. */
+export function readSeats(x: unknown): Seats | null {
+  const s = x as Seats;
+  if (!s || typeof s !== 'object' || !Array.isArray(s.opp) || s.opp.length !== 2) return null;
+  const all = [s.partner, ...s.opp];
+  if (!all.every(c => !!charById(c)) || new Set(all).size !== 3) return null;
+  return { partner: s.partner, opp: [s.opp[0], s.opp[1]] };
+}
+/** Three different characters of any pack, drawn with the given random function (0 ≤ rand() < 1). */
+export function drawSeats(rand: () => number): Seats {
+  const all = TEAMS.flatMap(t => [0, 1, 2].map(i => `${t.id}/${i}`)), pick: string[] = [];
+  while (pick.length < 3) { const c = all[Math.floor(rand() * all.length) % all.length]; if (!pick.includes(c)) pick.push(c); }
+  return { partner: pick[0], opp: [pick[1], pick[2]] };
+}
+/** Who sits where: the names of the four seats, and the colour key of each pair (null: the app's own).
+ *  - a table seat by seat: the partner and the two opponents chosen;
+ *  - a team and no rival: the star is the partner, the other two the opponents;
+ *  - a team and a rival: the star is the partner, the rival's first two the opponents;
+ *  - nothing: the bar table.
+ *  The colours follow `by`: the partner's (or the team's star) own, their team's, or their pack's; the other pair takes
+ *  the first opponent's the same way, except a team playing itself, which leaves "Eles" in the app's colours. */
+export function lineup(team?: string | null, rival?: string | null, custom?: Record<string, string[]>, seats?: Seats | null, by: ColorBy = 'team'): { names: string[]; sides: [string | null, string | null] } {
+  const s = readSeats(seats);
+  if (s) return { names: ['Você', charName(s.opp[0], custom), charName(s.partner, custom), charName(s.opp[1], custom)], sides: [keyOf(s.partner, by), keyOf(s.opp[0], by)] };
   const t = teamById(team);
   if (!t) return { names: [...DEFAULT_NAMES], sides: [null, null] };
   const mine = playersOf(t.id, custom), r = teamById(rival);
-  if (!r || r.id === t.id) return { names: ['Você', mine[1], mine[0], mine[2]], sides: [t.id, null] };
+  if (!r || r.id === t.id) return { names: ['Você', mine[1], mine[0], mine[2]], sides: [keyOf(`${t.id}/0`, by), null] };
   const theirs = playersOf(r.id, custom);
-  return { names: ['Você', theirs[0], mine[0], theirs[1]], sides: [t.id, r.id] };
+  return { names: ['Você', theirs[0], mine[0], theirs[1]], sides: [keyOf(`${t.id}/0`, by), keyOf(`${r.id}/0`, by)] };
 }
