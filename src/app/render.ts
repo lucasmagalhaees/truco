@@ -1,7 +1,7 @@
 import { Core } from '../core';
-import type { Card, Drill, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
+import type { Card, Drill, Game, Pack, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
-import { S, applyClub, ui } from './state';
+import { S, applyClub, table, ui } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
 import { canPlayOnline, inRoom, net, roomLink } from './net';
@@ -19,7 +19,7 @@ export function render(): void {
   if (active && view.contains(active) && active.matches('input')) return;        // never throw away what is being typed
   const online = inRoom(), g = online ? (net.view?.game ?? null) : S.game;
   applyClub(online ? g : undefined);
-  seatNames = g ? g.names : Core.lineup(S.team, S.rival, S.custom).names;
+  seatNames = g ? g.names : table().names;
   const sc = g ? `${g.score[0]}-${g.score[1]}` : '';
   const bump = !!g && seenScore !== '' && sc !== seenScore; seenScore = sc;
   part('score').innerHTML = g ? `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>` : '';
@@ -123,25 +123,58 @@ function vNet(): string {
   return `<p class="explain" id="netstatus">${gone.map(m => `<b>${esc(m.name)}</b> saiu da sala`).join(', ')}. A partida espera voltar.${v.host ? gone.map(m => ` <button class="btn ghost" data-act="botseat" data-s="${m.seat}">IA no lugar de ${esc(m.name)}</button>`).join('') : ''}</p>`;
 }
 
-/* ---------- the club ---------- */
-const clubBtn = (act: string, id: string, label: string, on: boolean, colors?: [string, string, string]): string =>
-  `<button class="clubbtn${on ? ' on' : ''}" data-act="${act}" data-v="${id}" aria-pressed="${on}"${colors ? ` style="--c:${colors[0]};--c2:${colors[1]};--ci:${colors[2]}"` : ''}>${label}</button>`;
+/* ---------- the theme: a ready team, rivals, or a table put together seat by seat ----------
+   Everything here comes from the catalogue (Core.kinds, Core.PACKS): no pack or kind is named in the screen. */
+const colorVars = (c: [string, string, string] | null): string => (c ? ` style="--c:${c[0]};--c2:${c[1]};--ci:${c[2]}"` : '');
+const clubBtn = (act: string, id: string, label: string, on: boolean, colors?: [string, string, string] | null, extra = ''): string =>
+  `<button class="clubbtn${on ? ' on' : ''}" data-act="${act}" data-v="${id}" aria-pressed="${on}"${colorVars(colors ?? null)}${extra}>${esc(label)}</button>`;
+/** The tabs of the kinds (Futebol, Animes, Jogos…), for the picker `k`; the open one is ui.kind[k], or the kind of `cur`. */
+function kindOf(k: string, cur?: string | null): string {
+  const all = Core.kinds(), want = ui.kind[k] || (cur ? (Core.charById(cur)?.team.pack.kind || Core.teamById(cur)?.pack.kind) : '') || all[0].id;
+  return all.some(x => x.id === want) ? want : all[0].id;
+}
+function kindTabs(k: string, open: string): string {
+  return `<div class="segm small kinds" role="tablist" aria-label="Tema">${Core.kinds().map(x => `<button role="tab" class="${x.id === open ? 'on' : ''}" data-act="kind" data-k="${k}" data-v="${esc(x.id)}" aria-selected="${x.id === open}">${esc(x.name)}</button>`).join('')}</div>`;
+}
+/** The teams of the open kind, by pack, as buttons in their colours. */
+function teamPicker(k: string, act: string, cur: string | undefined, skip?: string): string {
+  const open = kindOf(k, cur), packs = (Core.kinds().find(x => x.id === open) as { packs: Pack[] }).packs;
+  return kindTabs(k, open) + packs.map(p => `${packs.length > 1 ? `<p class="packname">${esc(p.name)}</p>` : ''}<div class="clubs">${Core.teamsOf(p).filter(t => t.id !== skip).map(t => clubBtn(act, t.id, t.name, cur === t.id, t.colors)).join('')}</div>`).join('');
+}
+/** Every character of the open kind, by pack and team, each in its own colours: tapping one puts it in the seat being filled. */
+function charPicker(chosen: string[]): string {
+  const open = kindOf('seat', chosen[ui.slot]), packs = (Core.kinds().find(x => x.id === open) as { packs: Pack[] }).packs;
+  return kindTabs('seat', open) + packs.map(p => `<p class="packname">${esc(p.name)}</p>` + Core.teamsOf(p).map(t => `<div class="charrow"><span>${esc(t.name)}</span><div class="clubs">${[0, 1, 2].map(i => {
+    const id = `${t.id}/${i}`;
+    return clubBtn('seat', id, Core.charName(id, S.custom), chosen.includes(id), Core.colorsOf(id));
+  }).join('')}</div></div>`).join('')).join('');
+}
+const SLOT = ['Sua dupla', 'Adversário 1', 'Adversário 2'];
 function vClub(): string {
-  const t = Core.teamById(S.team), r = Core.teamById(S.rival);
-  const grid = (act: string, cur: string | undefined, skip?: string): string => `<div class="clubs">${Core.TEAMS.filter(c => c.id !== skip).map(c => clubBtn(act, c.id, c.name, cur === c.id, c.colors)).join('')}</div>`;
-  let h = `<section class="card" id="club"><span class="label">Seu time</span>
-    <p class="hint">Escolha o seu time: a IA ganha os nomes do elenco (o craque é sua dupla) e o app fica com as cores do clube.</p>
-    ${grid('team', S.team)}<button class="btn ghost block" data-act="team" data-v=""${t ? '' : ' disabled'}>Sem time</button>`;
+  const t = Core.teamById(S.team), r = Core.teamById(S.rival), seats = S.seats ? Core.readSeats(S.seats) : null;
+  const mode = seats ? 'seats' : r ? 'rivals' : 'own';
+  let h = `<section class="card" id="club"><span class="label">Sua equipe</span>
+    <p class="hint">Escolha uma equipe (futebol, anime, jogo…), jogue contra outra, ou monte a mesa com quem quiser: a IA ganha os nomes e o app fica com as cores.</p>
+    <div class="segm" role="group" aria-label="Modo"><button class="${mode === 'own' ? 'on' : ''}" data-act="mode" data-v="own" aria-pressed="${mode === 'own'}">Equipe</button><button class="${mode === 'rivals' ? 'on' : ''}" data-act="mode" data-v="rivals" aria-pressed="${mode === 'rivals'}">Rivais</button><button class="${mode === 'seats' ? 'on' : ''}" data-act="mode" data-v="seats" aria-pressed="${mode === 'seats'}">Montar</button></div>`;
+  if (seats) {
+    const chosen = [seats.partner, ...seats.opp];
+    h += `<p class="hint">Toque num lugar e depois em quem senta nele. Vale personagem de qualquer tema.</p><div class="slots" id="slots">${chosen.map((c, i) => {
+      const x = Core.charById(c) as NonNullable<ReturnType<typeof Core.charById>>;
+      return `<button class="slot${ui.slot === i ? ' on' : ''}" data-act="slot" data-v="${i}" aria-pressed="${ui.slot === i}"${colorVars(Core.colorsOf(c))}><small>${SLOT[i]}</small><b>${esc(Core.charName(c, S.custom))}</b><small>${esc(x.team.name)}</small></button>`;
+    }).join('')}</div>
+      <div class="pick"><button class="btn ghost" data-act="swapopp">Trocar a ordem</button><button class="btn ghost" data-act="drawseats">Sortear</button></div>${charPicker(chosen)}`;
+    return h + '</section>';
+  }
+  h += `${teamPicker('team', 'team', S.team)}<button class="btn ghost block" data-act="team" data-v=""${t ? '' : ' disabled'}>Sem equipe</button>`;
   if (t) {
-    const p = Core.playersOf(t.id, S.custom);
-    h += `<p id="squad">Elenco do ${esc(t.name)}: <b>${esc(p[0])}</b> (craque), ${esc(p[1])} e ${esc(p[2])}.</p>`;
-    h += ui.editing ? `<div class="edit" id="edit">${p.map((x, i) => `<div class="field"><input id="pl${i}" maxlength="24" autocomplete="off" value="${esc(x)}" aria-label="${i ? `Jogador ${i + 1}` : 'Craque'}"></div>`).join('')}
-      <div class="pick"><button class="btn" data-act="saveplayers">Salvar nomes</button><button class="btn ghost" data-act="resetplayers">Voltar aos do clube</button></div></div>`
+    const p = Core.playersOf(t.id, S.custom), lead = t.pack.lead;
+    h += `<p id="squad">${esc(t.name)} (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>`;
+    h += ui.editing ? `<div class="edit" id="edit">${p.map((x, i) => `<div class="field"><input id="pl${i}" maxlength="24" autocomplete="off" value="${esc(x)}" aria-label="${i ? `Jogador ${i + 1}` : esc(lead)}"></div>`).join('')}
+      <div class="pick"><button class="btn" data-act="saveplayers">Salvar nomes</button><button class="btn ghost" data-act="resetplayers">Voltar aos originais</button></div></div>`
       : `<button class="btn ghost block" data-act="editplayers">Trocar os nomes</button>`;
-    h += `<p class="hint">Modo</p><div class="segm" role="group" aria-label="Modo"><button class="${r ? '' : 'on'}" data-act="mode" data-v="own" aria-pressed="${!r}">Elenco</button><button class="${r ? 'on' : ''}" data-act="mode" data-v="rivals" aria-pressed="${!!r}">Rivais</button></div>`;
-    h += r ? `<p class="hint">Rivais: você e ${esc(p[0])} contra os dois principais de outro time. Escolha o adversário:</p>${grid('rival', S.rival, t.id)}`
-      : `<p class="hint">Elenco: você e ${esc(p[0])} contra ${esc(p[1])} e ${esc(p[2])}.</p>`;
-    h += `<p class="hint">Elencos conferidos em ${Core.TEAMS_CHECKED}, pelas escalações prováveis publicadas. Jogador troca de clube: se algum nome estiver velho, troque acima.</p>`;
+    h += r ? `<p class="hint">Rivais: você e ${esc(p[0])} contra os dois primeiros de outra equipe, de qualquer tema. Escolha o adversário:</p>${teamPicker('rival', 'rival', S.rival, t.id)}`
+      : `<p class="hint">Equipe: você e ${esc(p[0])} contra ${esc(p[1])} e ${esc(p[2])}.</p>`;
+    if (t.pack.note) h += `<p class="hint">${esc(t.pack.note)}</p>`;
   }
   return h + '</section>';
 }
@@ -332,6 +365,7 @@ function vSettings(): string {
     <p class="hint">Rodinhas: marcam as manilhas e a força de cada carta, mostram quem está levando a rodada, explicam por que ela foi ganha e deixam o ranking à mão. Tire quando quiser treinar como na mesa de verdade.</p>
     ${seg('hints', hints() ? 'on' : 'off', [['on', 'Com rodinhas'], ['off', 'Sem rodinhas']], 'Rodinhas')}
     <p class="hint">Velocidade das jogadas da IA</p>${seg('speed', S.speed || 'normal', [['calma', 'Calma'], ['normal', 'Normal'], ['rapida', 'Rápida']], 'Velocidade')}
+    <p class="hint">Cores do app: as do tema (o jogo, o anime, o campeonato), as da equipe, ou as do personagem que é sua dupla</p>${seg('colorby', S.colorBy || 'team', [['pack', 'Do tema'], ['team', 'Da equipe'], ['char', 'Da dupla']], 'Cores do app')}
     <p class="hint">Tema</p>${seg('theme', S.theme || 'auto', [['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Escuro']], 'Tema')}
     <p class="hint">Som e vibração</p>${seg('fx', S.quiet ? 'off' : 'on', [['on', 'Ligados'], ['off', 'Desligados']], 'Som e vibração')}</section>
     <section class="card" id="about"><span class="label">Versão do app</span><p class="hint" id="version">${built ? `Versão ${esc(built.slice(0, 7))}.` : 'Versão de desenvolvimento.'} ${canUpdate() ? 'O app fica guardado neste aparelho: abre na hora e também sem internet.' : 'Neste endereço o app não fica guardado no aparelho.'}</p>${canUpdate() ? '<button class="btn ghost block" data-act="checkupdate">Procurar versão nova</button>' : ''}</section>`;

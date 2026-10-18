@@ -21,7 +21,7 @@ export const futebol: Pack = {
     { id: 'cruzeiro', name: 'Cruzeiro', colors: ['#003b94', '#ffffff', '#ffffff'], players: ['Kaio Jorge', 'Matheus Pereira', 'Lucas Silva'] },
     { id: 'flamengo', name: 'Flamengo', colors: ['#c8102e', '#111111', '#ffffff'], players: ['Pedro', 'Lucas Paquetá', 'Carrascal'] },
     { id: 'fluminense', name: 'Fluminense', colors: ['#7a1f3d', '#00613c', '#ffffff'], players: ['Hulk', 'Thiago Silva', 'Ganso'] },
-    { id: 'gremio', name: 'Grêmio', colors: ['#0d80bf', '#111111', '#ffffff'], players: ['Carlos Vinícius', 'Weverton', 'Pavón'] },
+    { id: 'gremio', name: 'Grêmio', colors: ['#0a72ad', '#111111', '#ffffff'], players: ['Carlos Vinícius', 'Weverton', 'Pavón'] },
     { id: 'internacional', name: 'Internacional', colors: ['#e2001a', '#ffffff', '#ffffff'], players: ['Alan Patrick', 'Alerrandro', 'Thiago Maia'] },
     { id: 'mirassol', name: 'Mirassol', colors: ['#ffd200', '#00843d', '#111111'], players: ['Reinaldo', 'Edson Carioca', 'Chico Kim'] },
     { id: 'palmeiras', name: 'Palmeiras', colors: ['#006437', '#ffffff', '#ffffff'], players: ['Vitor Roque', 'Flaco López', 'Andreas Pereira'] },

@@ -41,7 +41,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .top{position:sticky;top:0;z-index:5;background:var(--club,var(--felt2));color:var(--club-ink,var(--chalk));border-bottom:4px solid var(--club2,var(--rim));padding-top:env(safe-area-inset-top)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;min-height:56px;gap:12px}
 .brand{font:800 24px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:inherit}
-.brand span{color:var(--club2,var(--accent-bg))}
+.brand span{color:var(--club-accent,var(--accent-bg))}
 .score{display:flex;gap:6px}
 .chip{font:800 15px/1 var(--display);letter-spacing:.04em;padding:7px 10px;border-radius:999px;color:#fff;white-space:nowrap}
 .chip.nos{background:var(--club,#2563a8);color:var(--club-ink,#fff);box-shadow:inset 0 0 0 2px var(--club-ink,transparent)}
@@ -258,6 +258,16 @@ details.card .log,details.card .ranking{margin-top:12px}
 .clubs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .clubbtn{min-height:44px;padding:4px;border-radius:10px;border:2px solid var(--line);background:var(--c);color:var(--ci);box-shadow:inset 0 -5px 0 var(--c2);font:800 13px/1.1 var(--display);letter-spacing:.02em;min-width:0}
 .clubbtn.on{outline:3px solid var(--accent-bg);outline-offset:2px}
+/* the theme pickers: tabs of the kinds, the name of each pack, a team's three characters in a row, the three seats */
+.kinds{flex-wrap:wrap}
+.packname{font:800 13px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.charrow{display:flex;flex-direction:column;gap:4px}
+.charrow>span{font-size:13px;color:var(--muted)}
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:64px;padding:6px 4px;border-radius:12px;border:2px solid var(--line);background:var(--c,var(--surface));color:var(--ci,var(--fg));box-shadow:inset 0 -5px 0 var(--c2,var(--line));min-width:0;overflow-wrap:anywhere;text-align:center}
+.slot small{font-size:11px;opacity:.85}
+.slot b{font:800 14px/1.1 var(--display)}
+.slot.on{outline:3px solid var(--accent-bg);outline-offset:2px}
 .edit{display:flex;flex-direction:column;gap:8px}
 .field{display:flex;align-items:center;border:2px solid var(--line);border-radius:10px;padding:0 12px;background:var(--bg)}
 .field input{flex:1;min-width:0;border:0;background:none;color:var(--fg);height:46px;font:inherit;font-size:16px;outline:none}
