@@ -76,6 +76,8 @@ main .wrap{display:flex;flex-direction:column;gap:14px;padding-top:14px;padding-
 .segm{display:flex;border:2px solid var(--line);border-radius:12px;overflow:hidden}
 .segm button{flex:1;min-height:44px;font:700 14px/1 var(--display);letter-spacing:.03em;text-transform:uppercase;min-width:0;padding:0 4px;overflow-wrap:anywhere}
 .segm button+button{border-left:2px solid var(--line)}
+/* four or more choices in a row (the levels): tighter letters, so "Extremo" fits on one line at 393 px */
+.segm:not(.small) button:first-child:nth-last-child(n+4),.segm:not(.small) button:first-child:nth-last-child(n+4)~button{letter-spacing:0;font-size:13px}
 .segm button.on{background:var(--fg);color:var(--surface)}
 .segm.small button{min-height:38px;font-size:15px;letter-spacing:0;text-transform:none}
 .pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}

@@ -18,7 +18,7 @@ if (!ONLY) console.log('Aceita o pedido (aceita ou aumenta), pela força da mão
 const buckets = [[0, 2.5, 'fraca'], [2.5, 4.5, 'média'], [4.5, 7, 'boa'], [7, 99, 'forte']];
 for (const [prev, asked] of ONLY ? [] : [[1, 3], [3, 6], [6, 9], [9, 12]]) {
   const row = [];
-  for (const level of ['facil', 'medio', 'dificil']) {
+  for (const level of ['facil', 'medio', 'dificil', 'extremo']) {
     const n = buckets.map(() => [0, 0]), rand = Core.seeded(asked * 7 + level.length);
     for (let i = 0; i < 1500; i++) {
       const g0 = Core.newGame(rand, level);
@@ -30,6 +30,44 @@ for (const [prev, asked] of ONLY ? [] : [[1, 3], [3, 6], [6, 9], [9, 12]]) {
     row.push(`${level.padEnd(7)} ${n.map(([a, t], k) => `${buckets[k][2]} ${pct(a, t)}`).join('  ')}`);
   }
   console.log(`  ${prev}→${asked}`); for (const r of row) console.log(`    ${r}`);
+}
+
+// ---------- 1b. the doze from nove, with and without a bluffing history of the one who asks ----------
+// finer bands here: with nove already on the table almost any hand with a 3 or a manilha clears the bar, so the
+// interesting bands are the weak ones
+const fine = [[0, 1.2, 'lixo'], [1.2, 2.5, 'fraca'], [2.5, 4.5, 'média'], [4.5, 99, 'boa']];
+const noHist = [0, 1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
+const bluffer = [{ shown: 8, weak: 6, answers: 4, runs: 0 }, ...noHist.slice(1)];
+const honest = [{ shown: 8, weak: 0, answers: 4, runs: 1 }, ...noHist.slice(1)];
+if (!ONLY) {
+  console.log('\nPaga o doze (9→12), pela força da mão, sem histórico / pedinte que só pede com mão / pedinte que blefa (6 de 8 mostrados):');
+  for (const level of ['facil', 'medio', 'dificil', 'extremo']) {
+    const cells = [];
+    for (const [name, reads] of [['sem histórico', noHist], ['honesto', honest], ['blefador', bluffer]]) {
+      const n = fine.map(() => [0, 0]), rand = Core.seeded(77 + level.length);
+      for (let i = 0; i < 1200; i++) {
+        const g0 = Core.newGame(rand, level);
+        if (g0.phase !== 'play') continue;
+        const g = { ...g0, value: 9, raisedBy: 1, phase: 'truco', ask: { by: 0, value: 12 }, turn: 0, starter: 0, reads, watch: [{ by: 0, held: 3, stand: 0, value: 12, seen: [] }] };
+        const s = Core.strength(g.hands[1], g.vira), b = fine.findIndex(([lo, hi]) => s >= lo && s < hi);
+        n[b][1]++; if (Core.aiAnswer(g, 1, rand) !== 'run') n[b][0]++;
+      }
+      cells.push(`${name}: ${n.map(([a, t]) => pct(a, t)).join(' ')}`);
+    }
+    console.log(`  ${level.padEnd(7)} (lixo fraca média boa)  ${cells.join('   ')}`);
+  }
+  // how long one decision takes, the slowest kind for each level: three cards to choose from, at the start of a hand
+  const t = {};
+  for (const level of ['medio', 'dificil', 'extremo']) {
+    const rand = Core.seeded(9); let ms = 0, k = 0;
+    for (let i = 0; i < 60; i++) {
+      const g = Core.newGame(rand, level); if (g.phase !== 'play') continue;
+      const a = { ...g, phase: 'truco', ask: { by: g.turn, value: 3 }, watch: [{ by: g.turn, held: 3, stand: 0, value: 3, seen: [] }] }, s = (g.turn + 1) % 4;
+      const t0 = performance.now(); Core.aiAnswer(a, s, rand); Core.aiCard({ ...g, turn: s }, s, rand); ms += performance.now() - t0; k++;
+    }
+    t[level] = (ms / k).toFixed(1);
+  }
+  console.log(`\nTempo por decisão (responder um truco e escolher a carta, em ms, neste Node): ${JSON.stringify(t)}`);
 }
 
 // ---------- 2. whole games, each pair with its own way of playing ----------
@@ -82,5 +120,8 @@ function series(name, kinds) {
 }
 console.log(`\nPartidas inteiras (${GAMES} cada, sementes fixas); a dupla de IA nos assentos 1 e 3:`);
 for (const lv of ['facil', 'medio', 'dificil']) series(`${lv} contra a pessoa que blefa`, ['blefador', lv, 'medio', lv]);
+series('extremo contra a pessoa que blefa', ['blefador', 'extremo', 'medio', 'extremo']);
 series('dificil contra medio', ['medio', 'dificil', 'medio', 'dificil']);
+series('extremo contra dificil', ['dificil', 'extremo', 'dificil', 'extremo']);
+series('extremo contra medio', ['medio', 'extremo', 'medio', 'extremo']);
 series('medio contra facil', ['facil', 'medio', 'facil', 'medio']);

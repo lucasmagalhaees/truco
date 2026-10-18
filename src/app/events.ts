@@ -61,7 +61,7 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
+function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
  *  on the tab they were opened from. */
 function home(): void {
