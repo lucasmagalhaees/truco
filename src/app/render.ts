@@ -107,7 +107,7 @@ function screenOf(r: string[]): Screen {
     if (r[1] === 'online') return { title: 'Jogar online', body: vOnline(), depth: 2 };
     const lvBtn = (v: string): string => `<button class="${lv === v ? 'on' : ''}" data-act="level" data-v="${v}" aria-pressed="${lv === v}">${LEVEL[v][0]}</button>`;
     return { title: 'Jogar', depth: 1, body: `${tableNow()}<section class="card" id="start">
-    <p class="big" id="lineup">Você e <b>${(name(2))}</b> contra <b>${(name(1))}</b> e <b>${(name(3))}</b>. Quem fizer ${Core.WIN_POINTS} pontos primeiro leva.</p>
+    <p id="lineup">Quem fizer ${Core.WIN_POINTS} pontos primeiro leva. Nível da IA:</p>
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>
     <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p></section>
