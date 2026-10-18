@@ -39,6 +39,14 @@ export interface Shout { seat: Seat; word: Word }
 /** One finished hand, for the summary at the end. */
 export interface HandRecord { team: Team | null; points: number; how: string; value: number }
 
+/** What the whole table has seen of one seat over the game, for reading bluffs: raises whose cards came to light (all
+ *  played out, or shown when the others ran), how many of those were weak, raises answered, and how many were run from.
+ *  Only public things are counted. */
+export interface Read { shown: number; weak: number; answers: number; runs: number }
+/** A raise of this hand, while its cards come out: who asked, how many cards they held then, how the rounds stood for
+ *  their pair, what was asked, and their cards seen since. All of it was in plain sight. */
+export interface Watch { by: Seat; held: number; stand: number; value: number; seen: Card[] }
+
 /** The cards of whoever raised, shown when the other pair ran: and whether a computer player raised on a bluff. */
 export interface Shown { seat: Seat; cards: Card[]; bluff: boolean }
 
@@ -89,6 +97,10 @@ export interface Game {
   hist: HandRecord[];
   /** What happened, in order, in words. */
   log: string[];
+  /** What each seat has shown so far, for reading bluffs (games saved before it have none: everyone starts unread). */
+  reads?: Read[];
+  /** The raises of this hand whose cards are still coming out. */
+  watch?: Watch[];
 }
 
 /** Games won and lost on this device. */
