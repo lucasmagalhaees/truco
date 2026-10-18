@@ -83,6 +83,7 @@ export function leave(): void {
 /** Whether this person is in a room right now (connected or trying to). */
 export const inRoom = (): boolean => !!S.online;
 /** The raw seat on the server of a seat as this person sees it (the view is turned so that they sit at 0). */
-export const rawSeat = (v: number): number => ((net.view ? net.view.seat : 0) + v) % 4;
+/** A seat as this phone sees it, back to the room's numbering (six seats with three pairs). */
+export const rawSeat = (v: number): number => { const n = net.view?.game ? Core.teamsOf(net.view.game) * 2 : 4; return ((net.view ? net.view.seat : 0) + v) % n; };
 export const roomLink = (code: string): string => `${location.origin}${location.pathname}?sala=${code}`;
 export const isRoomCode = Core.isCode;
