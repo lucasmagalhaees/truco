@@ -95,6 +95,30 @@ Modelo de uma decisão:
 - **Interpretações que precisaram ser feitas:** os números acima são escolha minha, sem medição de uso real; fechar a conexão (em vez de só ignorar a mensagem) para que um cliente com defeito apareça logo, e não fique em silêncio.
 - **Não sei:** como o celular da pessoa reage a ser cortado (ele tenta voltar sozinho, `RETRY`); não há limite de salas por endereço, só por sala.
 
+## D9. Sala com 3 pessoas: quem criou escolhe o formato
+
+- **Contexto (18/10/2026):** pedido do Lucas: com número ímpar de pessoas numa sala (na prática, 3), dar a opção de jogar "2 humanos contra 1 humano com uma IA" ou "3 duplas, cada humano com uma IA". Ele escolheu oferecer as duas e deixar quem criou a sala escolher. Nas 3 duplas, ele decidiu: quando alguém pede, as duas outras duplas respondem (quem corre sai da mão; se as duas correm, quem pediu leva o valor de antes) e, no 1 a 1 a 1, leva quem fez a 1ª.
+- **Decisão:** a sala ganha o campo `format` (`'duplas'`, o padrão, ou `'tres'`), escolhido por quem criou só antes de começar e só com 3 pessoas; com 2 ou 4 pessoas ele não é olhado. No "2 contra 1", quem criou toca no nome de quem joga com a IA; os outros dois sentam de frente. As regras de 6 lugares das 3 duplas estão na D10; `SUPPORTS_THREE` liga o formato (ligado desde 18/10/2026). Ao começar as 3 duplas, as pessoas vão para os lugares 0, 1 e 2 (quem criou no 0, os outros na ordem em que entraram).
+- **Interpretações que precisaram ser feitas (minhas, não do Lucas):** sem escolha, fica como a ordem de entrada já dava: quem criou e o terceiro a entrar de dupla, o segundo com a IA. Quem criou fica sempre no lugar 0 (é assim que a sala sabe quem criou): se ele mesmo escolhe jogar com a IA, os outros dois vão para os lugares 1 e 3 e a IA senta no 2. A escolha de quem fica com a IA é por toque nos nomes, num grupo de botões, e só quem criou vê os botões; os outros veem o formato escolhido em texto.
+- **Não sei:** se 3 pessoas preferem, na prática, o "2 contra 1" ou as 3 duplas.
+
+## D10. Três duplas (6 na mesa), o núcleo
+
+- **Contexto (18/10/2026, pedido do Lucas):** numa sala com 3 pessoas, poder jogar em 3 duplas, cada pessoa com uma IA de parceira, cada dupla contra as outras duas. O núcleo de regras está em `src/core/game.ts`; a escolha do formato na sala é a D9; a mesa de 6 na tela entrou junto com a sala (18/10/2026).
+- **Decidido pelo Lucas (18/10/2026):**
+  - Pedido (truco, seis, nove, doze): as duas outras duplas respondem, cada uma aceita, corre ou aumenta. Quem corre sai da mão: não marca e as cartas dela saem do jogo. Se as duas correm, quem pediu leva o valor de antes; se uma corre e a outra aceita, a mão segue entre as duas no valor novo.
+  - 1 a 1 a 1 (cada dupla fez uma rodada): leva quem fez a 1ª. O resto dos desempates é o do truco paulista; quem fizer 2 rodadas leva.
+- **Decidido pelo agente, confirmar com o Lucas:**
+  - Lugares: 6 em roda, parceiros de frente (lugar `s` e `s + 3`), as duplas se alternando (dupla `s % 3`); baralho de 40, 3 cartas para cada um (18) e a vira. Nomes padrão: Você, Biu, Zé, Cida, Toinho, Nena (`SEATS6`).
+  - A ordem de quem responde a um pedido é a ordem da roda depois de quem pediu. Quem aumenta pede para todas as duplas ainda na mão (inclusive a que tinha pedido); a dupla que já tinha aceitado responde de novo.
+  - Uma dupla que corre perde as rodadas que já tinha feito: contam como empatadas. Se isso já decide a mão, ela acaba na hora, no valor aceito.
+  - Quem fez a última rodada empatada e saiu da mão: começa a próxima rodada o seguinte na roda que ainda está na mão.
+  - Mão de onze com uma dupla em 11: ela decide (vale `ELEVEN_VALUE`); se corre, cada uma das outras duas leva 1. Com duas ou três duplas em 11: mão de ferro (vale 1, às cegas, sem pedidos). Com alguém em 11, ninguém pede.
+  - Responde por cada dupla a pessoa dela; numa dupla só de IAs, o primeiro dela a jogar depois de quem pediu.
+  - O placar tem três números; vence quem chega a 12 (`WIN_POINTS`). As frases do histórico dizem os nomes da dupla, não "Nós" e "Eles".
+  - Na tela: o placar diz "Nós" e, de cada outra dupla, o nome da pessoa nela; a mesa de 6 põe você embaixo, o parceiro em cima e as outras quatro cadeiras duas de cada lado, na ordem da roda; quem correu fica com "saiu da mão" na cadeira; a dupla não cochicha conselho com 3 duplas (a IA de 6 é a de 4 adaptada). A cor da terceira dupla é roxa (`--t2`).
+- **Não sei:** se a IA joga bem com 6 (é a de 4 adaptada); se o jogo fica bom de jogar assim. Ninguém jogou ainda.
+
 ## Pendências
 
 | Pendência | Quem resolve |

@@ -14,8 +14,9 @@ export type Level = 'facil' | 'medio' | 'dificil';
 export type Card = string;
 /** A seat at the table: 0 is the person, 2 their partner; 1 and 3 the other pair. Play goes 0, 1, 2, 3. */
 export type Seat = number;
-/** A pair: 0 is "Nós" (seats 0 and 2), 1 is "Eles" (seats 1 and 3). */
-export type Team = 0 | 1;
+/** A pair: 0 is "Nós" (seats 0 and 2), 1 is "Eles" (seats 1 and 3). With three pairs (six seats), seat s is in pair
+ *  s % 3: 0 (seats 0 and 3), 1 (1 and 4) and 2 (2 and 5). */
+export type Team = 0 | 1 | 2;
 /** A round of the hand: the pair that took it, or -1 for a tie. */
 export type RoundResult = Team | -1;
 
@@ -29,8 +30,9 @@ export type Phase =
   | 'handEnd'   // the hand is over and its points counted; the next one waits for a tap
   | 'over';     // a pair reached 12
 
-/** A raise waiting for an answer: who asked, and what the hand would be worth. */
-export interface Ask { by: Seat; value: number; bluff?: true }
+/** A raise waiting for an answer: who asked, and what the hand would be worth. With three pairs, `wait`: the pairs that
+ *  still have to answer, the next one first. */
+export interface Ask { by: Seat; value: number; bluff?: true; wait?: Team[] }
 
 /** Something said out loud at the table, shown as a speech bubble: a raise, an answer, a decision on a hand of eleven. */
 export type Word = 'truco' | 'seis' | 'nove' | 'doze' | 'aceito' | 'corro' | 'jogo' | 'fujo';
@@ -51,7 +53,11 @@ export interface Watch { by: Seat; held: number; stand: number; value: number; s
 export interface Shown { seat: Seat; cards: Card[]; bluff: boolean }
 
 export interface Game {
-  /** The names at the four seats (0 is always "Você"), and the club of each pair (null: none). */
+  /** 3 in a game of three pairs (six seats, online only); absent in the game of four. */
+  teams?: 3;
+  /** With three pairs: the pairs that ran from a raise in this hand, out of it until the next one. */
+  out?: Team[];
+  /** The names at the four seats (six, with three pairs; 0 is always "Você"), and the club of each pair (null: none). */
   names: string[]; sides: [string | null, string | null];
   /** The seats played by people; the others are computer players. On one phone, only seat 0; in a room, each person's. */
   humans: Seat[];
@@ -61,8 +67,8 @@ export interface Game {
   blind: boolean;
   /** Every card played in this hand, in order (what a careful player remembers). */
   played: Card[];
-  /** Points of each pair. */
-  score: [number, number];
+  /** Points of each pair (three numbers with three pairs). */
+  score: number[];
   /** Who dealt this hand; the one after the dealer leads the first round. */
   dealer: Seat;
   /** How many hands have been dealt in this game. */

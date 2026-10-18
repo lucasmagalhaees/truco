@@ -1,4 +1,5 @@
-/* The rules of truco paulista for four (two pairs, partners facing each other), and the computer players.
+/* The rules of truco paulista for four (two pairs, partners facing each other), and for six in three pairs (`teams: 3`,
+   online only), and the computer players.
    Pure: no page, no network, no storage. Chance comes in as a function (`rand`), so a seeded one makes any game the
    same every time. Every move returns a new Game; a move that is not allowed returns the same object unchanged. */
 import type { Ask, Card, Game, HandRecord, Level, Phase, Play, Read, RoundResult, Seat, Team, Watch, Word } from './types';
@@ -16,6 +17,8 @@ export const VALUES = [1, 3, 6, 9, 12];
 export const ELEVEN = 11, ELEVEN_VALUE = 3;
 /** The four seats: the person, the pair on their right, their partner (facing them) and the pair on their left. */
 export const SEATS = ['Você', 'Biu', 'Cida', 'Toinho'];
+/** The six seats of a game of three pairs: partners face each other (seat i and i + 3), the pairs take turns. */
+export const SEATS6 = ['Você', 'Biu', 'Zé', 'Cida', 'Toinho', 'Nena'];
 
 /* ---------- chance ---------- */
 /** A seeded source of chance (mulberry32): the same seed gives the same numbers, in [0, 1). */
@@ -37,9 +40,24 @@ export function shuffle<T>(list: readonly T[], rand: () => number): T[] {
 }
 
 /* ---------- cards ---------- */
-export const teamOf = (s: Seat): Team => (s % 2) as Team;
-export const nextSeat = (s: Seat): Seat => (s + 1) % 4;
+/** The pair of a seat: the pairs take turns around the table (with three pairs, seats 0 and 3, 1 and 4, 2 and 5). */
+export const teamOf = (s: Seat, teams = 2): Team => (s % teams) as Team;
+export const nextSeat = (s: Seat, seats = 4): Seat => (s + 1) % seats;
 export const other = (t: Team): Team => (1 - t) as Team;
+/** How many pairs play this game (2, or 3 in a game of three pairs), and how many seats. */
+export const teamsOf = (g: Pick<Game, 'teams'>): number => (g.teams === 3 ? 3 : 2);
+export const seatsOf = (g: Pick<Game, 'teams'>): number => teamsOf(g) * 2;
+/** The pair of a seat in this game. */
+const tm = (g: Pick<Game, 'teams'>, s: Seat): Team => teamOf(s, teamsOf(g));
+/** The partner of a seat: the one facing it. */
+export const partnerOf = (g: Pick<Game, 'teams'>, s: Seat): Seat => (s + teamsOf(g)) % seatsOf(g);
+/** Whether a seat is still in this hand: with three pairs, a pair that ran from a raise is out of it. */
+export const inHand = (g: Pick<Game, 'teams' | 'out'>, s: Seat): boolean => !(g.out || []).includes(tm(g, s));
+/** The next seat after `s` still in the hand, and `s` itself if it still is. */
+const after = (g: Pick<Game, 'teams' | 'out'>, s: Seat): Seat => { let t = nextSeat(s, seatsOf(g)); while (!inHand(g, t) && t !== s) t = nextSeat(t, seatsOf(g)); return t; };
+const from = (g: Pick<Game, 'teams' | 'out'>, s: Seat): Seat => (inHand(g, s) ? s : after(g, s));
+/** How many seats are still in the hand. */
+const inPlay = (g: Pick<Game, 'teams' | 'out'>): number => Array.from({ length: seatsOf(g) }, (_, s) => s).filter(s => inHand(g, s)).length;
 /** The 40 cards: no 8, 9, 10 or jokers. */
 export const deck = (): Card[] => RANKS.flatMap(r => SUITS.map(s => r + s));
 /** The rank of the manilhas: the one after the vira's (after 3 comes 4 again). */
@@ -67,37 +85,42 @@ export function ranking(vira: Card): { rank: string; cards: Card[]; manilha: boo
 /** The difficulty levels. */
 export const LEVELS: Level[] = ['facil', 'medio', 'dificil'];
 const say = (g: Pick<Game, 'names'>, s: Seat): string => g.names[s] || SEATS[s];
+/** A pair of a game of three pairs in words: its two names. */
+const pairSay = (g: Pick<Game, 'names' | 'teams'>, t: Team): string => `${say(g, t)} e ${say(g, partnerOf(g, t))}`;
 const WORD: Record<number, Word> = { 3: 'truco', 6: 'seis', 9: 'nove', 12: 'doze' };
 export const nextValue = (v: number): number => VALUES[Math.min(VALUES.length - 1, VALUES.indexOf(v) + 1)];
 
 /* ---------- a game ---------- */
 /** Deals a new hand on top of what the game already has: score, history, log and the next dealer. */
-function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level' | 'names' | 'sides' | 'humans' | 'reads'>, rand: () => number): Game {
-  const d = shuffle(deck(), rand), starter = nextSeat(base.dealer);
-  const at = [base.score[0] === ELEVEN, base.score[1] === ELEVEN];
-  const eleven: Team | null = at[0] !== at[1] ? (at[0] ? 0 : 1) : null;
-  const vira = d[HAND_SIZE * 4];
+function deal(base: Pick<Game, 'score' | 'dealer' | 'n' | 'hist' | 'log' | 'level' | 'names' | 'sides' | 'humans' | 'teams' | 'reads'>, rand: () => number): Game {
+  const T = teamsOf(base), N = T * 2, d = shuffle(deck(), rand), starter = nextSeat(base.dealer, N);
+  const at = base.score.map(x => x === ELEVEN), nAt = at.filter(Boolean).length;
+  // one pair with 11: a hand of eleven; two or more: a hand of iron
+  const eleven: Team | null = nAt === 1 ? (at.indexOf(true) as Team) : null;
+  const vira = d[HAND_SIZE * N];
   const log = [...base.log, `Mão ${base.n}: ${say(base, base.dealer)} deu as cartas. Vira: ${cardName(vira)}.`];
-  if (eleven !== null) log.push(`Mão de onze: ${eleven === 0 ? 'nós' : 'eles'} ${eleven === 0 ? 'decidimos se jogamos' : 'decidem se jogam'}.`);
-  else if (at[0] && at[1]) log.push('Mão de ferro: os dois com 11. Todo mundo joga às cegas, sem ver as próprias cartas; quem levar a mão leva o jogo.');
+  if (eleven !== null) log.push(T === 3 ? `Mão de onze: ${pairSay(base, eleven)} decidem se jogam.` : `Mão de onze: ${eleven === 0 ? 'nós' : 'eles'} ${eleven === 0 ? 'decidimos se jogamos' : 'decidem se jogam'}.`);
+  else if (nAt >= 2) log.push(T === 3 ? `Mão de ferro: ${nAt === 3 ? 'as três duplas' : 'duas duplas'} com 11. Todo mundo joga às cegas, sem ver as próprias cartas.` : 'Mão de ferro: os dois com 11. Todo mundo joga às cegas, sem ver as próprias cartas; quem levar a mão leva o jogo.');
   return {
-    names: base.names, sides: base.sides, humans: base.humans, level: base.level, blind: at[0] && at[1], played: [],
+    ...(T === 3 ? { teams: 3 as const } : {}),
+    names: base.names, sides: base.sides, humans: base.humans, level: base.level, blind: nAt >= 2, played: [],
     score: base.score, dealer: base.dealer, n: base.n, hist: base.hist, log,
-    hands: [0, 1, 2, 3].map(i => d.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE)), vira,
+    hands: Array.from({ length: N }, (_, i) => d.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE)), vira,
     table: [], last: null, rounds: [], starter, turn: starter, value: 1, raisedBy: null, ask: null,
     eleven, phase: eleven !== null ? 'eleven' : 'play', shout: null, result: null, winner: null,
-    reads: base.reads || unread(), watch: []
+    reads: base.reads && base.reads.length === N ? base.reads : unread(N), watch: []
   };
 }
 /** A new game: nobody has points, the first dealer is drawn. */
-export function newGame(rand: () => number, level: Level = 'medio', table?: { names: string[]; sides: [string | null, string | null]; humans?: Seat[] }): Game {
-  const names = table && table.names.length === 4 ? table.names.map((x, i) => String(x || SEATS[i]).slice(0, 24)) : [...SEATS];
-  return deal({ score: [0, 0], dealer: Math.floor(rand() * 4), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio', names, sides: table ? table.sides : [null, null], humans: table && table.humans && table.humans.length ? [...table.humans].sort() : [0] }, rand);
+export function newGame(rand: () => number, level: Level = 'medio', table?: { names: string[]; sides: [string | null, string | null]; humans?: Seat[]; teams?: 3 }): Game {
+  const T = table && table.teams === 3 ? 3 : 2, N = T * 2, base = T === 3 ? SEATS6 : SEATS;
+  const names = table && table.names.length === N ? table.names.map((x, i) => String(x || base[i]).slice(0, 24)) : [...base];
+  return deal({ ...(T === 3 ? { teams: 3 as const } : {}), score: Array(T).fill(0), dealer: Math.floor(rand() * N), n: 1, hist: [], log: [], level: LEVELS.includes(level) ? level : 'medio', names, sides: table && T === 2 ? table.sides : [null, null], humans: table && table.humans && table.humans.length ? [...table.humans].sort() : [0] }, rand);
 }
 /** After a hand: the next one, dealt by the next seat. */
 export function nextHand(g: Game, rand: () => number): Game {
   if (g.phase !== 'handEnd') return g;
-  return deal({ score: g.score, dealer: nextSeat(g.dealer), n: g.n + 1, hist: g.hist, log: g.log, level: g.level, names: g.names, sides: g.sides, humans: g.humans, reads: g.reads }, rand);
+  return deal({ ...(g.teams === 3 ? { teams: 3 as const } : {}), score: g.score, dealer: nextSeat(g.dealer, seatsOf(g)), n: g.n + 1, hist: g.hist, log: g.log, level: g.level, names: g.names, sides: g.sides, humans: g.humans, reads: g.reads }, rand);
 }
 
 /** Who has to act now: the seat whose turn it is, the one who answers a raise, or the one who decides a hand of eleven
@@ -110,21 +133,30 @@ export function whoActs(g: Game): Seat | null {
   return null;
 }
 /** The seat that speaks for pair `t`: its person (the first one, if both are people), or `fallback`. */
-const speaker = (g: Game, t: Team, fallback: Seat): Seat => { const h = (g.humans || [0]).filter(s => teamOf(s) === t).sort()[0]; return h === undefined ? fallback : h; };
-const responder = (g: Game, a: Ask): Seat => speaker(g, other(teamOf(a.by)), nextSeat(a.by));
+const speaker = (g: Game, t: Team, fallback: Seat): Seat => { const h = (g.humans || [0]).filter(s => tm(g, s) === t).sort()[0]; return h === undefined ? fallback : h; };
+/** The pairs that still have to answer a raise, the next one first: the other pair; with three pairs, both others still
+ *  in the hand, in the order they play after who asked. */
+const waiting = (g: Game, a: Ask): Team[] => a.wait || [other(tm(g, a.by))];
+/** Who answers for the pair answering now: its person, or its first seat after who asked. */
+const responder = (g: Game, a: Ask): Seat => {
+  const t = waiting(g, a)[0];
+  let s = nextSeat(a.by, seatsOf(g));
+  while (tm(g, s) !== t) s = nextSeat(s, seatsOf(g));
+  return speaker(g, t, s);
+};
 /** Whether `seat` is played by a person. */
 export const isHuman = (g: Game, seat: Seat): boolean => (g.humans || [0]).includes(seat);
 
-/** Who takes a round: the seat with the strongest card, or -1 when the strongest cards tie between the two pairs (two
- *  equal cards of the same pair are not a tie: that pair takes it). */
-export function roundWinner(plays: Play[], vira: Card): Seat | -1 {
+/** Who takes a round: the seat with the strongest card, or -1 when the strongest cards tie between different pairs (two
+ *  equal cards of the same pair are not a tie: that pair takes it). `teams`: how many pairs play. */
+export function roundWinner(plays: Play[], vira: Card, teams = 2): Seat | -1 {
   const best = Math.max(...plays.map(p => power(p.card, vira)));
   const tops = plays.filter(p => power(p.card, vira) === best);
-  return tops.every(p => teamOf(p.seat) === teamOf(tops[0].seat)) ? tops[0].seat : -1;
+  return tops.every(p => teamOf(p.seat, teams) === teamOf(tops[0].seat, teams)) ? tops[0].seat : -1;
 }
 /** Who takes the hand from the rounds played so far: a pair, null (nobody: every round tied), or undefined when it is
  *  not decided yet. Two rounds win it; a tie goes to whoever took the other round, and a tie in the third round goes
- *  to whoever took the first. */
+ *  to whoever took the first. With three pairs, one round each (1 a 1 a 1) also goes to whoever took the first. */
 export function handWinner(rounds: RoundResult[]): Team | null | undefined {
   const [a, b, c] = rounds;
   if (rounds.length < 2) return undefined;
@@ -133,7 +165,7 @@ export function handWinner(rounds: RoundResult[]): Team | null | undefined {
     if (a === -1 && b !== -1) return b;
     return undefined;
   }
-  if (c !== -1) return c;
+  if (c !== -1 && (a === -1 || c === a || c === b)) return c;
   return a !== -1 ? a : null;
 }
 
@@ -150,17 +182,19 @@ export function suitDuel(plays: Play[], vira: Card): Card[] {
   return m.length > 1 ? m : [];
 }
 
-/** Ends the hand: the points go to `team` (none to anyone when null), and 12 points end the game. */
-function endHand(g: Game, team: Team | null, points: number, why: string): Game {
-  const score: [number, number] = [g.score[0], g.score[1]];
-  if (team !== null) score[team] = Math.min(WIN_POINTS, score[team] + points);
+/** Ends the hand: the points go to `team` (none to anyone when null), and also to the pairs in `also` (with three pairs,
+ *  running from a hand of eleven gives a point to each of the others), and 12 points end the game. */
+function endHand(g: Game, team: Team | null, points: number, why: string, also: Team[] = []): Game {
+  const score = [...g.score];
+  [...(team === null ? [] : [team]), ...also].forEach(t => { score[t] = Math.min(WIN_POINTS, score[t] + points); });
   const rec: HandRecord = { team, points: team === null ? 0 : points, how: why, value: g.value };
-  const over = score[0] >= WIN_POINTS || score[1] >= WIN_POINTS;
-  const winner: Team | null = over ? (score[0] >= WIN_POINTS ? 0 : 1) : null;
-  const log = [...g.log, team === null ? `${why} Ninguém marca.` : `${why} ${team === 0 ? 'Nós' : 'Eles'} +${points}.`];
-  if (over) log.push(winner === 0 ? 'Fim de jogo: nós vencemos!' : 'Fim de jogo: eles venceram.');
+  const over = score.some(x => x >= WIN_POINTS);
+  const winner: Team | null = over ? (score.findIndex(x => x >= WIN_POINTS) as Team) : null;
+  const three = teamsOf(g) === 3, gain = [team, ...also].filter((t): t is Team => t !== null);
+  const log = [...g.log, team === null ? `${why} Ninguém marca.` : three ? `${why} ${gain.map(t => pairSay(g, t)).join('; ')} +${points}.` : `${why} ${team === 0 ? 'Nós' : 'Eles'} +${points}.`];
+  if (over) log.push(three ? `Fim de jogo: ${pairSay(g, winner as Team)} venceram!` : winner === 0 ? 'Fim de jogo: nós vencemos!' : 'Fim de jogo: eles venceram.');
   let reads = g.reads;
-  for (const w of g.watch || []) if (w.seen.length && w.seen.length >= w.held - 1) reads = reveal(reads, w, w.seen, g.vira, team === teamOf(w.by));
+  for (const w of g.watch || []) if (w.seen.length && w.seen.length >= w.held - 1) reads = reveal(g, reads, w, w.seen, team === tm(g, w.by));
   return { ...g, reads, watch: [], score, ask: null, phase: (over ? 'over' : 'handEnd') as Phase, result: { team, points: rec.points, why }, winner, hist: [...g.hist, rec], log };
 }
 
@@ -173,41 +207,50 @@ export function playCard(g: Game, seat: Seat, k: number): Game {
   const table = [...g.table, { seat, card }];
   const watch = g.watch && g.watch.some(w => w.by === seat) ? g.watch.map(w => (w.by === seat ? { ...w, seen: [...w.seen, card] } : w)) : g.watch;
   const next: Game = { ...g, hands, table, played: [...g.played, card], shout: null, ...(watch ? { watch } : {}) };
-  if (table.length < 4) return { ...next, turn: nextSeat(seat) };
-  const w = roundWinner(table, g.vira), result: RoundResult = w === -1 ? -1 : teamOf(w);
+  if (table.length < inPlay(g)) return { ...next, turn: after(g, seat) };
+  const w = roundWinner(table, g.vira, teamsOf(g)), result: RoundResult = w === -1 ? -1 : tm(g, w);
   const rounds = [...g.rounds, result], n = rounds.length;
   const log = [...g.log, ...table.map(p => `${say(g, p.seat)} jogou ${cardSay(p.card, g.vira)}.`), roundSay(g, table, w, n)];
   const done: Game = { ...next, rounds, table: [], last: { plays: table, winner: w }, log };
   const hw = handWinner(rounds);
-  if (hw !== undefined) return endHand(done, hw, g.value, hw === null ? 'As três rodadas empataram.' : `${hw === 0 ? 'Nós levamos' : 'Eles levaram'} a mão.`);
-  const starter = w === -1 ? g.starter : w;
+  if (hw !== undefined) return endHand(done, hw, g.value, handSay(g, hw));
+  const starter = w === -1 ? from(g, g.starter) : w;
   return { ...done, starter, turn: starter };
 }
+/** Who took the hand, in words. */
+const handSay = (g: Game, hw: Team | null): string => (hw === null ? 'As três rodadas empataram.' : teamsOf(g) === 3 ? `${pairSay(g, hw)} levaram a mão.` : `${hw === 0 ? 'Nós levamos' : 'Eles levaram'} a mão.`);
 
 /** Whether `seat` may raise the stakes now: on their turn, before playing, if the hand is not at 12 yet, if the last
  *  accepted raise was not their pair's, and if nobody has 11 points (a hand of eleven or of iron has no truco). */
 export function canRaise(g: Game, seat: Seat): boolean {
-  return g.phase === 'play' && g.turn === seat && g.value < WIN_POINTS && g.raisedBy !== teamOf(seat) && g.score[0] < ELEVEN && g.score[1] < ELEVEN;
+  return g.phase === 'play' && g.turn === seat && g.value < WIN_POINTS && g.raisedBy !== tm(g, seat) && g.score.every(x => x < ELEVEN);
+}
+/** A raise by `seat`: with three pairs, it says which pairs have to answer, in the order they play after `seat`. */
+function askOf(g: Game, seat: Seat, value: number, bluff = false): Ask {
+  const base: Ask = bluff ? { by: seat, value, bluff: true } : { by: seat, value };
+  if (teamsOf(g) === 2) return base;
+  const wait: Team[] = [];
+  for (let s = after(g, seat); s !== seat; s = after(g, s)) if (tm(g, s) !== tm(g, seat) && !wait.includes(tm(g, s))) wait.push(tm(g, s));
+  return { ...base, wait };
 }
 /** Truco (or seis, nove, doze): the other pair has to answer. */
 export function raise(g: Game, seat: Seat, bluff = false): Game {
   if (!canRaise(g, seat)) return g;
   const value = nextValue(g.value), word = WORD[value];
-  return { ...g, phase: 'truco', ask: bluff ? { by: seat, value, bluff: true } : { by: seat, value }, shout: { seat, word }, watch: watching(g, seat, value), log: [...g.log, `${say(g, seat)} pediu ${word}!`] };
+  return { ...g, phase: 'truco', ask: askOf(g, seat, value, bluff), shout: { seat, word }, watch: watching(g, seat, value), log: [...g.log, `${say(g, seat)} pediu ${word}!`] };
 }
 export type Answer = 'accept' | 'run' | 'raise';
 /** The answer to a raise. Accepting makes the hand worth what was asked; running gives the asking pair what the hand
  *  was worth before; raising accepts and asks for the next value, and then the first pair answers. */
 export function answer(g: Game, a: Answer, bluff = false): Game {
   if (g.phase !== 'truco' || !g.ask) return g;
-  const ask = g.ask, seat = responder(g, ask), reads = heard(g.reads, seat, a === 'run');
+  if (teamsOf(g) === 3) return answer3(g, a, bluff);
+  const ask = g.ask, seat = responder(g, ask), reads = heard(g, seat, a === 'run');
   if (a === 'accept') return { ...g, reads, phase: 'play', value: ask.value, raisedBy: teamOf(ask.by), ask: null, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(g, seat)} aceitou. Vale ${ask.value}.`] };
   if (a === 'run') {
     const end = endHand({ ...g, reads }, teamOf(ask.by), g.value, `${say(g, seat)} correu do ${WORD[ask.value]}.`);
     const shown = { seat: ask.by, cards: g.hands[ask.by], bluff: !!ask.bluff };
-    // the one who asked shows the hand: everyone sees whether it was worth the raise
-    const w = (g.watch || []).find(x => x.by === ask.by && x.value === ask.value);
-    if (w) end.reads = reveal(end.reads, w, g.hands[ask.by], g.vira, false);
+    end.reads = shownRead(g, end.reads, ask);
     return { ...end, shout: { seat, word: 'corro' }, result: { ...(end.result as NonNullable<Game['result']>), shown }, log: shown.bluff ? [...end.log, `${say(g, ask.by)} estava blefando!`] : end.log };
   }
   if (a === 'raise' && ask.value < WIN_POINTS) {
@@ -215,6 +258,45 @@ export function answer(g: Game, a: Answer, bluff = false): Game {
     return { ...g, reads, watch: watching(g, seat, value), value: ask.value, raisedBy: teamOf(ask.by), ask: bluff ? { by: seat, value, bluff: true } : { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
   }
   return g;
+}
+/** The answer to a raise with three pairs. Each of the other pairs answers in turn: accepting waits for the next one;
+ *  running takes the pair out of the hand (its cards leave the game, and the rounds it took count as tied); raising
+ *  accepts and asks for the next value, which the pairs still in the hand answer. If everyone ran, the asking pair takes
+ *  what the hand was worth before; if one ran and the other accepted, the hand goes on between the two at the new value. */
+function answer3(h: Game, a: Answer, bluff: boolean): Game {
+  const ask = h.ask as Ask, seat = responder(h, ask), mine = tm(h, seat), asker = tm(h, ask.by), rest = waiting(h, ask).slice(1);
+  const g: Game = { ...h, reads: heard(h, seat, a === 'run') };
+  if (a === 'raise' && ask.value < WIN_POINTS) {
+    const value = nextValue(ask.value), word = WORD[value];
+    const back = { ...g, value: ask.value, raisedBy: asker };
+    return { ...back, watch: watching(back, seat, value), ask: askOf(back, seat, value, bluff), shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
+  }
+  if (a === 'accept') {
+    const said: Game = { ...g, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(g, seat)} aceitou.`] };
+    return rest.length ? { ...said, ask: { ...ask, wait: rest } } : goOn(said, ask);
+  }
+  if (a !== 'run') return g;
+  const out = [...(g.out || []), mine];
+  const gone: Game = {
+    ...g, out, hands: g.hands.map((h, i) => (tm(g, i) === mine ? [] : h)), table: g.table.filter(p => tm(g, p.seat) !== mine),
+    rounds: g.rounds.map(r => (r === mine ? -1 : r)), shout: { seat, word: 'corro' },
+    log: [...g.log, `${say(g, seat)} correu do ${WORD[ask.value]}: ${pairSay(g, mine)} saem da mão.`]
+  };
+  const left = Array.from({ length: teamsOf(g) }, (_, t) => t as Team).filter(t => t !== asker && !out.includes(t));
+  if (!left.length) {
+    const end = endHand(gone, asker, g.value, `Todo mundo correu do ${WORD[ask.value]}.`);
+    const shown = { seat: ask.by, cards: g.hands[ask.by], bluff: !!ask.bluff };
+    end.reads = shownRead(g, end.reads, ask);
+    return { ...end, result: { ...(end.result as NonNullable<Game['result']>), shown }, log: shown.bluff ? [...end.log, `${say(g, ask.by)} estava blefando!`] : end.log };
+  }
+  return rest.length ? { ...gone, ask: { ...ask, wait: rest } } : goOn(gone, ask);
+}
+/** Everyone left in the hand answered and someone accepted: it is worth what was asked, and play goes on (or the hand
+ *  is decided already, when a pair that ran had taken a round). */
+function goOn(g: Game, ask: Ask): Game {
+  const on: Game = { ...g, phase: 'play', value: ask.value, raisedBy: tm(g, ask.by), ask: null, turn: from(g, g.turn), starter: from(g, g.starter), log: [...g.log, `Vale ${ask.value}.`] };
+  const hw = handWinner(on.rounds);
+  return hw === undefined ? on : endHand(on, hw, on.value, handSay(on, hw));
 }
 /* ---------- reading the table ----------
    Everyone sees how each seat raises and answers. A raise whose cards come to light (played out, or shown when the
@@ -230,17 +312,23 @@ export const WEAK_BY = 2;
 export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 12 };
 /** The first guess before anything is seen: how often a raise is a bluff, and how often a seat runs from a raise. */
 export const BLUFF_GUESS = 0.2, RUN_GUESS = 0.35;
-const unread = (): Read[] => [0, 1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
-const bump = (reads: Read[] | undefined, seat: Seat, f: (r: Read) => Read): Read[] => (reads || unread()).map((r, i) => (i === seat ? f(r) : r));
+const unread = (n: number): Read[] => Array.from({ length: n }, () => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
+const bump = (g: Pick<Game, 'teams'>, reads: Read[] | undefined, seat: Seat, f: (r: Read) => Read): Read[] =>
+  (reads && reads.length === seatsOf(g) ? reads : unread(seatsOf(g))).map((r, i) => (i === seat ? f(r) : r));
 /** A raise starts being watched: how many cards its seat holds and how the rounds stand are in plain sight. */
-const watching = (g: Game, seat: Seat, value: number): Watch[] => [...(g.watch || []), { by: seat, held: g.hands[seat].length, stand: standing(g, teamOf(seat)), value, seen: [] }];
+const watching = (g: Game, seat: Seat, value: number): Watch[] => [...(g.watch || []), { by: seat, held: g.hands[seat].length, stand: standing(g, tm(g, seat)), value, seen: [] }];
 /** A raise answered by `seat`, and whether it ran. */
-const heard = (reads: Read[] | undefined, seat: Seat, ran: boolean): Read[] => bump(reads, seat, r => ({ ...r, answers: r.answers + 1, runs: r.runs + (ran ? 1 : 0) }));
+const heard = (g: Game, seat: Seat, ran: boolean): Read[] => bump(g, g.reads, seat, r => ({ ...r, answers: r.answers + 1, runs: r.runs + (ran ? 1 : 0) }));
 /** A raise whose cards came to light: weak when it did not take the hand and the cards were well under the line. */
-function reveal(reads: Read[] | undefined, w: Watch, cards: Card[], vira: Card, won: boolean): Read[] {
-  const top = Math.max(0, ...cards.map(c => weight(c, vira)));
+function reveal(g: Game, reads: Read[] | undefined, w: Watch, cards: Card[], won: boolean): Read[] {
+  const vira = g.vira, top = Math.max(0, ...cards.map(c => weight(c, vira)));
   const weak = !won && strength(cards, vira) + top * Math.max(0, w.held - cards.length) + w.stand < RAISE_NEED[w.value] - WEAK_BY;
-  return bump(reads, w.by, r => ({ ...r, shown: r.shown + 1, weak: r.weak + (weak ? 1 : 0) }));
+  return bump(g, reads, w.by, r => ({ ...r, shown: r.shown + 1, weak: r.weak + (weak ? 1 : 0) }));
+}
+/** Everyone ran and the one who asked shows the hand: whether it was worth the raise. */
+function shownRead(g: Game, reads: Read[] | undefined, ask: Ask): Read[] | undefined {
+  const w = (g.watch || []).find(x => x.by === ask.by && x.value === ask.value);
+  return w ? reveal(g, reads, w, g.hands[ask.by], false) : reads;
 }
 /** How often `seat` seems to bluff, for a player of this game's level: the first guess, moved by what it has shown. */
 export function bluffRate(g: Game, seat: Seat): number {
@@ -252,10 +340,17 @@ export function runRate(g: Game, seat: Seat): number {
   const r = (g.reads || [])[seat], k = READ_PRIOR[g.level];
   return ((r ? r.runs : 0) + RUN_GUESS * k) / ((r ? r.answers : 0) + k);
 }
-/** A hand of eleven: the pair with 11 plays it (worth 3) or runs (the others get 1). */
+/** A hand of eleven: the pair with 11 plays it (worth 3) or runs (the others get 1: with three pairs, each of them). */
 export function decideEleven(g: Game, play: boolean): Game {
   if (g.phase !== 'eleven' || g.eleven === null) return g;
   const t = g.eleven, seat = whoActs(g) as Seat;
+  if (teamsOf(g) === 3) {
+    if (!play) {
+      const others = [0, 1, 2].filter(x => x !== t) as Team[];
+      return { ...endHand({ ...g, value: 1 }, others[0], 1, `${pairSay(g, t)} correram da mão de onze.`, others.slice(1)), shout: { seat, word: 'fujo' } };
+    }
+    return { ...g, phase: 'play', value: ELEVEN_VALUE, shout: { seat, word: 'jogo' }, log: [...g.log, `${pairSay(g, t)} jogam a mão de onze: vale ${ELEVEN_VALUE}.`] };
+  }
   if (!play) return { ...endHand({ ...g, value: 1 }, other(t), 1, `${t === 0 ? 'Nós corremos' : 'Eles correram'} da mão de onze.`), shout: { seat, word: 'fujo' } };
   return { ...g, phase: 'play', value: ELEVEN_VALUE, shout: { seat, word: 'jogo' }, log: [...g.log, `${t === 0 ? 'Nós jogamos' : 'Eles jogam'} a mão de onze: vale ${ELEVEN_VALUE}.`] };
 }
@@ -287,21 +382,21 @@ export const sure = (g: Game, seat: Seat, c: Card): boolean => unseen(g, seat).e
 /** How strong a hand is for a player of this level: the hard one adds what it knows (sure cards, the partner's card
  *  that already holds the round). */
 function judge(g: Game, seat: Seat): number {
-  const t = teamOf(seat);
+  const t = tm(g, seat);
   let s = strength(g.hands[seat], g.vira) + standing(g, t);
   if (g.level === 'dificil') {
     s += g.hands[seat].filter(c => sure(g, seat, c)).length * 1.5;
-    const w = g.table.length ? roundWinner(g.table, g.vira) : -1;
-    if (w !== -1 && teamOf(w) === t && sure(g, seat, (g.table.find(p => p.seat === w) as Play).card)) s += 2.5;
+    const w = g.table.length ? roundWinner(g.table, g.vira, teamsOf(g)) : -1;
+    if (w !== -1 && tm(g, w) === t && sure(g, seat, (g.table.find(p => p.seat === w) as Play).card)) s += 2.5;
   }
   return s;
 }
 /** Whether `seat` surely takes the hand by playing now: last to play, the round already its pair's or a card that beats
  *  the table, and taking this round decides the hand. */
 function sureThing(g: Game, seat: Seat): boolean {
-  if (g.table.length !== 3) return false;
-  const t = teamOf(seat), best = Math.max(...g.table.map(p => power(p.card, g.vira)));
-  const partnerTop = roundWinner(g.table, g.vira) === nextSeat(nextSeat(seat));
+  if (g.table.length !== inPlay(g) - 1) return false;
+  const t = tm(g, seat), best = Math.max(...g.table.map(p => power(p.card, g.vira)));
+  const top = roundWinner(g.table, g.vira, teamsOf(g)), partnerTop = top !== -1 && tm(g, top) === t;
   return handWinner([...g.rounds, t]) === t && (partnerTop || g.hands[seat].some(c => power(c, g.vira) > best));
 }
 
@@ -318,12 +413,12 @@ export function aiCard(g: Game, seat: Seat, rand: () => number): number {
     if (!g.rounds.length && order.length > 1 && ((pw(high) >= 10 && pw(second) >= 8) || (hard && sure(g, seat, hand[high]) && pw(second) >= 7))) return second;
     return high;
   }
-  const w = roundWinner(g.table, g.vira), best = Math.max(...g.table.map(p => power(p.card, g.vira)));
+  const w = roundWinner(g.table, g.vira, teamsOf(g)), best = Math.max(...g.table.map(p => power(p.card, g.vira)));
   const beat = order.find(k => pw(k) > best);
-  if (w !== -1 && teamOf(w) === teamOf(seat)) {
+  if (w !== -1 && tm(g, w) === tm(g, seat)) {
     // the partner has it: throw the weakest; the hard player covers when an opponent still plays and could beat it
     const top = (g.table.find(p => p.seat === w) as Play).card;
-    if (hard && g.table.length < 3 && !sure(g, seat, top) && beat !== undefined && handWinner([...g.rounds, teamOf(seat)]) === teamOf(seat)) return beat;
+    if (hard && g.table.length < inPlay(g) - 1 && !sure(g, seat, top) && beat !== undefined && handWinner([...g.rounds, tm(g, seat)]) === tm(g, seat)) return beat;
     return low;
   }
   return beat === undefined ? low : beat;                            // the cheapest card that takes it, or the weakest
@@ -344,8 +439,8 @@ export function aiRaise(g: Game, seat: Seat, rand: () => number): 'no' | 'yes' |
 export function bluffOdds(g: Game, seat: Seat): number {
   if (g.level === 'facil') return 0.03;
   if (g.level === 'medio') return 0.08;
-  const where = standing(g, teamOf(seat)) > 0 || g.rounds.length === 2 ? 0.2 : 0.03;
-  const foe = speaker(g, other(teamOf(seat)), nextSeat(seat));
+  const where = standing(g, tm(g, seat)) > 0 || g.rounds.length === 2 ? 0.2 : 0.03;
+  const foe = responder(g, askOf(g, seat, nextValue(g.value)));                          // who would answer the raise
   const gone = [...g.played, ...g.table.map(p => p.card)].filter(c => isManilha(c, g.vira)).length >= 2 ? 0.05 : 0;
   return Math.min(BLUFF_MAX, where * runRate(g, foe) / RUN_GUESS + gone);
 }
@@ -358,11 +453,11 @@ export const RAISE_FOR = 0.62;
 /** The chance of taking the hand from which a player raises back instead of only accepting. */
 export const RAISE_BACK = 0.75;
 /** How many cards `s` still holds: three, less the rounds played and a card already on the table. Everyone knows it. */
-const holding = (g: Game, s: Seat): number => Math.max(0, HAND_SIZE - g.rounds.length - (g.table.some(p => p.seat === s) ? 1 : 0));
+const holding = (g: Game, s: Seat): number => (inHand(g, s) ? Math.max(0, HAND_SIZE - g.rounds.length - (g.table.some(p => p.seat === s) ? 1 : 0)) : 0);
 const calm = (): number => 0.5;
 /** Plays the rest of the hand out with these hands, every seat at this level: the pair that takes it, or null. */
 function playOut(g: Game, hands: Card[][], level: Level): Team | null {
-  let h: Game = { ...g, hands, phase: 'play', ask: null, level, blind: false, log: [], hist: [], watch: [], score: [0, 0] };
+  let h: Game = { ...g, hands, phase: 'play', ask: null, level, blind: false, log: [], hist: [], watch: [], score: g.score.map(() => 0) };
   for (let i = 0; i < 16 && h.phase === 'play'; i++) h = playCard(h, h.turn, aiCard(h, h.turn, calm));
   return h.result ? h.result.team : null;
 }
@@ -372,20 +467,20 @@ function playOut(g: Game, hands: Card[][], level: Level): Team | null {
  *  only those deals count, weighed by how often that seat seems to bluff. */
 export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMPLES[g.level] || SAMPLES.medio): { win: number; lose: number } {
   // the medium player does not remember the rounds already played: those cards may come back in what it imagines
-  const t = teamOf(seat), ask = g.ask, mine = g.hands[seat];
+  const t = tm(g, seat), ask = g.ask, mine = g.hands[seat];
   const pool = g.level === 'dificil' ? unseen(g, seat) : deck().filter(c => !mine.includes(c) && c !== g.vira && !g.table.some(p => p.card === c));
   const r = seeded(Math.floor(rand() * 4294967296));
   const all = { win: 0, lose: 0, n: 0 }, fair = { win: 0, lose: 0, n: 0 };
   for (let i = 0; i < samples; i++) {
     const d = shuffle(pool, r);
     let k = 0;
-    const hands = [0, 1, 2, 3].map(s => (s === seat ? [...mine] : d.slice(k, (k += holding(g, s)))));
+    const hands = Array.from({ length: seatsOf(g) }, (_, s) => (s === seat ? [...mine] : d.slice(k, (k += holding(g, s)))));
     const w = playOut(g, hands, 'medio');
-    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, teamOf(ask.by)) >= RAISE_NEED[ask.value] - 1;
+    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, tm(g, ask.by)) >= RAISE_NEED[ask.value] - 1;
     for (const o of deserved ? [all, fair] : [all]) { o.n++; if (w === t) o.win++; else if (w !== null) o.lose++; }
   }
   const odds = (o: { win: number; lose: number; n: number }) => ({ win: o.win / o.n, lose: o.lose / o.n });
-  if (!ask || teamOf(ask.by) === t) return odds(all);
+  if (!ask || tm(g, ask.by) === t) return odds(all);
   const b = bluffRate(g, ask.by), a = odds(all);
   const f = fair.n >= 4 ? odds(fair) : { win: a.win / 2, lose: 1 - a.win / 2 };   // hardly any deal deserves it: assume the worst
   return { win: b * a.win + (1 - b) * f.win, lose: b * a.lose + (1 - b) * f.lose };
@@ -406,7 +501,7 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
     return { a: rand && rand() < 0.2 ? 'accept' : 'run', bluff: false };
   }
   const roll = rand || seeded(g.n * 977 + g.played.length * 31 + seat);
-  const t = teamOf(seat), m = g.score[t], o = g.score[other(t)];
+  const t = tm(g, seat), m = g.score[t], o = Math.max(...g.score.filter((_, i) => i !== t));      // the pair closest to 12
   const run = gameChance(m, o + g.value);
   if (run === 0) return { a: 'accept', bluff: false };                   // running ends the game: play it
   const { win, lose } = handOdds(g, seat, roll);
@@ -424,7 +519,7 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
 /** How a computer player answers a raise (see answerPlan). */
 export const aiAnswer = (g: Game, seat: Seat, rand?: () => number): Answer => (g.ask ? answerPlan(g, seat, rand).a : 'accept');
 /** Whether the computer pair plays a hand of eleven: both hands together, strong enough. */
-export const aiEleven = (g: Game, t: Team): boolean => strength([...g.hands[t], ...g.hands[t + 2]], g.vira) >= (g.level === 'facil' ? 6 : 7.5);
+export const aiEleven = (g: Game, t: Team): boolean => strength([...g.hands[t], ...g.hands[partnerOf(g, t)]], g.vira) >= (g.level === 'facil' ? 6 : 7.5);
 /** The move of the computer player who has to act now; the same game when it is the person's move, or nobody's. */
 export function aiAct(g: Game, rand: () => number): Game {
   const s = whoActs(g);
