@@ -20,3 +20,4 @@ dist/
 .claude/settings.local.json
 tests/.coverage/
 tests/.build/
+tests/.build-medida/
