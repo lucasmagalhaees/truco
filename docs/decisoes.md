@@ -95,7 +95,14 @@ Modelo de uma decisão:
 - **Interpretações que precisaram ser feitas:** os números acima são escolha minha, sem medição de uso real; fechar a conexão (em vez de só ignorar a mensagem) para que um cliente com defeito apareça logo, e não fique em silêncio.
 - **Não sei:** como o celular da pessoa reage a ser cortado (ele tenta voltar sozinho, `RETRY`); não há limite de salas por endereço, só por sala.
 
-## D9. Temas: futebol, animes e jogos, mesa montada e cores por personagem
+## D9. Sala com 3 pessoas: quem criou escolhe o formato
+
+- **Contexto (18/10/2026):** pedido do Lucas: com número ímpar de pessoas numa sala (na prática, 3), dar a opção de jogar "2 humanos contra 1 humano com uma IA" ou "3 duplas, cada humano com uma IA". Ele escolheu oferecer as duas e deixar quem criou a sala escolher. Nas 3 duplas, ele decidiu: quando alguém pede, as duas outras duplas respondem (quem corre sai da mão; se as duas correm, quem pediu leva o valor de antes) e, no 1 a 1 a 1, leva quem fez a 1ª.
+- **Decisão:** a sala ganha o campo `format` (`'duplas'`, o padrão, ou `'tres'`), escolhido por quem criou só antes de começar e só com 3 pessoas; com 2 ou 4 pessoas ele não é olhado. No "2 contra 1", quem criou toca no nome de quem joga com a IA; os outros dois sentam de frente. As regras de 6 lugares das 3 duplas são feitas à parte; até o núcleo jogar esse formato (`SUPPORTS_THREE`), o botão aparece como "em breve" e começar com ele é recusado.
+- **Interpretações que precisaram ser feitas (minhas, não do Lucas):** sem escolha, fica como a ordem de entrada já dava: quem criou e o terceiro a entrar de dupla, o segundo com a IA. Quem criou fica sempre no lugar 0 (é assim que a sala sabe quem criou): se ele mesmo escolhe jogar com a IA, os outros dois vão para os lugares 1 e 3 e a IA senta no 2. A escolha de quem fica com a IA é por toque nos nomes, num grupo de botões, e só quem criou vê os botões; os outros veem o formato escolhido em texto.
+- **Não sei:** se 3 pessoas preferem, na prática, o "2 contra 1" ou as 3 duplas.
+
+## D10. Temas: futebol, animes e jogos, mesa montada e cores por personagem
 
 - **Contexto (18/10/2026):** o Lucas pediu, além do futebol, um tema de animes (Blue Lock, Naruto Clássico, Dragon Ball), com equipes de um anime contra as de outro, e que nada ficasse "chumbado" no futebol: "se amanhã eu quiser adicionar filmes, isso precisa estar escalável, tanto na tela quanto na lógica". No mesmo dia pediu a categoria Jogos (Street Fighter e Mortal Kombat), montar a mesa com personagens de packs diferentes, em ordens diferentes, e cores da interface por jogo ou por personagem.
 - **Decisão:** um catálogo genérico em `src/core/teams.ts`, com os dados em `src/core/packs/`, um arquivo por pack:
@@ -117,7 +124,7 @@ Modelo de uma decisão:
   - As cores são inspiradas nas roupas e nas equipes; nenhuma imagem, logotipo ou desenho.
 - **Não sei:** se os nomes estão como o Lucas conhece em todos os casos (por exemplo "Rikum" ou "Recoome", "Exoterra" ou "Outworld"); se as cores agradam. Os nomes podem ser trocados no app.
 
-## D10. Heróis x Vilões
+## D11. Heróis x Vilões
 
 - **Contexto (18/10/2026):** o Lucas pediu um modo "Heróis x Vilões" (protagonistas contra antagonistas), onde fizer sentido.
 - **Decisão:** cada personagem pode ter `side: 'heroi' | 'vilao'` nos dados do pack; a equipe pode ter um padrão, e o personagem sobrescreve. O modo só aparece se algum pack tiver pelo menos dois heróis e dois vilões (`sidedPacks`). Na tela, "Heróis x Vilões" escolhe o universo (um pack, ou "Misturado" entre todos os que têm lados) e o lado da pessoa (heróis por padrão, ou vilões); a dupla sai do lado dela e os dois adversários do outro, sorteados (`drawSided`), com "Sortear de novo", e a mesa pode ser editada como no Montar. "Eles" fica nas cores dos adversários, como nos outros modos. Guardado em `S.hv` junto com `S.seats`.

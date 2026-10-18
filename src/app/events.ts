@@ -196,6 +196,8 @@ function room(a: string, d: DOMStringMap): void {
   else if (a === 'startroom') send({ t: 'start', table: table() });
   else if (a === 'againroom') send({ t: 'again', table: table() });
   else if (a === 'botseat') send({ t: 'bot', seat: rawSeat(Number(d.s)) });
+  else if (a === 'roomformat') send({ t: 'format', format: d.f === 'tres' ? 'tres' : 'duplas' });
+  else if (a === 'roomalone') send({ t: 'format', format: 'duplas', alone: rawSeat(Number(d.s)) });
   else if (a === 'retryroom') retryNow();
   else if (a === 'leaveroom') {
     if (net.view?.game && net.view.game.phase !== 'over' && !ui.confirmEnd) { ui.confirmEnd = true; render(); return; }
@@ -237,7 +239,7 @@ export function initEvents(): void {
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
-    else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
+    else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'roomformat', 'roomalone', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
     else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);
     else if (a === 'update') applyUpdate();
     else if (a === 'checkupdate') void checkNow();

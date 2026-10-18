@@ -286,6 +286,9 @@ details.card .log,details.card .ranking{margin-top:12px}
 /* a room online: the code to read out loud, the link, and the four seats as they sit at the table */
 .code{font:800 44px/1 var(--display);letter-spacing:.3em;text-align:center;padding-left:.3em;font-variant-numeric:tabular-nums}
 .link{font-size:13px;color:var(--muted);overflow-wrap:anywhere;text-align:center}
+/* with three people in the room: how they play */
+#format{display:flex;flex-direction:column;gap:8px}
+#format .hint,#format .explain{margin:0}
 .lseats{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:18px;background:radial-gradient(ellipse at 50% 40%,var(--felt) 0 55%,var(--felt2) 100%);border:6px solid var(--rim);color:var(--chalk)}
 .lrow{display:flex;justify-content:space-between;gap:8px;width:100%}
 .lseat{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;max-width:48%;padding:6px 10px;border-radius:12px;background:rgba(0,0,0,.25)}

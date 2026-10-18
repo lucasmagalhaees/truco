@@ -314,6 +314,28 @@ export default function cases(Core) {
   eq('a move before the game, or one the rules refuse', [Core.handle({ ...full, game: null }, T[0], { t: 'act', a: 'truco' }, roll).error, Core.handle({ ...room, game: { ...base, humans: [0, 1], turn: 0, raisedBy: 0 } , members: room.members }, T[0], { t: 'act', a: 'truco' }, roll).error, Core.handle({ ...room, game: { ...base, humans: [0, 1], phase: 'truco', ask: { by: 1, value: 3 } } }, T[0], { t: 'act', a: 'answer', v: 'dance' }, roll).error], ['A partida ainda não começou.', 'Agora não é a sua vez.', 'Agora não é a sua vez.']);
   eq('a saved room reads back; what does not hold together is null', [Core.readRoom(JSON.parse(JSON.stringify(room))).members.length, [null, {}, { ...room, code: 'x' }, { ...room, members: [{ seat: 'a' }] }].map(Core.readRoom)], [2, [null, null, null, null]]);
 
+  /* three people in a room: how they play (the host chooses) */
+  {
+    const r3 = ['Ana', 'Bia', 'Caio'].reduce((r, n, i) => Core.handle(r, T[i], { t: 'join', name: n, token: T[i] }, roll).room, Core.newRoom('ABCDE'));
+    const fmt = (r, tk, m) => Core.handle(r, tk, { t: 'format', ...m }, roll);
+    const seats = r => Object.fromEntries(r.members.map(m => [m.name, m.seat]));
+    eq('three people: by default the host and the third sit together, the second plays with a computer', [seats(r3), r3.format, Core.roomView(r3, T[1]).format], [{ Ana: 0, Bia: 1, Caio: 2 }, 'duplas', 'duplas']);
+    const caio = fmt(r3, T[0], { format: 'duplas', alone: 2 }).room, ana = fmt(r3, T[0], { format: 'duplas', alone: 0 }).room;
+    eq('two against one: whoever the host picks plays with the computer; the other two sit across; the host keeps seat 0', [seats(caio), seats(ana), seats(fmt(r3, T[0], { format: 'duplas', alone: 1 }).room)], [{ Ana: 0, Bia: 2, Caio: 1 }, { Ana: 0, Bia: 1, Caio: 3 }, { Ana: 0, Bia: 1, Caio: 2 }]);
+    const g = Core.handle(caio, T[0], { t: 'start' }, roll).room.game, vb = Core.viewFor(g, 2), vc = Core.viewFor(g, 1);
+    eq('the pair sees each other as "Nós"; the one alone sees the computer as partner', [g.humans, vb.humans, vb.names[2], vc.humans, vc.names[2]], [[0, 1, 2], [0, 2, 3], 'Ana', [0, 1, 3], Core.DEFAULT_NAMES[3]]);
+    const ga = Core.handle(ana, T[0], { t: 'start' }, roll).room;
+    eq('the host alone: the computer is the host’s partner, and the host still starts the game', [ga.game.humans, ga.game.names[2], Core.roomView(ga, T[0]).host], [[0, 1, 3], Core.DEFAULT_NAMES[2], true]);
+    eq('choosing is for the host, before the game, with three people, someone in the room', [fmt(r3, T[1], { format: 'duplas', alone: 1 }).error, fmt(Core.handle(r3, T[0], { t: 'start' }, roll).room, T[0], { format: 'duplas' }).error, fmt(Core.handle(r3, T[2], { t: 'leave' }, roll).room, T[0], { format: 'tres' }).error, fmt(r3, T[0], { format: 'duplas', alone: 3 }).error],
+      ['Só quem criou a sala escolhe como vão jogar.', 'A partida já começou.', 'Isso é só para sala com 3 pessoas.', 'Essa pessoa não está na sala.']);
+    const tres = fmt(r3, T[0], { format: 'tres' }).room;
+    eq('three pairs: chosen, but the core does not play it yet, so the game does not start (SUPPORTS_THREE)', [tres.format, Core.SUPPORTS_THREE, Core.handle(tres, T[0], { t: 'start' }, roll).error, seats(tres)], ['tres', false, 'As 3 duplas ainda não estão prontas. Escolha 2 contra 1.', seats(r3)]);
+    const four = Core.handle(tres, T[3], { t: 'join', name: 'Duda', token: T[3] }, roll).room;
+    eq('with a fourth person the format is not looked at: the table of four starts', [Core.handle(four, T[0], { t: 'start' }, roll).room.game.humans], [[0, 1, 2, 3]]);
+    eq('the format over the wire, and in a saved room (an old room without it plays as before)', [Core.readMsg({ t: 'format', format: 'tres' }), Core.readMsg(JSON.stringify({ t: 'format', format: 'duplas', alone: 2 })), Core.readMsg({ t: 'format', format: 'seis' }), Core.readMsg({ t: 'format', format: 'duplas', alone: 'a' }), Core.readRoom(JSON.parse(JSON.stringify(tres))).format, Core.readRoom({ ...r3, format: undefined }).format, Core.readRoom({ ...r3, format: 'x' }).format],
+      [{ t: 'format', format: 'tres' }, { t: 'format', format: 'duplas', alone: 2 }, null, { t: 'format', format: 'duplas' }, 'tres', 'duplas', 'duplas']);
+  }
+
   /* what is saved */
   const st = { v: 1, game: h, tally: { w: 2, l: 1 }, level: 'dificil', train: { ok: 3, total: 4, best: 2 }, real: rt, theme: 'dark', speed: 'rapida', quiet: true, hints: false, team: 'futebol/flamengo', rival: 'naruto/time-7', seats: { partner: 'street-fighter/shotokan/0', opp: ['mortal-kombat/netherrealm/0', 'dragon-ball/guerreiros-z/0'] }, colorBy: 'char', custom: { 'futebol/flamengo': ['A', 'B', 'C'] } };
   eq('read state: a saved state comes back as it was', Core.readState(JSON.parse(JSON.stringify(st))), st);

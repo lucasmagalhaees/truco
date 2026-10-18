@@ -105,8 +105,25 @@ function vLobby(): string {
     <p class="link" id="link">${esc(link)}</p>
     <div class="pick"><button class="btn ghost" data-act="copylink">Copiar link</button>${typeof navigator.share === 'function' ? '<button class="btn ghost" data-act="sharelink">Compartilhar</button>' : ''}</div>
     <div class="lseats">${at(2)}<div class="lrow">${at(3)}${at(1)}</div>${at(0)}</div>
+    ${vFormat()}
     ${v.host ? `<p class="hint">Nível das IAs: <b>${LEVEL[v.level][0]}</b>.</p><button class="btn block" data-act="startroom">Começar ${v.members.length === 1 ? 'só com as IAs' : `com ${v.members.length} pessoas`}</button>` : `<p class="thinking">Esperando quem criou a sala começar…</p>`}
     <button class="btn ghost block" data-act="leaveroom">Sair da sala</button></section>`;
+}
+/** With three people in the room: how they play. The host chooses (two against one, and who plays with a computer, or
+ *  three pairs once the core plays them); the others see the choice. */
+function vFormat(): string {
+  const v = net.view as NonNullable<typeof net.view>;
+  if (v.members.length !== 3) return '';
+  const three = v.format === 'tres', alone = v.members.find(m => !v.members.some(x => x.seat === (m.seat + 2) % 4));
+  const who = (m: { name: string; seat: number }): string => (m.seat === 0 ? 'Você' : esc(m.name));
+  if (!v.host) {
+    return `<div id="format"><p class="hint">Como vão jogar</p><p class="explain">${three ? 'Três duplas: cada um com uma IA.' : `Dois contra um: <b>${alone ? who(alone) : ''}</b> joga com a IA.`}</p></div>`;
+  }
+  const soon = !Core.SUPPORTS_THREE;
+  return `<div id="format"><p class="hint">Como vão jogar?</p>
+    <div class="segm" role="group" aria-label="Como vão jogar"><button class="${three ? '' : 'on'}" data-act="roomformat" data-f="duplas" aria-pressed="${!three}">2 contra 1</button><button class="${three ? 'on' : ''}" data-act="roomformat" data-f="tres" aria-pressed="${three}"${soon ? ' disabled' : ''}>3 duplas${soon ? ' (em breve)' : ''}</button></div>
+    ${three ? '<p class="hint">Cada um com uma IA, três duplas na mesa.</p>' : `<p class="hint">Quem joga com a IA? Os outros dois fazem dupla.</p>
+    <div class="segm small" role="group" aria-label="Quem joga com a IA">${v.members.map(m => `<button class="${m === alone ? 'on' : ''}" data-act="roomalone" data-s="${m.seat}" aria-pressed="${m === alone}">${who(m)}</button>`).join('')}</div>`}</div>`;
 }
 /** A strip at the top while the connection to the room is down: coming back by itself, or given up with a button. */
 function vConn(): string {
