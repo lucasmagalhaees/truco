@@ -22,7 +22,7 @@ Para rodar: `npm install` e `npm run dev`. Para testar tudo: `scripts/verify.sh`
 
 1. Em vercel.com: **Add New → Project → Import** o repositório `truco`. O `vercel.json` já diz o que fazer (`npm ci`, `npm run build`, publicar `dist/`); não precisa mexer em nada.
 2. Produção: https://turco-six.vercel.app. Se mudar, defina a variável `APP_PROD_URL` no GitHub (Settings → Secrets and variables → Actions → Variables) com o endereço que a Vercel deu.
-3. Para jogar online: crie uma conta na Cloudflare, gere um token com "Edit Cloudflare Workers" e ponha `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` nos secrets do GitHub. O workflow `Salas` publica o servidor; o endereço dele (`wss://truco-salas.<conta>.workers.dev`) vai na variável `VITE_ROOM_URL` do projeto na Vercel.
+3. Para jogar online: crie uma conta na Cloudflare, gere um token com "Edit Cloudflare Workers" e ponha `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` nos secrets do GitHub. O workflow `Salas` publica o servidor; o build na Vercel já aponta para ele (`ROOM_SERVER` no `vite.config.js`, ou a variável `VITE_ROOM_URL` para trocar).
 4. No GitHub, proteja a `main`: exigir PR e os checks `checks`, `e2e (dark)` e `e2e (light)`. A Vercel publica o que chega na `main` sem olhar o CI; é essa proteção que segura código não testado.
 
 ## Estrutura

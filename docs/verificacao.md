@@ -18,13 +18,13 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 | Duas pessoas numa sala, cada uma no seu navegador, pelo servidor local: cada uma só vê as próprias cartas, partida pela tela, truco, cair e voltar, IA no lugar de quem saiu (nos dois temas) | `python3 tests/e2e_online.py dark` e `light` | 17/10/2026 |
 | O servidor de salas monta para a Cloudflare e os tipos dele fecham | `npx wrangler@4.145.0 deploy --dry-run` e `tsc -p server` | 17/10/2026 |
 
+| O servidor de salas na Cloudflare (https://truco-salas.lucasbarbosa1738.workers.dev): sala criada e achada pelo código, a sala parada 40 min e de pé de novo (hibernação), cada página só com as próprias cartas, uma mão inteira jogada pelas duas páginas com a Cida e o Toinho jogando no servidor (alarmes), placar espelhado, aviso e "IA no lugar" quando o amigo saiu | duas abas da produção (commit `8bd35c5`) no navegador do Lucas, apontadas para o servidor por `ui.server` | 17/10/2026 |
 ## Não verificado
 
 | Afirmação | Por que não | Como verificar |
 |---|---|---|
 | O reconhecimento de voz entendendo cartas faladas | Os testes leem texto; ninguém falou no microfone ainda | Abrir a mesa real no celular, tocar em "Falar a carta" e dizer "vira sete de copas" |
 | O service worker no Safari do iPhone e no app instalado na Tela de Início | Os testes rodam no Chromium | Abrir a produção no iPhone, ligar o modo avião e abrir de novo |
-| O servidor de salas rodando na Cloudflare de verdade (Durable Object, alarmes, hibernação) | Precisa da conta e do deploy | Depois do primeiro deploy, criar uma sala em dois celulares e jogar uma mão |
 | Jogar online pelo 4G | Os testes rodam na mesma máquina | Jogar uma partida com um amigo fora do Wi-Fi |
 | Os três jogadores de cada clube ainda estarem no clube | Elencos mudam; a fonte são prévias de julho a outubro de 2026 (D6) | Conferir o time da pessoa e trocar no app o que estiver velho |
 | Se o difícil é difícil para uma pessoa | A medição foi IA contra IA | Jogar umas partidas e anotar |
