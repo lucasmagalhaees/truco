@@ -33,6 +33,9 @@ for (const [prev, asked] of ONLY ? [] : [[1, 3], [3, 6], [6, 9], [9, 12]]) {
 }
 
 // ---------- 1b. the doze from nove, with and without a bluffing history of the one who asks ----------
+// finer bands here: with nove already on the table almost any hand with a 3 or a manilha clears the bar, so the
+// interesting bands are the weak ones
+const fine = [[0, 1.2, 'lixo'], [1.2, 2.5, 'fraca'], [2.5, 4.5, 'média'], [4.5, 99, 'boa']];
 const noHist = [0, 1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
 const bluffer = [{ shown: 8, weak: 6, answers: 4, runs: 0 }, ...noHist.slice(1)];
 const honest = [{ shown: 8, weak: 0, answers: 4, runs: 1 }, ...noHist.slice(1)];
@@ -41,17 +44,17 @@ if (!ONLY) {
   for (const level of ['facil', 'medio', 'dificil', 'extremo']) {
     const cells = [];
     for (const [name, reads] of [['sem histórico', noHist], ['honesto', honest], ['blefador', bluffer]]) {
-      const n = buckets.map(() => [0, 0]), rand = Core.seeded(77 + level.length);
+      const n = fine.map(() => [0, 0]), rand = Core.seeded(77 + level.length);
       for (let i = 0; i < 1200; i++) {
         const g0 = Core.newGame(rand, level);
         if (g0.phase !== 'play') continue;
         const g = { ...g0, value: 9, raisedBy: 1, phase: 'truco', ask: { by: 0, value: 12 }, turn: 0, starter: 0, reads, watch: [{ by: 0, held: 3, stand: 0, value: 12, seen: [] }] };
-        const s = Core.strength(g.hands[1], g.vira), b = buckets.findIndex(([lo, hi]) => s >= lo && s < hi);
+        const s = Core.strength(g.hands[1], g.vira), b = fine.findIndex(([lo, hi]) => s >= lo && s < hi);
         n[b][1]++; if (Core.aiAnswer(g, 1, rand) !== 'run') n[b][0]++;
       }
       cells.push(`${name}: ${n.map(([a, t]) => pct(a, t)).join(' ')}`);
     }
-    console.log(`  ${level.padEnd(7)} (fraca média boa forte)  ${cells.join('   ')}`);
+    console.log(`  ${level.padEnd(7)} (lixo fraca média boa)  ${cells.join('   ')}`);
   }
   // how long one decision takes, the slowest kind for each level: three cards to choose from, at the start of a hand
   const t = {};

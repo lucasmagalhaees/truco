@@ -6,7 +6,7 @@ Feito a partir do [secret-game](https://github.com/lucasmagalhaees/secret-game),
 
 ## O que faz
 
-- **Partida contra a máquina**: truco paulista com vira e manilha, truco/seis/nove/doze, mão de onze, mão de ferro às cegas, até 12 pontos. Três níveis; as IAs blefam, e quando você corre elas mostram as cartas ("Era blefe!").
+- **Partida contra a máquina**: truco paulista com vira e manilha, truco/seis/nove/doze, mão de onze, mão de ferro às cegas, até 12 pontos. Quatro níveis (o extremo conta as cartas); as IAs blefam, leem os seus blefes, e quando você corre elas mostram as cartas ("Era blefe!").
 - **Rodinhas**: manilhas marcadas, lugar de cada carta no ranking, quem está levando a rodada, por que ela foi ganha. Tira quando quiser.
 - **Treino**: "Qual é a manilha?" e "Quem ganha a rodada?", com duelos de manilha pelo naipe e cangadas, e a explicação de cada resposta.
 - **Ranking e glossário**: escolha a vira e veja da mais forte para a mais fraca; zap, copas, espadilha, picafumo, cangar, mão de onze, mão de ferro, pé e mão.
