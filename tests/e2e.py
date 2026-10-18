@@ -267,6 +267,7 @@ with sync_playwright() as p:
     mp.goto((ROOT / 'dist' / 'index.html').as_uri()); mp.wait_for_function('window.__APP && window.__APP.S'); mp.evaluate('window.__APP.ui.wait = 1e6')
     mp.click('[data-act=new]'); assert mp.locator('#hand .hc.deal').count() == 3, 'a new hand is dealt in a fan'
     mp.evaluate('''() => { const a = window.__APP; Object.assign(a.S.game, { vira: "4o", starter: 0, turn: 0, phase: "play", hands: [["5c", "4e", "6o"], ["5p", "4c", "6e"], ["Ke", "7o", "Qe"], ["Jo", "Jc", "6c"]] }); a.ui.wait = 20; }''')
+    mp.evaluate('Math.random = () => 0.99')                      # the same chance every run: Biu (zap in hand) accepts the truco
     mp.click('[data-act=end]')                                    # a repaint with nothing new: the hand is not dealt again
     assert mp.locator('#hand .hc.deal').count() == 0
     mp.click('[data-act=truco]'); assert mp.locator('#stamp.go').count() == 1 and 'TRUCO' in mp.text_content('#stamp')

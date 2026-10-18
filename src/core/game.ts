@@ -447,7 +447,7 @@ export function bluffOdds(g: Game, seat: Seat): number {
 /** The most a hard player bluffs, however much the others run. */
 export const BLUFF_MAX = 0.45;
 /** How many deals of the unseen cards a player imagines before answering a raise. */
-export const SAMPLES: Record<Level, number> = { facil: 0, medio: 16, dificil: 80 };
+export const SAMPLES: Record<Level, number> = { facil: 0, medio: 40, dificil: 120 };
 /** The chance of taking the hand from which the hard player raises. */
 export const RAISE_FOR = 0.62;
 /** The chance of taking the hand from which a player raises back instead of only accepting. */
@@ -476,20 +476,23 @@ export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMP
     let k = 0;
     const hands = Array.from({ length: seatsOf(g) }, (_, s) => (s === seat ? [...mine] : d.slice(k, (k += holding(g, s)))));
     const w = playOut(g, hands, 'medio');
-    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, tm(g, ask.by)) >= RAISE_NEED[ask.value] - 1;
+    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, tm(g, ask.by)) >= DESERVE;
     for (const o of deserved ? [all, fair] : [all]) { o.n++; if (w === t) o.win++; else if (w !== null) o.lose++; }
   }
   const odds = (o: { win: number; lose: number; n: number }) => ({ win: o.win / o.n, lose: o.lose / o.n });
   if (!ask || tm(g, ask.by) === t) return odds(all);
   // Bayes: a deal where the asker's hand deserves the raise explains it fully; a deal where it does not, only as a
   // bluff, which happens with chance `beta` per weak hand: the rate that makes the seat's bluff rate come out right
-  const b = bluffRate(g, ask.by), q0 = FAIR_BASE[ask.value], beta = Math.min(1, (b * q0) / ((1 - b) * (1 - q0)));
+  const b = bluffRate(g, ask.by), q0 = FAIR_BASE, beta = Math.min(1, (b * q0) / ((1 - b) * (1 - q0)));
   const n = fair.n + beta * (all.n - fair.n);
   return { win: (fair.win + beta * (all.win - fair.win)) / n, lose: (fair.lose + beta * (all.lose - fair.lose)) / n };
 }
-/** How often a hand dealt at random deserves each raise (measured with 20000 deals, 18/10/2026): the base rate that
- *  turns a seat's bluff rate into how often it raises on a weak hand. */
-export const FAIR_BASE: Record<number, number> = { 3: 0.26, 6: 0.11, 9: 0.04, 12: 0.01 };
+/** What a hand that deserves a raise looks like, whatever is asked: strength plus how the rounds stand. A seis or a
+ *  doze comes from a hand that was worth raising and from the stakes already up, not from an ever stronger hand. */
+export const DESERVE = 5.5;
+/** How often a hand dealt at random is that good (measured with 20000 deals, 18/10/2026): the base rate that turns a
+ *  seat's bluff rate into how often it raises on a weak hand. */
+export const FAIR_BASE = 0.26;
 /** The chance of winning the game from a score, as a fair coin walk to 12 would give it: by the points still missing. */
 export const gameChance = (mine: number, theirs: number): number =>
   (mine >= WIN_POINTS ? 1 : theirs >= WIN_POINTS ? 0 : (WIN_POINTS - theirs) / (2 * WIN_POINTS - mine - theirs));

@@ -118,8 +118,8 @@ export default function cases(Core) {
   eq('easy AI never raises back', Core.aiAnswer(asked(['5p', '5c', '3e'], 3, 'facil'), 1), 'accept');
   // answering by the odds: running gives the others what the hand was worth, accepting risks what was asked
   const at = (hand, prev, value, level, extra = {}) => ({ ...base, level, phase: 'truco', value: prev, raisedBy: prev > 1 ? 1 : null, ask: { by: 0, value }, hands: [[], hand, [], []], ...extra });
-  eq('a doze from nove is paid with a fair hand (running loses 9 for sure), at médio and difícil; a hopeless hand still runs',
-    [Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'medio'), 1, never), Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'dificil'), 1, never), Core.aiAnswer(at(['4e', '6o', '7e'], 9, 12, 'dificil'), 1, never)], ['accept', 'accept', 'run']);
+  eq('a doze from nove is paid with a fair hand (running loses 9 for sure), at médio and difícil; a lost hand (a round down, nothing left) still runs',
+    [Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'medio'), 1, never), Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'dificil'), 1, never), Core.aiAnswer(at(['4e', '6o'], 9, 12, 'dificil', { rounds: [0] }), 1, never)], ['accept', 'accept', 'run']);
   eq('never runs when running hands the others the game', [Core.aiAnswer(at(['4e', '6o', '7e'], 6, 9, 'medio', { score: [6, 0] }), 1, never), Core.aiAnswer(at(['4e', '6o', '7e'], 6, 9, 'dificil', { score: [6, 0] }), 1, never)], ['accept', 'accept']);
   // a seat seen bluffing again and again gets paid more often by the hard player
   const bluffer = [{ shown: 10, weak: 8, answers: 0, runs: 0 }, ...[1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }))];
@@ -393,7 +393,9 @@ export default function cases(Core) {
   for (const level of Core.LEVELS) {
     const rr = Core.seeded(23); let g = { ...Core.newGame(rr, level, { names: Core.SEATS6, sides: [null, null], humans: [0], teams: 3 }), humans: [] }, k = 0, ran = 0;
     while (g.phase !== 'over' && k < 6000) { k++; g = Core.whoActs(g) === null ? Core.nextHand(g, rr) : Core.aiAct(g, rr); if (g.out && g.out.length) ran++; }
-    eq(`three pairs: a whole game of six computer players at ${level} ends with one pair at 12`, [g.phase, g.score.filter(x => x === 12).length, g.score.length, g.hist.length > 3], ['over', 1, 3, true]);
+    // a game can end in two hands once the stakes go up (doze is paid now): what counts is that the hands add up
+    const sums = [0, 1, 2].map(t => Math.min(12, g.hist.filter(h => h.team === t).reduce((x, h) => x + h.points, 0)));
+    eq(`three pairs: a whole game of six computer players at ${level} ends with one pair at 12, the hands adding up to the score`, [g.phase, g.score.filter(x => x === 12).length, g.score.length, g.hist.length >= 1, sums.every((x, t) => x >= g.score[t])], ['over', 1, 3, true, true]);
   }
   }
   eq('source: an entry read', Core.normEntry({ id: 7, name: ' Um ', value: '2.5', extra: true }), { id: '7', name: 'Um', value: 2.5 });
