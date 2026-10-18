@@ -125,6 +125,7 @@ with sync_playwright() as p:
     host.click('#format [data-act=roomalone][data-s="0"]')                # the host plays with the computer: the other two pair up
     guest.wait_for_function('document.getElementById("lseat2").textContent.includes("Zé")')
     third.wait_for_function('document.getElementById("lseat2").textContent.includes("Amigo")')
+    host.wait_for_function('document.getElementById("lseat2").textContent.includes("IA")')      # the host's own screen also waits for the room to come back
     assert 'Sua dupla' in txt(guest, '#lseat2') and 'Lucas' in txt(guest, '#lseat1') + txt(guest, '#lseat3') and 'IA (Cida)' in txt(host, '#lseat2')
     assert 'Lucas' in txt(third, '#format b') and overflow(host) == 0 and overflow(third) == 0
     host.screenshot(path=str(SHOTS / f'o1b-tres-pessoas-{TAG}.png'), full_page=True)
