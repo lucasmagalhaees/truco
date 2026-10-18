@@ -10,13 +10,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'tests', '.build-medida');
 await build({ root, configFile: false, logLevel: 'silent', build: { outDir, emptyOutDir: true, minify: false, target: 'node22', lib: { entry: path.join(root, 'src', 'core', 'index.ts'), formats: ['es'], fileName: () => 'core.mjs' } } });
 const { Core } = await import(pathToFileURL(path.join(outDir, 'core.mjs')).href);
-const GAMES = Number(process.argv[2] || 400);
+const GAMES = Number(process.argv[2] || 400), ONLY = process.argv[3] || '';   // ONLY: run only the games whose name has it
 const pct = (a, b) => (b ? `${(100 * a / b).toFixed(0)}%` : '-').padStart(5);
 
 // ---------- 1. answering a raise, by hand strength ----------
-console.log('Aceita o pedido (aceita ou aumenta), pela força da mão de quem responde, no começo da mão, placar 0 a 0:');
+if (!ONLY) console.log('Aceita o pedido (aceita ou aumenta), pela força da mão de quem responde, no começo da mão, placar 0 a 0:');
 const buckets = [[0, 2.5, 'fraca'], [2.5, 4.5, 'média'], [4.5, 7, 'boa'], [7, 99, 'forte']];
-for (const [prev, asked] of [[1, 3], [3, 6], [6, 9], [9, 12]]) {
+for (const [prev, asked] of ONLY ? [] : [[1, 3], [3, 6], [6, 9], [9, 12]]) {
   const row = [];
   for (const level of ['facil', 'medio', 'dificil']) {
     const n = buckets.map(() => [0, 0]), rand = Core.seeded(asked * 7 + level.length);
@@ -70,6 +70,7 @@ function match(kinds, seed) {
   return { winner: g.winner, stats };
 }
 function series(name, kinds) {
+  if (ONLY && !name.includes(ONLY)) return;
   let w = 0, bluffs = 0, paid = 0, b12 = 0, p12 = 0, pts = [0, 0];
   for (let i = 0; i < GAMES; i++) {
     const { winner, stats } = match(kinds, 1000 + i);

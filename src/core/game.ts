@@ -227,7 +227,7 @@ export const RAISE_NEED: Record<number, number> = { 3: 6.5, 6: 8, 9: 9.5, 12: 11
 export const WEAK_BY = 2;
 /** How many raises (or answers) a first guess is worth before what a seat has shown counts more: little for the hard
  *  player, who learns fast, more for the medium one. */
-export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4 };
+export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 12 };
 /** The first guess before anything is seen: how often a raise is a bluff, and how often a seat runs from a raise. */
 export const BLUFF_GUESS = 0.2, RUN_GUESS = 0.35;
 const unread = (): Read[] => [0, 1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
@@ -323,7 +323,7 @@ export function aiCard(g: Game, seat: Seat, rand: () => number): number {
   if (w !== -1 && teamOf(w) === teamOf(seat)) {
     // the partner has it: throw the weakest; the hard player covers when an opponent still plays and could beat it
     const top = (g.table.find(p => p.seat === w) as Play).card;
-    if (hard && g.table.length < 3 && !sure(g, seat, top) && beat !== undefined) return beat;
+    if (hard && g.table.length < 3 && !sure(g, seat, top) && beat !== undefined && handWinner([...g.rounds, teamOf(seat)]) === teamOf(seat)) return beat;
     return low;
   }
   return beat === undefined ? low : beat;                            // the cheapest card that takes it, or the weakest
@@ -332,10 +332,10 @@ export function aiCard(g: Game, seat: Seat, rand: () => number): number {
 export function aiRaise(g: Game, seat: Seat, rand: () => number): 'no' | 'yes' | 'bluff' {
   if (!canRaise(g, seat)) return 'no';
   if (sureThing(g, seat)) return 'yes';
-  const need = RAISE_NEED[nextValue(g.value)] + (g.level === 'facil' ? 1.5 : 0);
-  if (judge(g, seat) >= need) return 'yes';
-  // the hard player raises once a round is in the pocket and it holds a card nobody can beat
-  if (g.level === 'dificil' && standing(g, teamOf(seat)) > 0 && g.hands[seat].some(c => sure(g, seat, c))) return 'yes';
+  if (g.level === 'dificil') {
+    // the hard player raises for value when the hand looks won more often than not
+    if (handOdds(g, seat, rand).win >= RAISE_FOR) return 'yes';
+  } else if (judge(g, seat) >= RAISE_NEED[nextValue(g.value)] + (g.level === 'facil' ? 1.5 : 0)) return 'yes';
   return rand() < bluffOdds(g, seat) ? 'bluff' : 'no';
 }
 /** How likely a player is to bluff now. The easy one hardly does, the medium one now and then; the hard one mostly
@@ -352,15 +352,17 @@ export function bluffOdds(g: Game, seat: Seat): number {
 /** The most a hard player bluffs, however much the others run. */
 export const BLUFF_MAX = 0.45;
 /** How many deals of the unseen cards a player imagines before answering a raise. */
-export const SAMPLES: Record<Level, number> = { facil: 0, medio: 30, dificil: 80 };
+export const SAMPLES: Record<Level, number> = { facil: 0, medio: 16, dificil: 80 };
+/** The chance of taking the hand from which the hard player raises. */
+export const RAISE_FOR = 0.62;
 /** The chance of taking the hand from which a player raises back instead of only accepting. */
 export const RAISE_BACK = 0.75;
 /** How many cards `s` still holds: three, less the rounds played and a card already on the table. Everyone knows it. */
 const holding = (g: Game, s: Seat): number => Math.max(0, HAND_SIZE - g.rounds.length - (g.table.some(p => p.seat === s) ? 1 : 0));
 const calm = (): number => 0.5;
-/** Plays the rest of the hand out with these hands, every seat the medium way: the pair that takes it, or null. */
-function playOut(g: Game, hands: Card[][]): Team | null {
-  let h: Game = { ...g, hands, phase: 'play', ask: null, level: 'medio', blind: false, log: [], hist: [], watch: [], score: [0, 0] };
+/** Plays the rest of the hand out with these hands, every seat at this level: the pair that takes it, or null. */
+function playOut(g: Game, hands: Card[][], level: Level): Team | null {
+  let h: Game = { ...g, hands, phase: 'play', ask: null, level, blind: false, log: [], hist: [], watch: [], score: [0, 0] };
   for (let i = 0; i < 16 && h.phase === 'play'; i++) h = playCard(h, h.turn, aiCard(h, h.turn, calm));
   return h.result ? h.result.team : null;
 }
@@ -369,14 +371,16 @@ function playOut(g: Game, hands: Card[][]): Team | null {
  *  each deal out. A raise in the air says something: unless the one who asked is bluffing, their hand deserves it, so
  *  only those deals count, weighed by how often that seat seems to bluff. */
 export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMPLES[g.level] || SAMPLES.medio): { win: number; lose: number } {
-  const t = teamOf(seat), pool = unseen(g, seat), ask = g.ask, mine = g.hands[seat];
+  // the medium player does not remember the rounds already played: those cards may come back in what it imagines
+  const t = teamOf(seat), ask = g.ask, mine = g.hands[seat];
+  const pool = g.level === 'dificil' ? unseen(g, seat) : deck().filter(c => !mine.includes(c) && c !== g.vira && !g.table.some(p => p.card === c));
   const r = seeded(Math.floor(rand() * 4294967296));
   const all = { win: 0, lose: 0, n: 0 }, fair = { win: 0, lose: 0, n: 0 };
   for (let i = 0; i < samples; i++) {
     const d = shuffle(pool, r);
     let k = 0;
     const hands = [0, 1, 2, 3].map(s => (s === seat ? [...mine] : d.slice(k, (k += holding(g, s)))));
-    const w = playOut(g, hands);
+    const w = playOut(g, hands, 'medio');
     const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, teamOf(ask.by)) >= RAISE_NEED[ask.value] - 1;
     for (const o of deserved ? [all, fair] : [all]) { o.n++; if (w === t) o.win++; else if (w !== null) o.lose++; }
   }
@@ -409,8 +413,12 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
   if (ask.value < WIN_POINTS && win >= RAISE_BACK) return { a: 'raise', bluff: false };
   // the hard player now and then raises back on a weak hand, against a seat that runs a lot
   if (g.level === 'dificil' && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
-  const play = win * gameChance(m + ask.value, o) + lose * gameChance(m, o + ask.value) + (1 - win - lose) * gameChance(m, o);
-  if (play >= run) return { a: 'accept', bluff: false };
+  // points: the hand's worth now against what was asked (so a doze from nove is paid when the hand is won more than one
+  // time in eight); near the end of the game the hard player weighs what each outcome does to the game instead
+  const play = g.level === 'dificil' && Math.max(m, o) + ask.value >= WIN_POINTS
+    ? win * gameChance(m + ask.value, o) + lose * gameChance(m, o + ask.value) + (1 - win - lose) * gameChance(m, o) >= run
+    : (win - lose) * ask.value >= -g.value;
+  if (play) return { a: 'accept', bluff: false };
   return { a: rand && rand() < 0.05 ? 'accept' : 'run', bluff: false };
 }
 /** How a computer player answers a raise (see answerPlan). */
