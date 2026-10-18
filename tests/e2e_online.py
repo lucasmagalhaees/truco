@@ -178,7 +178,7 @@ with sync_playwright() as p:
     for ws in line_['open']: ws.close()
     line_['open'].clear()
     guest.wait_for_selector('#netbar:not(.off)')
-    assert txt(guest, '#netbar') == 'Caiu a conexão, voltando…' and overflow(guest) == 0
+    _bar = (txt(guest, '#netbar'), overflow(guest)); assert _bar == ('Caiu a conexão, voltando…', 0), _bar
     guest.screenshot(path=str(SHOTS / f'o3-caiu-{TAG}.png'))
     host.wait_for_selector('#netstatus [data-act=botseat]')            # the seat is kept; the host could hand it over
     assert 'Amigo' in txt(host, '#netstatus') and 'saiu da sala' in txt(host, '#netstatus')
