@@ -3,7 +3,7 @@
    viewFor: the table turned so that they sit at seat 0 (the bottom of their screen), with nobody else's cards in it.
    Pure, like the rest of the core: the server (server/worker.ts on Cloudflare, tests/room_server.mjs in the tests)
    only moves messages in and out and keeps the time. */
-import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS } from './game';
+import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS, teamOf, teamsOf } from './game';
 import type { Answer } from './game';
 import { DEFAULT_NAMES } from './teams';
 import type { Game, Level, Seat, Team } from './types';
@@ -75,20 +75,23 @@ export function swapSides(text: string): string {
  *  as "??", so their number still shows). In a hand of eleven, the pair deciding sees both its hands, as the rules say.
  *  A computer player's bluff is not told until it is shown. */
 export function viewFor(g: Game, seat: Seat): Game {
-  const r = (s: number): number => (s - seat + 4) % 4, flip = seat % 2 === 1;
-  const tm = <T extends Team | null>(t: T): T => (t === null || !flip ? t : ((1 - (t as number)) as T));
-  const turn = <T>(xs: T[]): T[] => [0, 1, 2, 3].map(v => xs[(v + seat) % 4]);
+  // with three pairs (six seats) the table turns the same way; the log names the pairs, so it needs no swapping
+  const T = teamsOf(g), N = T * 2, mine = teamOf(seat, T), flip = T === 2 && mine === 1;
+  const r = (s: number): number => (s - seat + N) % N;
+  const tm = <X extends Team | null>(t: X): X => (t === null ? t : (((t as number) - mine + T) % T) as X);
+  const turn = <X>(xs: X[]): X[] => Array.from({ length: N }, (_, v) => xs[(v + seat) % N]);
   const say = (s: string): string => (flip ? swapSides(s) : s);
   const eleven = tm(g.eleven);
-  const hands = turn(g.hands).map((h, v) => (v === 0 || (v === 2 && g.phase === 'eleven' && eleven === 0) ? [...h] : h.map(() => '??')));
+  const hands = turn(g.hands).map((h, v) => (v === 0 || (v === T && g.phase === 'eleven' && eleven === 0) ? [...h] : h.map(() => '??')));
   return {
     ...g, hands, names: turn(g.names), sides: flip ? [g.sides[1], g.sides[0]] : [...g.sides] as [string | null, string | null],
-    humans: g.humans.map(r).sort(), score: flip ? [g.score[1], g.score[0]] : [...g.score] as [number, number],
+    humans: g.humans.map(r).sort(), score: Array.from({ length: T }, (_, v) => g.score[(v + mine) % T]),
+    ...(g.out ? { out: g.out.map(tm) } : {}),
     dealer: r(g.dealer), starter: r(g.starter), turn: r(g.turn),
     table: g.table.map(p => ({ seat: r(p.seat), card: p.card })),
     last: g.last ? { plays: g.last.plays.map(p => ({ seat: r(p.seat), card: p.card })), winner: g.last.winner === -1 ? -1 : r(g.last.winner) } : null,
     rounds: g.rounds.map(x => (x === -1 ? -1 : tm(x))), raisedBy: tm(g.raisedBy),
-    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value } : null, eleven,
+    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value, ...(g.ask.wait ? { wait: g.ask.wait.map(tm) } : {}) } : null, eleven,
     shout: g.shout ? { seat: r(g.shout.seat), word: g.shout.word } : null,
     result: g.result ? { team: tm(g.result.team), points: g.result.points, why: say(g.result.why), ...(g.result.shown ? { shown: { ...g.result.shown, seat: r(g.result.shown.seat) } } : {}) } : null,
     winner: tm(g.winner), hist: g.hist.map(h => ({ ...h, team: tm(h.team), how: say(h.how) })), log: g.log.map(say)
