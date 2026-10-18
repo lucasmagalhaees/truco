@@ -2,6 +2,16 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). Versões: [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Adicionado
+- Quem pediu fica claro (D15): "Biu pediu TRUCO!" no cartão, a cadeira de quem pediu destacada, o carimbo com o nome embaixo, "Responde: <nome>", "<nome> aceitou", "<nome> correu", "pediu SEIS de volta". Também online e nas 3 duplas.
+- Avançar sozinho (Ajustes, ligado por padrão): a próxima mão sai sozinha depois de uma pausa pela velocidade; o fim da partida espera. Online, o servidor dá a próxima mão.
+- Equipe contra equipe: a aba Equipe em dois passos (sua equipe, equipe adversária) com o resumo; o nome das equipes no placar e sobre a mesa.
+
+### Mudado
+- Montar a mesa e Heróis x Vilões foram para "Mais jeitos de montar a mesa"; o seletor de personagens mostra uma equipe por vez.
+
 ## [0.3.0]
 
 ### Adicionado

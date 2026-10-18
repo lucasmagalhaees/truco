@@ -122,6 +122,8 @@ export interface Training { ok: number; total: number; best: number }
 export interface AppState {
   v: 1; game: Game | null; tally: Tally; level: Level; train: Training; real: RealTable;
   theme?: Theme; speed?: Speed; quiet?: true; hints?: false;
+  /** `auto` false: a finished hand waits for a tap on "Próxima mão" (absent: the next hand comes by itself, D15). */
+  auto?: false;
   /** The person's team (a group of a theme pack, `pack/group`), the rival team in the rivals mode, and the names the
    *  person changed, by team. `seats`: a table put together seat by seat (it wins over team and rival). `colorBy`:
    *  which colours the app takes (absent: the team's). */

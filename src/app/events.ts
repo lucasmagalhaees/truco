@@ -1,7 +1,7 @@
 import { Core } from '../core';
 import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } from '../core';
 import { buzz, later, sound } from './fx';
-import { confetti, lift, render, stamp, toast } from './render';
+import { confetti, lift, render, shoutLine, stamp, toast } from './render';
 import { $, valOf } from './format';
 import { S, applyTheme, saveS, setS, table, TABS, ui } from './state';
 import { back, backTo, closeOver, go, openOver } from './nav';
@@ -18,6 +18,12 @@ const rand = (): number => Math.random();
 /** How long the computer players think, in ms, by speed; a finished round stays on the table a little longer. */
 export const THINK: Record<Speed, number> = { calma: 1500, normal: 900, rapida: 400 };
 export const ROUND_PAUSE = 700;
+/** With "Avançar sozinho" on (S.auto, D15): how long a finished hand stays on the screen, with the cards, the result and
+ *  the score, before the next one is dealt by itself, in ms, by speed. The end of a game never moves on by itself. */
+export const HAND_PAUSE: Record<Speed, number> = { calma: 4500, normal: 3000, rapida: 2000 };
+/** Online the server deals the next hand (ROOM_HAND_PAUSE); if it has not after this much more, the host's phone asks
+ *  for it, so a server that does not deal by itself never leaves a room stuck. */
+export const HOST_NEXT_AFTER = 4000;
 const LOUD = ['truco', 'seis', 'nove', 'doze'];
 
 /** A new game state: saved and painted, with the sound and the moment that goes with what changed. */
@@ -34,14 +40,19 @@ function play(next: Game): void {
   schedule();
 }
 /** What the table hears and sees when the game moves. */
+/** What was said, as a key: the same words seen again (a room sends the whole game on every change) are not news. */
+const shoutKey = (g: Game): string => (g.shout ? `${g.n}:${g.log.length}:${g.shout.seat}:${g.shout.word}` : '');
 function moment(before: Game | null, g: Game): void {
   if (!before || before.n !== g.n) { sound('shuffle'); return; }
   if (g.played.length > before.played.length) sound('card');
-  if (g.shout && g.shout !== before.shout) {
+  if (g.shout && shoutKey(g) !== shoutKey(before)) {
+    // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!"
+    const team = Core.teamOf(g.shout.seat, Core.teamsOf(g)), line = shoutLine(g);
     if (LOUD.includes(g.shout.word)) {
-      stamp(`${g.shout.word.toUpperCase()}!`, Core.teamOf(g.shout.seat, Core.teamsOf(g))); sound('truco');
+      stamp(`${g.shout.word.toUpperCase()}!`, team, line); sound('truco');
       if (Core.teamOf(g.shout.seat) === 1) buzz([50, 40, 50]);
-    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? null);
+    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? team, line);
+    else if (g.shout.word === 'aceito') stamp('Aceito!', team, line);
   }
   if (g.phase === 'over' && before.phase !== 'over' && g.winner !== null) {
     if (g.winner === 0) confetti(0);
@@ -50,11 +61,17 @@ function moment(before: Game | null, g: Game): void {
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
-/** If a computer player has to act, it acts after a moment (and only if nothing else changed the game meanwhile). */
+/** If a computer player has to act, it acts after a moment (and only if nothing else changed the game meanwhile). With
+ *  "Avançar sozinho" on, a finished hand is followed by the next one after a pause to read it (D15); the pause is a plain
+ *  wait, so it stays when the device asks for less motion. The tests fix both times with ui.wait. */
 export function schedule(): void {
   clearTimeout(timer);
   if (inRoom()) return;                                  // in a room the server moves the computer players
   const g = S.game, who = g ? Core.whoActs(g) : null;
+  if (g && g.phase === 'handEnd' && S.auto !== false) {
+    timer = setTimeout(() => { if (S.game === g) play(Core.nextHand(g, rand)); }, ui.wait ?? HAND_PAUSE[S.speed || 'normal']);
+    return;
+  }
   if (!g || who === null || Core.isHuman(g, who)) return;
   let ms = ui.wait ?? THINK[S.speed || 'normal'];
   if (ui.wait === null && g.phase === 'play' && !g.table.length && g.last) ms += ROUND_PAUSE;
@@ -103,7 +120,8 @@ function voice(): void {
 /** The theme: a ready team, rivals, or the table seat by seat; the names of the players; the tabs of the pickers. */
 function club(a: string, v: string, d: DOMStringMap): void {
   const s = S.seats;
-  if (a === 'team') { if (v) S.team = v; else delete S.team; if (!v || S.rival === v) delete S.rival; ui.editing = false; }
+  // choosing a team or a rival is the main way (team against team): it takes the place of a table put together
+  if (a === 'team') { if (v) S.team = v; else delete S.team; if (!v || S.rival === v) delete S.rival; delete S.seats; delete S.hv; ui.editing = false; }
   else if (a === 'mode') {
     if (v === 'hv') { S.hv = {}; S.seats = Core.drawSided(rand, null, 'heroi'); ui.slot = 0; }
     else if (v === 'seats') {
@@ -119,9 +137,14 @@ function club(a: string, v: string, d: DOMStringMap): void {
       else { if (!S.team) S.team = Core.TEAMS[0].id; if (!S.rival) S.rival = (Core.TEAMS.find(t => t.id !== S.team) as { id: string }).id; }
     }
   }
-  else if (a === 'rival') S.rival = v;
-  else if (a === 'kind' && d.k) ui.kind = { ...ui.kind, [d.k]: v };
-  else if (a === 'slot') ui.slot = (Number(v) % 3) as 0 | 1 | 2;
+  else if (a === 'rival') { S.rival = v; delete S.seats; delete S.hv; }
+  else if (a === 'kind' && d.k) {
+    // another kind or universe opens on its own team; the team chip opens that team
+    const k: Record<string, string> = { ...ui.kind, [d.k]: v };
+    if (d.k === 'seat' || d.k === 'seatpack') { delete k.seatteam; if (d.k === 'seat') delete k.seatpack; }
+    ui.kind = k;
+  }
+  else if (a === 'slot') { ui.slot = (Number(v) % 3) as 0 | 1 | 2; const k = { ...ui.kind }; delete k.seatteam; ui.kind = k; }      // the seat tapped shows its own team
   else if (a === 'seat' && s) {
     // the character goes to the seat being filled; if it sat elsewhere, the two swap
     const all = [s.partner, ...s.opp], was = all.findIndex((c, k) => k !== ui.slot && Core.samePerson(c, v));
@@ -159,6 +182,16 @@ function onRoom(before: typeof net.view): void {
   if (!before && net.view && location.search.includes('sala=')) history.replaceState(null, '', location.pathname + location.hash);
   render();
   if (now) moment(was, now);
+  hostNext();
+}
+let hostTimer: ReturnType<typeof setTimeout> | undefined;
+/** The host's phone, at the end of a hand in a room: if the server has not dealt the next one a while after it should
+ *  have, it asks for it (see HOST_NEXT_AFTER). */
+function hostNext(): void {
+  clearTimeout(hostTimer);
+  const g = net.view?.game;
+  if (!g || g.phase !== 'handEnd' || !net.view?.host) return;
+  hostTimer = setTimeout(() => { const now = net.view?.game; if (now && now.phase === 'handEnd' && now.n === g.n && net.view?.host) send({ t: 'act', a: 'next' }); }, Core.ROOM_HAND_PAUSE + HOST_NEXT_AFTER);
 }
 function onRoomError(why: string): void {
   toast(why);
@@ -222,8 +255,9 @@ function setting(a: string, v: string): void {
   else if (a === 'hints') { if (v === 'off') S.hints = false; else delete S.hints; }
   else if (a === 'speed') { if (v === 'normal') delete S.speed; else S.speed = v as Speed; }
   else if (a === 'theme') { if (v === 'auto') delete S.theme; else S.theme = v as Theme; applyTheme(); }
+  else if (a === 'auto') { if (v === 'off') S.auto = false; else delete S.auto; }
   else if (a === 'fx') { if (v === 'off') S.quiet = true; else { delete S.quiet; buzz(30); sound('card'); } }
-  saveS(); render();
+  saveS(); render(); schedule();
 }
 
 export function initEvents(): void {
@@ -240,7 +274,7 @@ export function initEvents(): void {
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
-    if (['level', 'hints', 'speed', 'theme', 'fx'].includes(a)) setting(a, d.v || '');
+    if (['level', 'hints', 'speed', 'theme', 'fx', 'auto'].includes(a)) setting(a, d.v || '');
     else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || '', d); backTo(1); }
     else if (['team', 'mode', 'rival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }

@@ -264,6 +264,25 @@ details.card .log,details.card .ranking{margin-top:12px}
 .card.enter{animation:enter .28s ease-out}
 .toast:not([hidden]){animation:toastIn .2s ease-out}
 
+/* who asked, by name (D15): the line on the answer card, the chair of who asked, the one answering, and the stamp */
+.asked{font:900 24px/1.15 var(--display);letter-spacing:.02em;color:var(--eles);margin:2px 0}
+#action.asking{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.said{font:700 15px/1.3 var(--display);text-align:center;margin:0}
+.seat .asktag{font:800 10px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:6px;background:var(--eles);color:#fff;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.seat .asktag.ans{background:var(--accent-bg);color:#1f1a14}
+.seat.asking .who{background:var(--eles);color:#fff;box-shadow:0 0 0 3px var(--accent-bg)}
+.stamp small{display:block;font:800 18px/1.2 var(--display);letter-spacing:.02em;text-transform:none;margin-top:6px;max-width:80vw;overflow:hidden;text-overflow:ellipsis;text-align:center}
+/* the teams by name over the table, and their names on the score */
+.matchup{display:flex;justify-content:center;align-items:center;gap:8px;font:700 13px/1.2 var(--display);color:var(--muted);margin:0;min-width:0}
+.matchup span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.matchup b{font-weight:800}
+.score .chip .nm{max-width:24vw}
+/* the next hand coming by itself: a bar that fills in the time of the pause (still, with less motion) */
+.autonext{display:flex;flex-direction:column;gap:6px;font:700 14px/1.2 var(--display);color:var(--muted);margin:0}
+.autonext i{display:block;height:6px;border-radius:999px;background:var(--line);overflow:hidden;position:relative}
+.autonext i::after{content:"";position:absolute;inset:0;background:var(--accent-bg);transform-origin:left;animation:fill var(--t,3000ms) linear both}
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
 /* a raise, a run or a bluff, stamped over the screen */
 .stamp{position:fixed;left:50%;top:38%;z-index:20;pointer-events:none;font:900 52px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;
   padding:10px 22px;border:6px double currentColor;border-radius:10px;transform:translate(-50%,-50%) rotate(-8deg);background:rgba(255,250,236,.94);white-space:nowrap}
@@ -392,4 +411,8 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .chars{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%;min-width:0}
 .chip-btn{min-height:34px;padding:0 9px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 13px/1 var(--font)}
 .chip-btn.on{background:var(--fg);color:var(--surface)}
+/* the teams of the open universe as small chips: only the open one's three characters show (keeps the 20 clubs short) */
+.teamchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip-btn.team{display:inline-flex;align-items:center;gap:6px;min-height:32px;font-size:12px}
+.chip-btn.team .sw{height:14px;width:6px;min-height:0}
 .linkbtn{text-decoration:underline;font-weight:700;color:var(--fg);padding:0 2px}

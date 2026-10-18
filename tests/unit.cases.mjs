@@ -338,6 +338,12 @@ export default function cases(Core) {
   let full = Core.newRoom('ABCDE');
   for (let i = 0; i < 4; i++) full = join(full, T[i], 'P' + i).room;
   eq('four people fill the room', [full.members.map(m => m.seat), join(full, T[4], 'Eva').error], [[0, 1, 2, 3], 'A sala está cheia.']);
+  {
+    // D15: a finished hand stays ROOM_HAND_PAUSE on every screen, then the server deals the next one, people in it or not
+    const ended = { ...room, game: { ...base, humans: [0, 1], phase: 'handEnd', result: { team: 0, points: 1, why: 'x' } } }, dealt = Core.aiStep(ended, Core.seeded(3));
+    eq('online: the server deals the next hand by itself after the pause; not with nobody in the room, nor at the end of the game', [Core.aiDelay(ended), dealt.game.n, dealt.game.phase !== 'handEnd', Core.aiDelay({ ...ended, members: [] }), Core.aiDelay({ ...ended, game: { ...ended.game, phase: 'over' } }), Core.ROOM_HAND_PAUSE > Core.ROOM_THINK],
+      [Core.ROOM_HAND_PAUSE, base.n + 1, true, null, null, true]);
+  }
   eq('the computer waits longer after a round closes', [Core.aiDelay({ ...room, game: { ...base, humans: [0], turn: 1, table: [], last: null } }), Core.aiDelay({ ...room, game: { ...base, humans: [0], turn: 1, table: [], last: { plays: [], winner: 0 } } })], [Core.ROOM_THINK, Core.ROOM_THINK + Core.ROOM_ROUND_PAUSE]);
   eq('messages over the wire: read field by field, anything else is null', [Core.readMsg('{"t":"act","a":"play","k":2}'), Core.readMsg({ t: 'act', a: 'answer', v: 'raise' }), Core.readMsg({ t: 'join', name: 'A', token: 'tttttttt', level: 'x' }), Core.readMsg({ t: 'bot', seat: 2 }), Core.readMsg({ t: 'act', a: 'eleven', v: false }), Core.readMsg({ t: 'act', a: 'next' }), Core.readMsg({ t: 'start' })],
     [{ t: 'act', a: 'play', k: 2 }, { t: 'act', a: 'answer', v: 'raise' }, { t: 'join', name: 'A', token: 'tttttttt' }, { t: 'bot', seat: 2 }, { t: 'act', a: 'eleven', v: false }, { t: 'act', a: 'next' }, { t: 'start' }]);
@@ -393,6 +399,7 @@ export default function cases(Core) {
   const empty = { v: 1, game: null, tally: { w: 0, l: 0 }, level: 'medio', train: { ok: 0, total: 0, best: 0 }, real: Core.emptyTable() };
   eq('read state: what is not a state reads as an empty one', [null, 'x', 7, { game: 'no' }].map(x => Core.readState(x)), Array(4).fill(empty));
   eq('read state: unknown settings are dropped, bad numbers read as 0', Core.readState({ level: 'deus', theme: 'pink', speed: 'turbo', quiet: 1, hints: 0, tally: { w: -1, l: 2.5 }, train: { ok: 'a' }, team: 'real-madrid', rival: 'x', custom: { flamengo: ['a'], xyz: ['a', 'b', 'c'] } }), empty);
+  eq('read state: "Avançar sozinho" is on unless saved off (D15); anything but false reads as on', [Core.readState({ auto: false }).auto, 'auto' in Core.readState({ auto: true }), 'auto' in Core.readState({ auto: 'no' }), 'auto' in Core.readState({})], [false, false, false, false]);
   eq('read state: a rival equal to the club is dropped', Core.readState({ team: 'bahia', rival: 'bahia' }).rival, undefined);
   const broken = [{ ...h, names: ['a'] }, { ...h, sides: ['xyz', null] }, { ...h, level: 'x' }, { ...h, score: [13, 0] }, { ...h, hands: [['Xx'], [], [], []] }, { ...h, vira: '9o' }, { ...h, phase: 'dance' }, { ...h, value: 2 }, { ...h, phase: 'truco', ask: null }, { ...h, phase: 'eleven', eleven: null }, { ...h, rounds: [0, 0, 0, 0] }, { ...h, table: [{ seat: 7, card: '3o' }] }, { ...h, log: [1] }, { ...h, blind: 'no' }, { ...h, last: { plays: [], winner: 9 } }, { ...h, ask: { by: 9, value: 3 } }, { ...h, shout: { seat: 'x' } }, { ...h, result: { why: 1 } }];
   eq('read game: what does not hold together is null', broken.map(Core.readGame), broken.map(() => null));
