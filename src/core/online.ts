@@ -5,7 +5,7 @@
    only moves messages in and out and keeps the time. */
 import { aiAct, answer, decideEleven, newGame, nextHand, playCard, raise, whoActs, isHuman, LEVELS, SEATS6, teamOf, teamsOf } from './game';
 import type { Answer } from './game';
-import { DEFAULT_NAMES } from './teams';
+import { colorsOf, DEFAULT_NAMES } from './teams';
 import type { Game, Level, Seat, Team } from './types';
 
 /** Seats in the order people take them (at the table of four; with three pairs, see start): the first is the host, the second sits against them (each with a computer
@@ -56,11 +56,14 @@ export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; 
 /** What a phone may send. */
 export type ClientMsg =
   | { t: 'join'; name: string; token: string; level?: Level; back?: boolean }   // back: this phone was in a game in this room
-  | { t: 'start' } | { t: 'again' } | { t: 'leave' }
+  | { t: 'start' | 'again'; table?: Table } | { t: 'leave' }
   | { t: 'drop' }                                  // the connection closed: sent by the server itself, never read off the wire
   | { t: 'bot'; seat: Seat }                       // the host puts the computer in the seat of someone who left
   | { t: 'format'; format: Format; alone?: Seat }  // the host, with three people: how they play, and who pairs with a computer
   | ({ t: 'act' } & Action);
+/** The host's table as the host sees it (the host at seat 0): the names for the computer players' seats and the colour
+ *  key of each pair (see lineup in teams.ts). */
+export interface Table { names: string[]; sides: [string | null, string | null] }
 /** What a phone receives: the room as that person sees it. */
 export interface RoomView { t: 'room'; code: string; host: boolean; seat: Seat; level: Level; format: Format; members: { seat: Seat; name: string; online: boolean }[]; game: Game | null }
 
@@ -138,7 +141,7 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     return { room: { ...room, level, members: [...room.members, { seat: free, name, token, online: true }] } };
   }
   if (!me) return { room, error: 'Você não está nessa sala.' };
-  const isHost = host(room) === me;
+  const isHost = host(room) === me ? me : null;
   // before the game, leaving or dropping frees the seat; the next person keeps theirs, and the host's part passes on
   if ((msg.t === 'leave' || msg.t === 'drop') && !room.game) return { room: { ...room, members: room.members.filter(m => m !== me) } };
   // during it, a dropped connection keeps the seat to come back to; leaving for good puts the computer there at once
@@ -162,7 +165,7 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
       const order = [host(room) as Member, ...room.members.filter(m => m !== host(room))], members = room.members.map(m => ({ ...m, seat: order.indexOf(m) }));
       return { room: { ...room, members, game: startGame({ ...room, members }, rand) } };
     }
-    return { room: { ...room, game: startGame(room, rand) } };
+    return { room: { ...room, game: startGame(room, rand, msg.table, isHost.seat) } };
   }
   if (msg.t === 'bot') {
     if (!isHost || !room.game) return { room, error: 'Só quem criou a sala faz isso.' };
@@ -194,11 +197,14 @@ function toComputer(room: Room, gone: Member): Room {
   const g = room.game as Game;
   return { ...room, members: room.members.filter(m => m !== gone), game: { ...g, humans: g.humans.filter(s => s !== gone.seat), log: [...g.log, `${g.names[gone.seat]} saiu; a IA joga no lugar.`] } };
 }
-/** A new game for the people in the room; the empty seats are computer players with the bar's names. */
-function startGame(room: Room, rand: () => number): Game {
-  const three = threeOf(room), base = three ? SEATS6 : DEFAULT_NAMES;
-  const names = base.map((d, s) => room.members.find(m => m.seat === s)?.name || d);
-  return newGame(rand, room.level, { names, sides: [null, null], humans: room.members.map(m => m.seat), ...(three ? { teams: 3 as const } : {}) });
+/** A new game for the people in the room. With four seats, the empty ones are computer players with the names of the
+ *  host's table (turned from where the host sits), or the bar's, and the pairs take the colours of that table. With three
+ *  pairs, for now, the bar's names and the app's colours: the host's table has four seats (D11). */
+function startGame(room: Room, rand: () => number, table?: Table, hostSeat: Seat = 0): Game {
+  const three = threeOf(room), base = three ? SEATS6 : DEFAULT_NAMES, turned = !three && table ? table : null;
+  const names = base.map((d, s) => room.members.find(m => m.seat === s)?.name || turned?.names[(s - hostSeat + 4) % 4] || d);
+  const sides: [string | null, string | null] = turned ? (hostSeat % 2 ? [turned.sides[1], turned.sides[0]] : [turned.sides[0], turned.sides[1]]) : [null, null];
+  return newGame(rand, room.level, { names, sides, humans: room.members.map(m => m.seat), ...(three ? { teams: 3 as const } : {}) });
 }
 /** A person's move, only when it is theirs to make; anyone may deal the next hand. */
 function act(g: Game, seat: Seat, x: Action, rand: () => number): Game {
@@ -223,7 +229,8 @@ export function readMsg(raw: unknown): ClientMsg | null {
   try { o = typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>); } catch (e) { return null; }
   if (!o || typeof o !== 'object' || typeof o.t !== 'string') return null;
   if (o.t === 'join') return { t: 'join', name: String(o.name ?? ''), token: String(o.token ?? ''), ...(LEVELS.includes(o.level as Level) ? { level: o.level as Level } : {}), ...(o.back === true ? { back: true } : {}) };
-  if (o.t === 'start' || o.t === 'again' || o.t === 'leave') return { t: o.t };
+  if (o.t === 'leave') return { t: o.t };
+  if (o.t === 'start' || o.t === 'again') { const table = readTable(o.table); return { t: o.t, ...(table ? { table } : {}) }; }
   if (o.t === 'bot' && Number.isInteger(o.seat)) return { t: 'bot', seat: o.seat as number };
   if (o.t === 'format' && FORMATS.includes(o.format as Format)) return { t: 'format', format: o.format as Format, ...(Number.isInteger(o.alone) ? { alone: o.alone as number } : {}) };
   if (o.t === 'act') {
@@ -241,4 +248,11 @@ export function readRoom(x: unknown): Room | null {
   if (!r.members.every(m => m && typeof m.name === 'string' && typeof m.token === 'string' && Number.isInteger(m.seat) && typeof m.online === 'boolean')) return null;
   // rooms saved before the format existed play as they did: the table of four
   return { code: r.code, level: r.level, members: r.members, game: r.game && typeof r.game === 'object' ? r.game : null, format: FORMATS.includes(r.format) ? r.format : 'duplas' };
+}
+/** The host's table off the wire: four short names and two colour keys the catalogue knows; anything else is no table. */
+function readTable(x: unknown): Table | null {
+  const t = x as Table;
+  if (!t || typeof t !== 'object' || !Array.isArray(t.names) || t.names.length !== 4 || !t.names.every(n => typeof n === 'string' && n.length <= 24)) return null;
+  if (!Array.isArray(t.sides) || t.sides.length !== 2 || !t.sides.every(k => k === null || (typeof k === 'string' && !!colorsOf(k)))) return null;
+  return { names: t.names.map(n => n.trim().slice(0, 24)), sides: [t.sides[0], t.sides[1]] };
 }

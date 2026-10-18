@@ -119,6 +119,41 @@ Modelo de uma decisão:
   - Na tela: o placar diz "Nós" e, de cada outra dupla, o nome da pessoa nela; a mesa de 6 põe você embaixo, o parceiro em cima e as outras quatro cadeiras duas de cada lado, na ordem da roda; quem correu fica com "saiu da mão" na cadeira; a dupla não cochicha conselho com 3 duplas (a IA de 6 é a de 4 adaptada). A cor da terceira dupla é roxa (`--t2`).
 - **Não sei:** se a IA joga bem com 6 (é a de 4 adaptada); se o jogo fica bom de jogar assim. Ninguém jogou ainda.
 
+## D11. Temas: futebol, animes e jogos, mesa montada e cores por personagem
+
+- **Contexto (18/10/2026):** o Lucas pediu, além do futebol, um tema de animes (Blue Lock, Naruto Clássico, Dragon Ball), com equipes de um anime contra as de outro, e que nada ficasse "chumbado" no futebol: "se amanhã eu quiser adicionar filmes, isso precisa estar escalável, tanto na tela quanto na lógica". No mesmo dia pediu a categoria Jogos (Street Fighter e Mortal Kombat), montar a mesa com personagens de packs diferentes, em ordens diferentes, e cores da interface por jogo ou por personagem.
+- **Decisão:** um catálogo genérico em `src/core/teams.ts`, com os dados em `src/core/packs/`, um arquivo por pack:
+  - `Pack { id, kind, kindName, name, lead, colors, note?, groups }`: `kind` é a categoria (a aba da tela), `lead` o nome do primeiro da equipe ("craque", "líder"), `note` uma linha opcional mostrada sob o pack (o futebol diz quando os elencos foram conferidos).
+  - `Group { id, name, colors?, players: [3 personagens] }`, e cada personagem é um nome ou `{ name, colors? }`. Sem cor própria, o personagem herda a da equipe, e a equipe a do pack.
+  - Ids qualificados: `futebol/flamengo` (equipe), `naruto/time-7/0` (personagem, pelo lugar na equipe). Um id antigo, só de clube (`flamengo`), é lido como `futebol/flamengo`, na partida salva e nos ajustes.
+  - Três modos: Equipe (o primeiro é a dupla, os outros dois contra), Rivais (contra os dois primeiros de outra equipe, de qualquer tema) e Montar (a dupla e os dois adversários escolhidos um por um, de qualquer pack, com "Trocar a ordem" e "Sortear"; `S.seats`).
+  - Cores, nos Ajustes (`S.colorBy`): as do tema, as da equipe (padrão) ou as do personagem que é a dupla. "Eles" segue o primeiro adversário do mesmo jeito; no modo Equipe sem rival, "Eles" fica nas cores do app, porque os dois lados seriam da mesma equipe.
+  - Toda cor declarada precisa de texto com contraste de 4,5 ou mais sobre a cor principal (caso do `unit.cases.mjs`). Por isso o azul do Grêmio ficou um pouco mais escuro (`#0a72ad` no lugar de `#0d80bf`): com texto branco ou preto, o original não passava.
+  - Online, quem cria a sala manda a mesa dela no `start` (os nomes das IAs e as cores das duplas), lida por `readMsg`; sem ela, a mesa de bar.
+  - Na sala de 3 duplas (D10), por enquanto, a mesa de quem criou não vale: as IAs ficam com os nomes de bar (`SEATS6`) e o app com as cores dele, porque a mesa montada tem 4 lugares e cada pessoa escolheria a própria equipe. Fica para depois, se o Lucas quiser.
+- **Como acrescentar um tema novo (filmes, por exemplo):**
+  1. Criar `src/core/packs/<id>.ts` com um `Pack` (copie um dos animes), com `kind: 'filmes'` e `kindName: 'Filmes'` se for uma categoria nova.
+  2. Registrar no `PACKS` de `src/core/packs/index.ts`, na posição em que deve aparecer.
+  3. Rodar `scripts/verify.sh`: os casos do catálogo conferem ids, três personagens por equipe e o contraste de toda cor; a tela gera a aba e os botões sozinha. Citar o pack no `CLAUDE.md` (o `docs_check.py` cobra).
+- **De onde vieram os personagens:** da memória do agente, em 18/10/2026, sem conferir na web; nomes como saem no Brasil (dublagem e legendas). Personagens não envelhecem como elencos, mas um nome pode estar escrito diferente do que a pessoa conhece: dá para trocar no app.
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - As equipes de cada anime e jogo: Blue Lock por time da seleção e da Liga Neo Egoísta (Time Z, Time V, Bastard München com o Noa como craque, Manshine City, PXG, Ubers, Barcha, Japão Sub-20); Naruto pelos times do Exame Chunin e outros grupos (Time 7, Time 8, Time 10, Time Gai, Irmãos da Areia, Ninjas do Som, Quarteto do Som com Tayuya, Sakon e Kidomaru, Ninjas da Névoa, Jônins de Konoha, Sannin); Dragon Ball pelos grupos do clássico e do Z (Guerreiros Z, Saiyajins, Turma do Kame com Bulma, Escola do Grou, Namekuseijins, Força Ginyu, Família de Freeza, Androides, Patrulha Vermelha, Majin Boo). A revisão do coordenador (18/10/2026) corrigiu o Quarteto (sem o Kimimaro), tirou o Tenshinhan da Turma do Kame e trouxe o Piccolo; Street Fighter (Shotokan, Shadaloo, Força Aérea, Lutadores do Mundo, Mestres da Ásia); Mortal Kombat (Shaolin, Lin Kuei, Forças Especiais, Exoterra, Shirai Ryu, Netherrealm). Os packs de Street Fighter e Mortal Kombat foram completados pelo agente F: todo personagem tem cor própria.
+  - Sugestões que mudaram: o "Blue Lock Eleven" ficou de fora para não repetir quase todos os nomes; "Mundo" virou duas equipes (Lutadores do Mundo e Mestres da Ásia); o Scorpion lidera a Shirai Ryu.
+  - As cores são inspiradas nas roupas e nas equipes; nenhuma imagem, logotipo ou desenho.
+- **Não sei:** se os nomes estão como o Lucas conhece em todos os casos (por exemplo "Rikum" ou "Recoome", "Exoterra" ou "Outworld"); se as cores agradam. Os nomes podem ser trocados no app.
+
+## D12. Heróis x Vilões
+
+- **Contexto (18/10/2026):** o Lucas pediu um modo "Heróis x Vilões" (protagonistas contra antagonistas), onde fizer sentido.
+- **Decisão:** cada personagem pode ter `side: 'heroi' | 'vilao'` nos dados do pack; a equipe pode ter um padrão, e o personagem sobrescreve. O modo só aparece se algum pack tiver pelo menos dois heróis e dois vilões (`sidedPacks`). Na tela, "Heróis x Vilões" escolhe o universo (um pack, ou "Misturado" entre todos os que têm lados) e o lado da pessoa (heróis por padrão, ou vilões); a dupla sai do lado dela e os dois adversários do outro, sorteados (`drawSided`), com "Sortear de novo", e a mesa pode ser editada como no Montar. "Eles" fica nas cores dos adversários, como nos outros modos. Guardado em `S.hv` junto com `S.seats`.
+- **A mesma pessoa nunca senta em dois lugares** (pedido do coordenador ao revisar): Nagi, Reo, Bachira e Isagi aparecem em duas equipes de Blue Lock, fiel ao anime; `samePerson` compara pelo nome, `readSeats` recusa a mesa com a mesma pessoa duas vezes, o sorteio nunca repete, e na tela de montar, pôr alguém que já está na mesa troca os dois de lugar.
+- **Marcações discutíveis (decididas pelo agente, confirmar com o Lucas):**
+  - Futebol e Blue Lock ficam sem lados: não há vilão de verdade.
+  - Naruto: os Irmãos da Areia (Gaara, Kankuro, Temari) são heróis, porque viram aliados a partir do resgate do Sasuke, embora sejam adversários no Exame Chunin; Orochimaru é vilão dentro dos Sannin; Kabuto não está no pack.
+  - Dragon Ball: os Saiyajins (Vegeta, Nappa, Raditz) são vilões, pela saga em que aparecem juntos; a Escola do Grou (Tenshinhan, Chaos, Mestre Tsuru) é de heróis, embora o Mestre Tsuru seja vilão no clássico.
+  - Street Fighter: Akuma e Sagat são vilões; o resto dos Shotokan e dos Mestres da Ásia, heróis.
+  - Mortal Kombat: Sub-Zero e Kitana são heróis; o resto da Exoterra e do Netherrealm, vilões; Smoke, Cyrax e a Shirai Ryu (Scorpion, Takeda, Kenshi) ficam sem lado, porque mudam de lado ao longo da série.
+
 ## Pendências
 
 | Pendência | Quem resolve |
