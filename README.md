@@ -10,6 +10,7 @@ Feito a partir do [secret-game](https://github.com/lucasmagalhaees/secret-game),
 - **Rodinhas**: manilhas marcadas, lugar de cada carta no ranking, quem está levando a rodada, por que ela foi ganha. Tira quando quiser.
 - **Treino**: "Qual é a manilha?" e "Quem ganha a rodada?", com duelos de manilha pelo naipe e cangadas, e a explicação de cada resposta.
 - **Ranking e glossário**: escolha a vira e veja da mais forte para a mais fraca; zap, copas, espadilha, picafumo, cangar, mão de onze, mão de ferro, pé e mão.
+- **Sua equipe, por tema**: futebol (os 20 clubes da Série A 2026), animes (Blue Lock, Naruto Clássico, Dragon Ball) e jogos (Street Fighter, Mortal Kombat). Jogue com uma equipe, contra a de outro tema, ou monte a mesa personagem por personagem; as cores do app seguem o tema, a equipe ou a sua dupla. Um tema novo é um arquivo em `src/core/packs/` (veja D11 em `docs/decisoes.md`).
 - **Jogar online**: crie uma sala e mande o link; você e uma IA contra um amigo e outra IA (ou até 4 pessoas), cada um no seu celular.
 - **Mesa real**: para partidas de verdade. Diga a vira e suas cartas por toque (grade com as 40 cartas) ou por voz, e o app mostra manilha, a força de cada carta, o que ainda ganha dela e qual carta joga.
 - Animações, som e vibração; tema claro e escuro; abre sem internet depois da primeira vez e avisa quando sai versão nova.

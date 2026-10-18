@@ -3,7 +3,7 @@ import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, saveS, setS, ui } from './state';
+import { S, applyTheme, saveS, setS, table, ui } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
 import { connect, inRoom, leave, net, rawSeat, retryNow, roomLink, send } from './net';
@@ -59,7 +59,7 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, Core.lineup(S.team, S.rival, S.custom))); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
+function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
 function home(): void { clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS(); render(); window.scrollTo(0, 0); }
 /** The person plays a card: it lifts off the hand, then lands on the table. Taps wait meanwhile. */
 function playMine(g: Game, k: number): void {
@@ -92,11 +92,44 @@ function voice(): void {
   }, error => { ui.listening = false; render(); if (error && error !== 'no-speech' && error !== 'aborted') toast(error === 'not-allowed' ? 'O microfone não foi liberado.' : 'Não deu pra ouvir agora.'); });
 }
 
-/** The club, the mode and the names of the players. */
-function club(a: string, v: string): void {
+/** The theme: a ready team, rivals, or the table seat by seat; the names of the players; the tabs of the pickers. */
+function club(a: string, v: string, d: DOMStringMap): void {
+  const s = S.seats;
   if (a === 'team') { if (v) S.team = v; else delete S.team; if (!v || S.rival === v) delete S.rival; ui.editing = false; }
-  else if (a === 'mode') { if (v === 'own') delete S.rival; else S.rival = (Core.TEAMS.find(t => t.id !== S.team) as { id: string }).id; }
+  else if (a === 'mode') {
+    if (v === 'hv') { S.hv = {}; S.seats = Core.drawSided(rand, null, 'heroi'); ui.slot = 0; }
+    else if (v === 'seats') {
+      delete S.hv;
+      if (!s) {
+        const t = S.team || Core.TEAMS[0].id, r = S.rival;
+        S.seats = { partner: `${t}/0`, opp: r ? [`${r}/0`, `${r}/1`] : [`${t}/1`, `${t}/2`] };
+      }
+      ui.slot = 0;
+    } else {
+      delete S.seats; delete S.hv;
+      if (v === 'own') delete S.rival;
+      else { if (!S.team) S.team = Core.TEAMS[0].id; if (!S.rival) S.rival = (Core.TEAMS.find(t => t.id !== S.team) as { id: string }).id; }
+    }
+  }
   else if (a === 'rival') S.rival = v;
+  else if (a === 'kind' && d.k) ui.kind = { ...ui.kind, [d.k]: v };
+  else if (a === 'slot') ui.slot = (Number(v) % 3) as 0 | 1 | 2;
+  else if (a === 'seat' && s) {
+    // the character goes to the seat being filled; if it sat elsewhere, the two swap
+    const all = [s.partner, ...s.opp], was = all.findIndex((c, k) => k !== ui.slot && Core.samePerson(c, v));
+    if (was >= 0) all[was] = all[ui.slot];
+    all[ui.slot] = v;
+    S.seats = { partner: all[0], opp: [all[1], all[2]] };
+    ui.slot = ((ui.slot + 1) % 3) as 0 | 1 | 2;
+  }
+  else if (a === 'swapopp' && s) S.seats = { partner: s.partner, opp: [s.opp[1], s.opp[0]] };
+  else if (a === 'drawseats') { S.seats = S.hv ? Core.drawSided(rand, S.hv.pack || null, S.hv.side || 'heroi') : Core.drawSeats(rand); ui.slot = 0; }
+  else if ((a === 'hvpack' || a === 'hvside') && S.hv) {
+    const h = { ...S.hv };
+    if (a === 'hvpack') { if (v) h.pack = v; else delete h.pack; } else if (v === 'vilao') h.side = 'vilao'; else delete h.side;
+    S.hv = h; S.seats = Core.drawSided(rand, h.pack || null, h.side || 'heroi'); ui.slot = 0;
+  }
+  else if (a === 'colorby') { if (v === 'pack' || v === 'char') S.colorBy = v; else delete S.colorBy; }
   else if (a === 'editplayers') ui.editing = true;
   else if (a === 'saveplayers' && S.team) {
     const names = [0, 1, 2].map(i => valOf(`#pl${i}`).trim().slice(0, 24));
@@ -160,8 +193,8 @@ function room(a: string, d: DOMStringMap): void {
   const code = net.view?.code || S.online?.code || '';
   if (a === 'createroom') joinRoom(Core.roomCode(rand));
   else if (a === 'joinroom') joinRoom(valOf('#ocode').trim().toUpperCase());
-  else if (a === 'startroom') send({ t: 'start' });
-  else if (a === 'againroom') send({ t: 'again' });
+  else if (a === 'startroom') send({ t: 'start', table: table() });
+  else if (a === 'againroom') send({ t: 'again', table: table() });
   else if (a === 'botseat') send({ t: 'bot', seat: rawSeat(Number(d.s)) });
   else if (a === 'roomformat') send({ t: 'format', format: d.f === 'tres' ? 'tres' : 'duplas' });
   else if (a === 'roomalone') send({ t: 'format', format: 'duplas', alone: rawSeat(Number(d.s)) });
@@ -191,7 +224,7 @@ export function initEvents(): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx'].includes(a)) setting(a, d.v || '');
-    else if (['team', 'mode', 'rival', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '');
+    else if (['team', 'mode', 'rival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
