@@ -6,7 +6,10 @@ import { render } from './app/render';
 import { S, ui } from './app/state';
 import { initUpdates } from './app/update';
 import { net } from './app/net';
+import { firstRoute, initNav } from './app/nav';
 
+ui.route = firstRoute();
+initNav();
 initEvents();
 window.__APP = { Core, ui, get S() { return S; }, get room() { return net.view; } };
 render();

@@ -370,3 +370,30 @@ details.card .log,details.card .ranking{margin-top:12px}
 body.tabbed main{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .tabpanel{display:flex;flex-direction:column;gap:inherit}
+
+/* the screens of a tab: a title (and, below the root, a way back), lines that open other screens, lists to choose from */
+.screenhead{display:flex;align-items:center;gap:10px;min-height:44px}
+.screenhead h1{margin:0;font:800 22px/1.15 var(--display);letter-spacing:.01em;min-width:0;overflow-wrap:anywhere}
+.screenhead .back{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 12px 0 8px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:700 15px/1 var(--display)}
+.screenhead .back span{font-size:22px;line-height:0}
+.now{margin:0;color:var(--muted)}
+.now b{color:var(--fg)}
+.entries,.list{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.entry,.item{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px;text-align:left;width:100%}
+.entry+.entry,.item+.item,.list .charrow+.charrow{border-top:1px solid var(--cardline)}
+.etext{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.etext b{font:700 17px/1.2 var(--display)}
+.etext small{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chev{flex:none;font-size:26px;line-height:1;color:var(--muted)}
+.item.on{background:var(--bg)}
+.tick{flex:none;font-weight:800;color:var(--accent)}
+.entry:focus-visible,.item:focus-visible{outline:3px solid var(--accent-bg);outline-offset:-3px}
+/* a team's colours, small: the only place they show in the lists */
+.sw{flex:none;width:10px;align-self:stretch;min-height:28px;border-radius:999px;background:linear-gradient(var(--a) 0 55%,var(--b) 55%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.sw.none{background:var(--cardline)}
+.slot .sw{width:100%;min-height:6px;height:6px}
+.list .charrow{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.charrow>span:not(.sw){flex:none;width:30%;font:700 14px/1.2 var(--display)}
+.chars{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.chip-btn{min-height:36px;padding:0 10px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 14px/1 var(--font)}
+.chip-btn.on{background:var(--fg);color:var(--surface)}

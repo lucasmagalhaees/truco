@@ -3,7 +3,8 @@ import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, keepTab, saveS, setS, table, TABS, ui } from './state';
+import { S, applyTheme, saveS, setS, table, TABS, ui } from './state';
+import { back, backTo, go } from './nav';
 import type { Tab } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
@@ -61,7 +62,13 @@ export function schedule(): void {
 }
 
 function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
-function home(): void { clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS(); render(); window.scrollTo(0, 0); }
+/** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
+ *  on the tab they were opened from. */
+function home(): void {
+  const wasGame = !!S.game;
+  clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS();
+  if (wasGame) go(['jogar'], 'replace'); else { render(); window.scrollTo(0, 0); }
+}
 /** The person plays a card: it lifts off the hand, then lands on the table. Taps wait meanwhile. */
 function playMine(g: Game, k: number): void {
   if (Core.whoActs(g) !== 0 || g.phase !== 'play') return;
@@ -225,15 +232,16 @@ export function initEvents(): void {
   document.addEventListener('keydown', e => {
     const tab = (e.target as HTMLElement | null)?.closest?.('[role=tab]');
     if (!tab) return;
-    const k = TABS.indexOf(ui.tab), to = e.key === 'ArrowRight' ? k + 1 : e.key === 'ArrowLeft' ? k - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
+    const k = TABS.indexOf(ui.route[0] as Tab), to = e.key === 'ArrowRight' ? k + 1 : e.key === 'ArrowLeft' ? k - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
     if (to === null) return;
-    e.preventDefault(); keepTab(TABS[(to + TABS.length) % TABS.length]); render();
-    (document.getElementById(`tab-${ui.tab}`) as HTMLElement | null)?.focus();
+    e.preventDefault(); go([TABS[(to + TABS.length) % TABS.length]]);
+    (document.getElementById(`tab-${ui.route[0]}`) as HTMLElement | null)?.focus();
   });
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx'].includes(a)) setting(a, d.v || '');
+    else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || '', d); backTo(1); }
     else if (['team', 'mode', 'rival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
@@ -248,7 +256,9 @@ export function initEvents(): void {
     else if (a === 'nextround') real(Core.nextRound(S.real));
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
-    else if (a === 'tab') { keepTab(TABS.includes(d.v as Tab) ? d.v as Tab : 'jogar'); render(); window.scrollTo(0, 0); }
+    else if (a === 'tab') go([TABS.includes(d.v as Tab) ? d.v as Tab : 'jogar']);
+    else if (a === 'go' && d.v) go(d.v.split('/'));
+    else if (a === 'back') back();
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
     else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'roomformat', 'roomalone', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
     else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);
