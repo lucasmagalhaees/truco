@@ -1,7 +1,8 @@
 import { Core } from '../core';
 import type { Card, Drill, Game, Pack, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
-import { S, applyClub, table, ui } from './state';
+import { S, applyClub, table, TABS, ui } from './state';
+import type { Tab } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
 import { canPlayOnline, inRoom, net, roomLink } from './net';
@@ -25,6 +26,8 @@ export function render(): void {
   part('score').innerHTML = !g ? '' : Core.teamsOf(g) === 3
     ? g.score.map((p, t) => `<span class="chip ${TEAM_CLS[t]}${bump ? ' bump' : ''}" id="chip${t}"><span class="nm">${t === 0 ? 'Nós' : esc(pairName(g, t as Team))}</span> ${p}</span>`).join('')
     : `<span class="chip nos${bump ? ' bump' : ''}">Nós ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}">Eles ${g.score[1]}</span>`;
+  const atHome = !online && !g && !ui.drill && !ui.real, tabs = part('tabs');
+  tabs.hidden = !atHome; tabs.innerHTML = atHome ? vTabs() : ''; document.body.classList.toggle('tabbed', atHome);
   view.innerHTML = online ? (g ? vNet() + vGame(g) : vLobby()) : g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
 }
 
@@ -67,21 +70,38 @@ const LEVEL: Record<string, [string, string]> = {
 function vHome(): string {
   const lv = S.level, t = S.tally, tr = S.train;
   const lvBtn = (v: string): string => `<button class="${lv === v ? 'on' : ''}" data-act="level" data-v="${v}" aria-pressed="${lv === v}">${LEVEL[v][0]}</button>`;
-  return `<section class="card" id="start"><span class="label">Nova partida</span>
+  const panes: Record<Tab, () => string> = {
+    jogar: () => `<section class="card" id="start"><span class="label">Nova partida</span>
     <p class="big" id="lineup">Você e <b>${(name(2))}</b> contra <b>${(name(1))}</b> e <b>${(name(3))}</b>. Quem fizer ${Core.WIN_POINTS} pontos primeiro leva.</p>
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>
-    <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p></section>
-  ${vOnline()}
-  ${vClub()}
-  <section class="card" id="train"><span class="label">Treino</span>
+    <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p>
+    <button class="btn ghost block" data-act="tab" data-v="equipe">Trocar quem senta na mesa</button></section>
+  ${vOnline()}`,
+    treinar: () => `<section class="card" id="train"><span class="label">Treino</span>
     <p>Exercícios rápidos pra ver na hora o que manda na mesa.</p>
     <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button></div>
     <p class="hint" id="trainstats">${tr.total ? `Acertos: ${tr.ok} de ${tr.total} (${Math.round(100 * tr.ok / tr.total)}%). Melhor sequência: ${tr.best}.` : 'Nenhum exercício feito ainda.'}</p></section>
-  <section class="card" id="realcard"><span class="label">Mesa real</span>
+  ${vGloss()}${vRules()}`,
+    real: () => `<section class="card" id="realcard"><span class="label">Mesa real</span>
     <p>Jogando de verdade? Diga a vira e suas cartas (num toque ou falando) e o app mostra o ranking, as manilhas, o que ainda pode ganhar de você e qual carta joga.</p>
-    <button class="btn ghost block" data-act="real">Abrir o assistente</button></section>
-  ${vGloss()}${vRules()}${vSettings()}`;
+    <button class="btn block" data-act="real">Abrir o assistente</button></section>`,
+    equipe: () => vClub(),
+    ajustes: () => vSettings()
+  };
+  return `<div class="tabpanel" role="tabpanel" id="panel" aria-labelledby="tab-${ui.tab}">${panes[ui.tab]()}</div>`;
+}
+/** The tabs of the start screen, at the bottom like an app's, within reach of the thumb. Only on the start screen. */
+const TAB_LABEL: Record<Tab, string> = { jogar: 'Jogar', treinar: 'Treinar', real: 'Mesa real', equipe: 'Equipe', ajustes: 'Ajustes' };
+const TAB_ICON: Record<Tab, string> = {
+  jogar: '<rect x="4" y="5" width="10" height="14" rx="2"/><path d="M14 7l4 1.2-2.6 11.6-5-1.3"/>',
+  treinar: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/>',
+  real: '<ellipse cx="12" cy="12" rx="9" ry="6"/><rect x="9.5" y="9" width="5" height="6" rx="1"/>',
+  equipe: '<path d="M8 4l-4 3 2 3 2-1v11h8V9l2 1 2-3-4-3c-.5 1.5-2 2.5-4 2.5S8.5 5.5 8 4z"/>',
+  ajustes: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>'
+};
+function vTabs(): string {
+  return TABS.map(t => `<button role="tab" id="tab-${t}" class="tab${ui.tab === t ? ' on' : ''}" data-act="tab" data-v="${t}" aria-selected="${ui.tab === t}" aria-controls="panel" tabindex="${ui.tab === t ? 0 : -1}"><svg viewBox="0 0 24 24" aria-hidden="true">${TAB_ICON[t]}</svg><span>${TAB_LABEL[t]}</span></button>`).join('');
 }
 
 /* ---------- playing online ---------- */

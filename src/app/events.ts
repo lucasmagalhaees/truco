@@ -3,7 +3,8 @@ import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, saveS, setS, table, ui } from './state';
+import { S, applyTheme, keepTab, saveS, setS, table, TABS, ui } from './state';
+import type { Tab } from './state';
 import { applyUpdate, checkNow } from './update';
 import { listen } from './voice';
 import { connect, inRoom, leave, net, rawSeat, retryNow, roomLink, send } from './net';
@@ -220,6 +221,15 @@ function setting(a: string, v: string): void {
 
 export function initEvents(): void {
   document.addEventListener('input', fieldOk);
+  // the tabs: arrow keys move between them (and open the one reached), Home and End go to the ends
+  document.addEventListener('keydown', e => {
+    const tab = (e.target as HTMLElement | null)?.closest?.('[role=tab]');
+    if (!tab) return;
+    const k = TABS.indexOf(ui.tab), to = e.key === 'ArrowRight' ? k + 1 : e.key === 'ArrowLeft' ? k - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault(); keepTab(TABS[(to + TABS.length) % TABS.length]); render();
+    (document.getElementById(`tab-${ui.tab}`) as HTMLElement | null)?.focus();
+  });
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
@@ -238,6 +248,7 @@ export function initEvents(): void {
     else if (a === 'nextround') real(Core.nextRound(S.real));
     else if (a === 'resetreal') { ui.heard = ''; real(Core.emptyTable()); }
     else if (a === 'listen') voice();
+    else if (a === 'tab') { keepTab(TABS.includes(d.v as Tab) ? d.v as Tab : 'jogar'); render(); window.scrollTo(0, 0); }
     else if (a === 'brand') { if (ui.drill && !g) home(); else window.scrollTo(0, 0); }
     else if (['createroom', 'joinroom', 'startroom', 'againroom', 'botseat', 'roomformat', 'roomalone', 'leaveroom', 'copylink', 'sharelink', 'retryroom'].includes(a)) room(a, d);
     else if (inRoom() && ['play', 'truco', 'answer', 'eleven', 'next'].includes(a)) netAct(a, d);
