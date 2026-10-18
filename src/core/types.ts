@@ -8,7 +8,7 @@ export type Theme = 'light' | 'dark';
 /** How long the computer players think before each move. */
 export type Speed = 'calma' | 'normal' | 'rapida';
 /** How well the computer players play. */
-export type Level = 'facil' | 'medio' | 'dificil';
+export type Level = 'facil' | 'medio' | 'dificil' | 'extremo';
 
 /** A card as two letters: the rank (4 5 6 7 Q J K A 2 3) and the suit (o ouros, e espadas, c copas, p paus). */
 export type Card = string;

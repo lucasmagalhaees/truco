@@ -59,7 +59,7 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, Core.lineup(S.team, S.rival, S.custom))); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil' }[S.level]}.`); }
+function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, Core.lineup(S.team, S.rival, S.custom))); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
 function home(): void { clearTimeout(timer); ui.drill = null; ui.real = false; ui.sheet = null; ui.confirmEnd = false; setS({ ...S, game: null }); saveS(); render(); window.scrollTo(0, 0); }
 /** The person plays a card: it lifts off the hand, then lands on the table. Taps wait meanwhile. */
 function playMine(g: Game, k: number): void {
