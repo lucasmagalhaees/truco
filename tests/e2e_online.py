@@ -70,6 +70,7 @@ with sync_playwright() as p:
     txt = lambda pg, sel: pg.text_content(sel).replace('\xa0', ' ')
     V = lambda pg: pg.evaluate('window.__APP.room')
     G = lambda pg: (V(pg) or {}).get('game')
+    WIDE = "() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > W + 0.5).map(e => `${e.tagName}#${e.id}.${e.className} r=${e.getBoundingClientRect().right.toFixed(1)}`).slice(0, 8); }"
     overflow = lambda pg: pg.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
 
     # ---------- without a server, the card says so ----------
@@ -113,6 +114,23 @@ with sync_playwright() as p:
     third.fill('#oname', 'Zé'); third.fill('#ocode', 'AB'); third.click('[data-act=joinroom]')
     assert txt(third, '#ocode-err') == 'O código tem 5 letras.' and third.get_attribute('#ocode', 'aria-invalid') == 'true' and third.evaluate('document.activeElement.id') == 'ocode'
     assert third.locator('#lobby').count() == 0 and third.locator('#oname-err').is_hidden()
+
+    # ---------- three people: the host chooses how they play (two against one, and who plays with a computer) ----------
+    third.fill('#ocode', code); third.click('[data-act=joinroom]'); third.wait_for_selector('#lobby #format')
+    host.wait_for_selector('#format [data-act=roomalone]')
+    assert host.locator('#format [data-act=roomformat][data-f=duplas].on').count() == 1
+    assert host.locator('#format [data-act=roomformat][data-f=tres]').is_disabled() and 'em breve' in txt(host, '#format [data-f=tres]')
+    assert 'Zé' in txt(host, '#lseat2') and txt(guest, '#format b') == 'Você' and txt(third, '#format b') == '<b>Amigo</b>', 'by default the third sits with the host; the second plays with the computer'
+    assert guest.locator('#format button').count() == 0 and third.locator('#format button').count() == 0, 'only the host chooses'
+    host.click('#format [data-act=roomalone][data-s="0"]')                # the host plays with the computer: the other two pair up
+    guest.wait_for_function('document.getElementById("lseat2").textContent.includes("Zé")')
+    third.wait_for_function('document.getElementById("lseat2").textContent.includes("Amigo")')
+    assert 'Sua dupla' in txt(guest, '#lseat2') and 'Lucas' in txt(guest, '#lseat1') + txt(guest, '#lseat3') and 'IA (Cida)' in txt(host, '#lseat2')
+    assert 'Lucas' in txt(third, '#format b') and overflow(host) == 0 and overflow(third) == 0
+    host.screenshot(path=str(SHOTS / f'o1b-tres-pessoas-{TAG}.png'), full_page=True)
+    third.click('[data-act=leaveroom]'); third.wait_for_selector('#online')
+    host.wait_for_function('!document.getElementById("format")')
+    assert '<b>Amigo</b>' in txt(host, '#lseat1') and 'Começar com 2 pessoas' in txt(host, '[data-act=startroom]')
 
     # ---------- the game: each sees only their own cards, from their own seat ----------
     host.click('[data-act=startroom]')
@@ -178,7 +196,7 @@ with sync_playwright() as p:
     for ws in line_['open']: ws.close()
     line_['open'].clear()
     guest.wait_for_selector('#netbar:not(.off)')
-    _bar = (txt(guest, '#netbar'), overflow(guest)); assert _bar == ('Caiu a conexão, voltando…', 0), _bar
+    _bar = (txt(guest, '#netbar'), overflow(guest)); assert _bar == ('Caiu a conexão, voltando…', 0), (_bar, guest.evaluate(WIDE))
     guest.screenshot(path=str(SHOTS / f'o3-caiu-{TAG}.png'))
     host.wait_for_selector('#netstatus [data-act=botseat]')            # the seat is kept; the host could hand it over
     assert 'Amigo' in txt(host, '#netstatus') and 'saiu da sala' in txt(host, '#netstatus')
