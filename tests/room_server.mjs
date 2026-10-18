@@ -1,7 +1,8 @@
 // A room server on this machine, for the tests: the same core (src/core/online.ts) and the same messages as the one on
 // Cloudflare (server/worker.ts), over a plain WebSocket server. The Cloudflare one adds only storage and alarms.
-//   node tests/room_server.mjs [port] [think-ms]     prints "salas em ws://127.0.0.1:<port>" once it listens
-// think-ms fixes how long the computer players think (default: the core's ROOM_THINK and ROOM_ROUND_PAUSE).
+//   node tests/room_server.mjs [port] [think-ms] [hand-ms]     prints "salas em ws://127.0.0.1:<port>" once it listens
+// think-ms fixes how long the computer players think (default: the core's ROOM_THINK and ROOM_ROUND_PAUSE); hand-ms how
+// long a finished hand stays before the next one is dealt (default: the core's ROOM_HAND_PAUSE).
 // With HIBERNATE=1 the room is never kept as an object between two events: it is written out as JSON after every change
 // and read back with Core.readRoom before every message, close and computer move, as the Durable Object does when it
 // sleeps and wakes. A saved room that readRoom refuses stops this server, so the test fails loudly.
@@ -16,7 +17,7 @@ const outDir = path.join(root, 'tests', '.build', 'room');
 await build({ root, configFile: false, logLevel: 'silent', build: { outDir, emptyOutDir: true, minify: false, target: 'node22', lib: { entry: path.join(root, 'src', 'core', 'index.ts'), formats: ['es'], fileName: () => 'core.mjs' } } });
 const { Core } = await import(pathToFileURL(path.join(outDir, 'core.mjs')).href);
 
-const port = Number(process.argv[2] || 0), think = process.argv[3] !== undefined ? Number(process.argv[3]) : null;
+const port = Number(process.argv[2] || 0), think = process.argv[3] !== undefined ? Number(process.argv[3]) : null, handMs = process.argv[4] !== undefined ? Number(process.argv[4]) : null;
 const HIBERNATE = process.env.HIBERNATE === '1';
 const rooms = new Map();                       // code -> { saved | room, sockets: Set<ws>, timer }
 /** The room as it is now: the object itself, or (sleeping) read back from what was saved, like worker.ts's load. */
@@ -41,7 +42,7 @@ function changed(r, room) {
     const now = load(r, r.code);
     if (Core.aiDelay(now) === null) return;
     changed(r, Core.aiStep(now, Math.random));
-  }, think ?? d);
+  }, room.game && room.game.phase === 'handEnd' ? handMs ?? d : think ?? d);
 }
 
 const server = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); res.end('truco: servidor de salas no ar'); });

@@ -13,6 +13,8 @@ import type { Game, Level, Seat, Team } from './types';
 export const SEAT_ORDER: Seat[] = [0, 1, 2, 3];
 /** How long the computer players think on the server, and the extra pause after a round closes, in ms. */
 export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;
+/** How long a finished hand stays on everyone's screen before the server deals the next one, in ms (D15). */
+export const ROOM_HAND_PAUSE = 3000;
 export const NAME_MAX = 16, CODE_LEN = 5;
 /** What a phone coming back to its game hears when the room is gone (nobody in it for a day), or its seat went to the computer. */
 export const ROOM_GONE = 'A sala anterior acabou.', SEAT_GONE = 'Seu lugar na partida ficou com a IA.';
@@ -217,14 +219,18 @@ function act(g: Game, seat: Seat, x: Action, rand: () => number): Game {
   if (x.a === 'answer') return ['accept', 'run', 'raise'].includes(x.v) ? answer(g, x.v) : g;
   return decideEleven(g, x.v === true);
 }
-/** If a computer player has to move, how long to wait first (ms); null when it is a person's move, or nobody's. */
+/** If the server has to move (a computer player, or dealing the next hand once a hand is over), how long to wait first
+ *  (ms); null when it is a person's move, or nobody's. */
 export function aiDelay(room: Room): number | null {
   const g = room.game, s = g ? whoActs(g) : null;
-  if (!g || s === null || isHuman(g, s) || !room.members.length) return null;      // nobody left: the computer stops too
+  if (!g || !room.members.length) return null;                                     // nobody left: the computer stops too
+  if (g.phase === 'handEnd') return ROOM_HAND_PAUSE;                               // the next hand comes by itself (D15)
+  if (s === null || isHuman(g, s)) return null;
   return ROOM_THINK + (g.phase === 'play' && !g.table.length && g.last ? ROOM_ROUND_PAUSE : 0);
 }
-/** The computer player's move, if one has to move. */
-export const aiStep = (room: Room, rand: () => number): Room => (room.game && aiDelay(room) !== null ? { ...room, game: aiAct(room.game, rand) } : room);
+/** The server's move, if it has one: the next hand after a finished one, or the computer player's move. */
+export const aiStep = (room: Room, rand: () => number): Room => (!room.game || aiDelay(room) === null ? room
+  : { ...room, game: room.game.phase === 'handEnd' ? nextHand(room.game, rand) : aiAct(room.game, rand) });
 /** A message as it arrived over the wire: anything that is not a message reads as null. */
 export function readMsg(raw: unknown): ClientMsg | null {
   let o: Record<string, unknown>;
