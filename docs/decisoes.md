@@ -154,6 +154,20 @@ Modelo de uma decisão:
   - Street Fighter: Akuma e Sagat são vilões; o resto dos Shotokan e dos Mestres da Ásia, heróis.
   - Mortal Kombat: Sub-Zero e Kitana são heróis; o resto da Exoterra e do Netherrealm, vilões; Smoke, Cyrax e a Shirai Ryu (Scorpion, Takeda, Kenshi) ficam sem lado, porque mudam de lado ao longo da série.
 
+## D13. Navegação por abas e em árvore, temas separados
+
+- **Contexto (18/10/2026, pedido do Lucas):** "o site cresceu muito, está tudo encavalado numa página só, com muitos elementos de cores diferentes; tem que ter navegação por abas, uma árvore de navegação; e os temas não podem se misturar: futebol, anime e jogo cada um apartado".
+- **Decisão:** cinco abas numa barra fixa embaixo (Jogar, Treinar, Mesa real, Equipe, Ajustes); dentro de cada aba, telas em árvore com título e "Voltar", o caminho no endereço (`#equipe/time/anime/naruto`) para o voltar do navegador funcionar; a Equipe separa por categoria e universo, gerada do catálogo (`kind` dos packs), nunca uma lista misturada; as cores das equipes só no topo, no placar e numa faixa pequena nos itens. A aba aberta fica lembrada no navegador (`truco.tab`), fora do estado salvo. Ícone da página e da Tela de Início.
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - A ordem das abas e os ícones (desenhos de traço feitos à mão, sem biblioteca). "Mesa real" é uma aba própria, não uma tela do Treinar.
+  - O nível da IA fica na raiz de Jogar, junto do "Dar as cartas"; o online é uma tela abaixo dela. Jogar tem um atalho "Trocar quem senta na mesa" que abre a aba Equipe.
+  - Na categoria com um universo só (Futebol), o passo do universo é pulado.
+  - Escolher uma equipe volta para a raiz da Equipe (as telas do caminho saem do histórico); o voltar do navegador depois disso vai para a aba anterior.
+  - Montar a mesa e Heróis x Vilões mostram um botão para começar o modo quando ele não está em uso, e o seletor de personagens com abas de categoria e de universo quando está.
+  - O treino e o assistente da mesa real cobrem a tela (sem a barra) e ganham um passo no histórico (`#treinar/exercicio`, `#real/assistente`); recarregar nesse endereço abre a raiz da aba.
+  - Durante a partida, o voltar do navegador não encerra a partida (só o "Encerrar", com dois toques).
+- **Não sei:** se o Lucas prefere outra ordem ou outros nomes de aba; se a barra embaixo atrapalha no iPhone com o app na Tela de Início (só conferido no Chromium).
+
 ## Pendências
 
 | Pendência | Quem resolve |

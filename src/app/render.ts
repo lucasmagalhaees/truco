@@ -174,7 +174,7 @@ function equipeScreen(r: string[]): Screen {
 const invited = (): string => { const c = new URLSearchParams(location.search).get('sala') || ''; return Core.isCode(c.toUpperCase()) ? c.toUpperCase() : ''; };
 function vOnline(): string {
   const off = !canPlayOnline(), inv = invited();
-  return `<section class="card" id="online"><span class="label">Jogar online</span>
+  return `<section class="card" id="online">
     <p>Você e uma IA contra um amigo e outra IA, cada um no seu celular. Cabem até 4 pessoas; lugar vazio fica com a IA.</p>
     ${inv ? `<p class="explain" id="invite">Você foi chamado para a sala <b>${inv}</b>. Escreva seu nome e toque em Entrar.</p>` : ''}
     <div class="field"><input id="oname" maxlength="16" autocomplete="nickname" placeholder="seu nome" value="${esc(S.myName || '')}" aria-label="Seu nome" aria-describedby="oname-err"></div>
@@ -183,7 +183,7 @@ function vOnline(): string {
     <div class="or" aria-hidden="true">ou entre com o código</div>
     <div class="row"><div class="field"><input id="ocode" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="código" value="${esc(inv)}" aria-label="Código da sala" aria-describedby="ocode-err"></div><button class="btn ghost" data-act="joinroom"${off ? ' disabled' : ''}>Entrar</button></div>
     <p class="fielderr" id="ocode-err" hidden></p>
-    ${off ? '<p class="hint" id="onlineoff">O servidor de salas ainda não está ligado neste endereço.</p>' : '<p class="hint">Quem cria a sala escolhe o nível das IAs (o de “Nova partida”).</p>'}</section>`;
+    ${off ? '<p class="hint" id="onlineoff">O servidor de salas ainda não está ligado neste endereço.</p>' : '<p class="hint">Quem cria a sala escolhe o nível das IAs (o da aba Jogar).</p>'}</section>`;
 }
 /** Who sits where in the room, as this person sees it: themselves at the bottom, the partner in front. */
 function seatsOf(): { seat: Seat; label: string; human: boolean; online: boolean }[] {
@@ -471,7 +471,7 @@ function vLog(g: Game): string {
 function vSettings(): string {
   const seg = (act: string, cur: string, opts: [string, string][], label: string): string => `<div class="segm" role="group" aria-label="${label}">${opts.map(([v, l]) => `<button class="${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
   const built = builtFrom();
-  return `<section class="card" id="prefs"><span class="label">Ajustes</span>
+  return `<section class="card" id="prefs">
     <p class="hint">Rodinhas: marcam as manilhas e a força de cada carta, mostram quem está levando a rodada, explicam por que ela foi ganha e deixam o ranking à mão. Tire quando quiser treinar como na mesa de verdade.</p>
     ${seg('hints', hints() ? 'on' : 'off', [['on', 'Com rodinhas'], ['off', 'Sem rodinhas']], 'Rodinhas')}
     <p class="hint">Velocidade das jogadas da IA</p>${seg('speed', S.speed || 'normal', [['calma', 'Calma'], ['normal', 'Normal'], ['rapida', 'Rápida']], 'Velocidade')}
