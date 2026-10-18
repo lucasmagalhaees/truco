@@ -84,6 +84,9 @@ jobs:
         run: python tests/e2e.py ${{ matrix.theme }}
       - name: End to end, online (two phones in a room)
         run: python tests/e2e_online.py ${{ matrix.theme }}
+      - name: End to end, online, with the room sleeping between moves (as on Cloudflare)
+        if: matrix.theme == 'dark'
+        run: python tests/e2e_online.py dark dormindo
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

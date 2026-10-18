@@ -1,10 +1,12 @@
 """End to end, online: two phones in the same room, through the screen, against the room server.
 
-Usage: python3 tests/e2e_online.py [dark|light]   (needs dist/ built: npm run build; and npm ci, for the ws package)
+Usage: python3 tests/e2e_online.py [dark|light] [dormindo]   (needs dist/ built: npm run build; and npm ci, for the ws package)
 Starts tests/room_server.mjs on this machine (the same core and messages as server/worker.ts on Cloudflare, without
 the storage and the alarms) with the computer players thinking 30 ms, and opens two phone-sized pages from the disk: the
 host creates a room, the friend opens the invitation link and joins, they play. Every action is a tap on the screen;
 the only thing set by the test is the server's address (ui.server). Nothing else on the network is reached.
+With "dormindo" the server runs with HIBERNATE=1: the room goes to JSON and back through Core.readRoom between every two
+events, as on Cloudflare when the Durable Object sleeps, so the same game proves that nothing is lost on the way.
 """
 import json, os, pathlib, re, subprocess, sys, traceback
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -14,20 +16,25 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHOTS = ROOT / 'tests' / 'shots'; SHOTS.mkdir(exist_ok=True)
 THEME = sys.argv[1] if len(sys.argv) > 1 else 'dark'
+SLEEP = 'dormindo' in sys.argv[2:]
+TAG = THEME + ('-dormindo' if SLEEP else '')             # names of screenshots and coverage files, so runs do not overwrite each other
 PAGE = (ROOT / 'dist' / 'index.html').as_uri()
 
-srv = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), '0', '30'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+srv = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), '0', '30'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                       env={**os.environ, 'HIBERNATE': '1' if SLEEP else '0'})
 line = srv.stdout.readline()
 m = re.search(r'ws://127\.0\.0\.1:(\d+)', line)
-if not m:
-    srv.kill(); sys.exit(f'o servidor de salas não subiu: {line}{srv.stdout.read()}')
+if not m or SLEEP != ('(hibernando)' in line):
+    srv.kill(); sys.exit(f'o servidor de salas não subiu como devia (dormindo={SLEEP}): {line}{srv.stdout.read()}')
 SERVER = m.group(0)
 
 def on_failure(kind, value, tb):
     traceback.print_exception(kind, value, tb)
     if os.environ.get('GITHUB_ACTIONS') == 'true':
         here = next((f for f in reversed(traceback.extract_tb(tb)) if f.filename.endswith('e2e_online.py')), None)
-        print(f'::error title=e2e online {THEME}::linha {here.lineno if here else "?"}: {here.line if here else ""} -> {kind.__name__}: {str(value)[:500]}'.replace('\n', ' '))
+        print(f'::error title=e2e online {TAG}::linha {here.lineno if here else "?"}: {here.line if here else ""} -> {kind.__name__}: {str(value)[:500]}'.replace('\n', ' '))
+    if srv.poll() is not None:                             # the server died: say why (in sleep mode, readRoom refusing the room)
+        print(f'o servidor de salas parou (código {srv.returncode}): {srv.stdout.read()[-2000:]}')
     srv.kill()
 sys.excepthook = on_failure
 
@@ -53,7 +60,7 @@ with sync_playwright() as p:
     # ---------- without a server, the card says so ----------
     off = phone(); off.goto(PAGE); off.wait_for_function('window.__APP && window.__APP.S')
     assert off.locator('#onlineoff').count() == 1 and off.locator('[data-act=createroom]').is_disabled()
-    cov.stop(off, f'e2e-online-off-{THEME}'); off.context.close()
+    cov.stop(off, f'e2e-online-off-{TAG}'); off.context.close()
 
     # ---------- the host creates a room ----------
     host = phone(); at(host)
@@ -77,7 +84,7 @@ with sync_playwright() as p:
     host.wait_for_function('document.getElementById("lseat1").textContent.includes("Amigo")')
     assert 'Começar com 2 pessoas' in txt(host, '[data-act=startroom]')
     assert overflow(host) == 0 and overflow(guest) == 0
-    host.screenshot(path=str(SHOTS / f'o1-sala-{THEME}.png'), full_page=True)
+    host.screenshot(path=str(SHOTS / f'o1-sala-{TAG}.png'), full_page=True)
 
     # a wrong code, and a room that is already playing, are refused
     third = phone(); at(third)
@@ -99,7 +106,7 @@ with sync_playwright() as p:
     third.fill('#ocode', code); third.click('[data-act=joinroom]')
     third.wait_for_function('!document.getElementById("toast").hidden && document.getElementById("toast").textContent.includes("já começou")')
     third.wait_for_selector('#online'); assert third.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None
-    cov.stop(third, f'e2e-online-third-{THEME}'); third.context.close()
+    cov.stop(third, f'e2e-online-third-{TAG}'); third.context.close()
 
     def whose(pg):
         g = G(pg)
@@ -130,8 +137,8 @@ with sync_playwright() as p:
     hg, gg = G(host), G(guest)
     assert hg['score'] == [gg['score'][1], gg['score'][0]], (hg['score'], gg['score'])
     if asked: assert hg['score'][1] >= 1 and 'correu' in txt(host, '#action') and 'Eles correram' in ' '.join(gg['log']) or 'correu' in ' '.join(gg['log']), gg['log'][-3:]
-    host.screenshot(path=str(SHOTS / f'o2-mao-{THEME}.png'), full_page=True)
-    guest.screenshot(path=str(SHOTS / f'o2-mao-amigo-{THEME}.png'), full_page=True)
+    host.screenshot(path=str(SHOTS / f'o2-mao-{TAG}.png'), full_page=True)
+    guest.screenshot(path=str(SHOTS / f'o2-mao-amigo-{TAG}.png'), full_page=True)
     assert overflow(host) == 0 and overflow(guest) == 0
     guest.click('[data-act=next]')
     host.wait_for_function('window.__APP.room.game.n === 2')
@@ -156,8 +163,8 @@ with sync_playwright() as p:
     # ---------- the host leaves too ----------
     host.click('[data-act=leaveroom]'); host.click('[data-act=leaveroom]'); host.wait_for_selector('#online')
     assert host.evaluate('JSON.parse(localStorage.getItem("truco.v1")).online') is None and V(host) is None
-    cov.stop(host, f'e2e-online-host-{THEME}'); cov.stop(guest, f'e2e-online-guest-{THEME}')
+    cov.stop(host, f'e2e-online-host-{TAG}'); cov.stop(guest, f'e2e-online-guest-{TAG}')
     assert not errs, errs
     b.close()
 srv.kill()
-print(f'e2e online ok ({THEME}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, cair e voltar ao mesmo lugar, sair, IA no lugar de quem saiu, sem estouro de largura e sem erro de script')
+print(f'e2e online ok ({TAG}): sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, cair e voltar ao mesmo lugar, sair, IA no lugar de quem saiu{", com a sala indo e voltando do armazenamento a cada passo" if SLEEP else ""}, sem estouro de largura e sem erro de script')

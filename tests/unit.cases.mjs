@@ -229,6 +229,7 @@ export default function cases(Core) {
   eq('during the game, leaving keeps the seat; coming back with the same token takes it again', [offline.members[1].online, join(offline, T[1], 'qualquer').room.members[1], offline.game.humans], [false, { seat: 1, name: 'Bia', token: T[1], online: true }, [0, 1]]);
   const botted = Core.handle(offline, T[0], { t: 'bot', seat: 1 }, roll).room;
   eq('the host can put the computer in the seat of someone who left', [botted.game.humans, botted.members.length, Core.handle(room, T[0], { t: 'bot', seat: 1 }, roll).error], [[0], 1, 'Esse jogador ainda está na sala.']);
+  const started = room;
   // play out the game through the room: people move only on their turn, the computer when aiDelay says so
   let steps = 0, refused = 0;
   while (room.game.phase !== 'over' && steps < 4000) {
@@ -242,6 +243,29 @@ export default function cases(Core) {
     room = Core.handle(room, tk, msg, roll).room;
   }
   eq('a whole game in a room ends; nobody can move out of turn', [room.game.phase, Math.max(...room.game.score), refused > 10, Core.aiDelay(room), Core.aiStep(room, roll) === room], ['over', 12, true, null, true]);
+  // the same game again, twice, from the same seed: once kept in memory, once with the room going to storage and back
+  // (JSON, then readRoom) after every message and every computer move, as the Durable Object does when it sleeps.
+  // People here ask for truco, raise and run too, so asks, hands of eleven and shown bluffs all go through storage.
+  const playOut = (sleep) => {
+    const rr = Core.seeded(21), back = r => (sleep ? Core.readRoom(JSON.parse(JSON.stringify(r))) : r);
+    let r = back(started), k = 0;
+    const said = [];
+    while (r.game.phase !== 'over' && k < 6000) {
+      k++;
+      const g = r.game, who = Core.whoActs(g);
+      if (who === null) { r = back(Core.handle(r, T[1], { t: 'act', a: 'next' }, rr).room); continue; }
+      if (!Core.isHuman(g, who)) { if (Core.aiDelay(r) === null) break; r = back(Core.aiStep(r, rr)); continue; }
+      const msg = g.phase === 'eleven' ? { t: 'act', a: 'eleven', v: k % 3 !== 0 }
+        : g.phase === 'truco' ? { t: 'act', a: 'answer', v: ['accept', 'raise', 'run'][k % 3] }
+        : k % 5 === 0 ? { t: 'act', a: 'truco' } : { t: 'act', a: 'play', k: k % g.hands[who].length };
+      const out = Core.handle(r, T[who], msg, rr);
+      r = back(out.error && msg.a === 'truco' ? Core.handle(r, T[who], { t: 'act', a: 'play', k: 0 }, rr).room : out.room);
+      said.push(JSON.stringify(Core.roomView(r, T[0])).length, JSON.stringify(Core.roomView(r, T[1])).length);
+    }
+    return { r, k, said };
+  };
+  const awake = playOut(false), asleep = playOut(true);
+  eq('a room that sleeps after every move plays the same whole game as one kept in memory', [asleep.r.game.phase, same(asleep.r, awake.r), same(asleep.said, awake.said), awake.k > 20, awake.r.game.hist.some(x => x.points > 1)], ['over', true, true, true, true]);
   eq('the host starts another game with the same people', [Core.handle(room, T[0], { t: 'again' }, roll).room.game.phase !== 'over', Core.handle(room, T[0], { t: 'again' }, roll).room.game.score], [true, [0, 0]]);
   let full = Core.newRoom('ABCDE');
   for (let i = 0; i < 4; i++) full = join(full, T[i], 'P' + i).room;
