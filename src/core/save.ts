@@ -35,6 +35,10 @@ export function readGame(x: unknown): Game | null {
   if (!(g.shout === null || (g.shout && isSeat(g.shout.seat) && typeof g.shout.word === 'string'))) return null;
   if (!(g.result === null || (g.result && typeof g.result.why === 'string' && Number.isInteger(g.result.points)))) return null;
   if (!(g.winner === null || isTeam(g.winner)) || !Array.isArray(g.hist) || !Array.isArray(g.log) || !g.log.every(l => typeof l === 'string')) return null;
+  // what the table has seen of each seat: a game saved before it, or with it damaged, just starts unread
+  const count = (x: unknown): boolean => Number.isInteger(x) && (x as number) >= 0;
+  if (!(Array.isArray(g.reads) && g.reads.length === N && g.reads.every(r => r && count(r.shown) && count(r.weak) && r.weak <= r.shown && count(r.answers) && count(r.runs) && r.runs <= r.answers))) delete g.reads;
+  if (!(Array.isArray(g.watch) && g.watch.length <= 8 && g.watch.every(w => w && isSeat(w.by) && count(w.held) && w.held <= 3 && typeof w.stand === 'number' && VALUES.includes(w.value) && isCards(w.seen, 3)))) delete g.watch;
   return g;
 }
 

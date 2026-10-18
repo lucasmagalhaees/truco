@@ -95,6 +95,8 @@ export function viewFor(g: Game, seat: Seat): Game {
     ...g, hands, names: turn(g.names), sides: flip ? [g.sides[1], g.sides[0]] : [...g.sides] as [string | null, string | null],
     humans: g.humans.map(r).sort(), score: Array.from({ length: T }, (_, v) => g.score[(v + mine) % T]),
     ...(g.out ? { out: g.out.map(tm) } : {}),
+    // what the table has seen of each seat is public: it only turns with the table
+    ...(g.reads ? { reads: turn(g.reads) } : {}), ...(g.watch ? { watch: g.watch.map(w => ({ ...w, by: r(w.by) })) } : {}),
     dealer: r(g.dealer), starter: r(g.starter), turn: r(g.turn),
     table: g.table.map(p => ({ seat: r(p.seat), card: p.card })),
     last: g.last ? { plays: g.last.plays.map(p => ({ seat: r(p.seat), card: p.card })), winner: g.last.winner === -1 ? -1 : r(g.last.winner) } : null,

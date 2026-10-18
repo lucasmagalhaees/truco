@@ -106,7 +106,8 @@ export default function cases(Core) {
   eq('AI takes the round with its cheapest winning card', Core.aiCard(ai([[], ['3e', 'Ke', 'Ae'], [], []], { table: [{ seat: 0, card: 'Jc' }] }), 1, never), 1);
   eq('AI throws its weakest when it cannot win, or when the partner has it', [Core.aiCard(ai([[], ['6e', '7e', 'Qe'], [], []], { table: [{ seat: 0, card: '3c' }] }), 1, never), Core.aiCard({ ...ai([[], [], [], ['3e', '6e', 'Ke']]), turn: 3, table: [{ seat: 0, card: 'Jc' }, { seat: 1, card: '3c' }, { seat: 2, card: '4c' }] }, 3, never)], [0, 1]);
   const hardCover = { ...base, level: 'dificil', turn: 2, table: [{ seat: 0, card: 'Ko' }, { seat: 1, card: '7e' }], hands: [[], [], ['6e', 'Ae', '2e'], []] };
-  eq('hard AI covers its partner when an opponent still plays; médio throws low', [Core.aiCard(hardCover, 2, never), Core.aiCard({ ...hardCover, level: 'medio', hands: [[], [], ['6e', 'Ae', '2e'], []] }, 2, never)], [1, 0]);
+  // the hard player covers only when taking this round takes the hand; in the first round it keeps the card
+  eq('hard AI covers its partner when an opponent still plays and the round decides the hand; médio throws low', [Core.aiCard({ ...hardCover, rounds: [0] }, 2, never), Core.aiCard({ ...hardCover, rounds: [0], level: 'medio' }, 2, never), Core.aiCard(hardCover, 2, never)], [1, 0, 0]);
   eq('easy AI sometimes plays any card; blind play is always any card', [Core.aiCard({ ...ai([[], ['4e', '3e', 'Ke'], [], []]), level: 'facil' }, 1, always), Core.aiCard({ ...ai([[], ['4e', '3e', 'Ke'], [], []]), blind: true }, 1, always)], [0, 0]);
   const strong = ai([[], ['5p', '5c', '3e'], [], []]), weak = ai([[], ['4e', '6o', '7e'], [], []]);
   eq('AI raises with a strong hand, not with a weak one; bluffs when chance says so', [Core.aiRaise(strong, 1, never), Core.aiRaise(weak, 1, never), Core.aiRaise(weak, 1, always), Core.aiRaise({ ...weak, raisedBy: 1 }, 1, always)], ['yes', 'no', 'bluff', 'no']);
@@ -115,7 +116,22 @@ export default function cases(Core) {
   const asked = (hand, value = 3, level = 'medio') => ({ ...base, level, phase: 'truco', ask: { by: 0, value }, hands: [[], hand, [], []] });
   eq('AI answers: raises with a monster, accepts a good hand, runs a bad one', [Core.aiAnswer(asked(['5p', '5c', '3e']), 1), Core.aiAnswer(asked(['3e', '2e', 'Ke']), 1), Core.aiAnswer(asked(['4e', '6o', '7e']), 1, never), Core.aiAnswer(asked(['4e', '6o', '7e']), 1, always)], ['raise', 'accept', 'run', 'accept']);
   eq('easy AI never raises back', Core.aiAnswer(asked(['5p', '5c', '3e'], 3, 'facil'), 1), 'accept');
-  eq('hard AI counts a sure card', [Core.aiAnswer(asked(['5p', '6o', '7e'], 9, 'dificil'), 1, never), Core.aiAnswer(asked(['5p', '6o', '7e'], 9, 'medio'), 1, never)], ['accept', 'run']);
+  // answering by the odds: running gives the others what the hand was worth, accepting risks what was asked
+  const at = (hand, prev, value, level, extra = {}) => ({ ...base, level, phase: 'truco', value: prev, raisedBy: prev > 1 ? 1 : null, ask: { by: 0, value }, hands: [[], hand, [], []], ...extra });
+  eq('a doze from nove is paid with a fair hand (running loses 9 for sure), at médio and difícil; a hopeless hand still runs',
+    [Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'medio'), 1, never), Core.aiAnswer(at(['3e', '2o', 'Ae'], 9, 12, 'dificil'), 1, never), Core.aiAnswer(at(['4e', '6o', '7e'], 9, 12, 'dificil'), 1, never)], ['accept', 'accept', 'run']);
+  eq('never runs when running hands the others the game', [Core.aiAnswer(at(['4e', '6o', '7e'], 6, 9, 'medio', { score: [6, 0] }), 1, never), Core.aiAnswer(at(['4e', '6o', '7e'], 6, 9, 'dificil', { score: [6, 0] }), 1, never)], ['accept', 'accept']);
+  // a seat seen bluffing again and again gets paid more often by the hard player
+  const bluffer = [{ shown: 10, weak: 8, answers: 0, runs: 0 }, ...[1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }))];
+  const honest = [{ shown: 10, weak: 0, answers: 0, runs: 0 }, ...[1, 2, 3].map(() => ({ shown: 0, weak: 0, answers: 0, runs: 0 }))];
+  const pays = reads => { let k = 0; for (let i = 0; i < 40; i++) if (Core.aiAnswer(at(['Ke', 'Ao', '7e'], 1, 3, 'dificil', { reads }), 1, Core.seeded(i)) !== 'run') k++; return k; };
+  const pb = pays(bluffer), ph = pays(honest);
+  eq('the hard player pays a known bluffer more than a seat that only raises with a hand', [pb > ph, Core.bluffRate({ ...base, level: 'dificil', reads: bluffer }, 0) > 0.6, Core.bluffRate({ ...base, level: 'dificil', reads: honest }, 0) < 0.1], [true, true, true]);
+  // what the table sees: a weak raise shown when the others run counts as a bluff, and the run is counted too
+  const seen = Core.answer(Core.raise({ ...base, hands: [['4e', '6o', '7e'], ['3e', '2o', 'Ae'], ['Qe', 'Je', 'Ke'], ['4c', '6p', '7c']] }, 0), 'run');
+  eq('reads: a weak raise shown when the others run is a bluff seen; the one who ran is counted', [seen.reads[0], seen.reads[1]], [{ shown: 1, weak: 1, answers: 0, runs: 0 }, { shown: 0, weak: 0, answers: 1, runs: 1 }]);
+  const old = JSON.parse(JSON.stringify(seen)); delete old.reads; delete old.watch;
+  eq('a game saved before reads opens, unread; broken reads are dropped', [!!Core.readGame(old), Core.readGame(old).reads, Core.readGame({ ...JSON.parse(JSON.stringify(seen)), reads: [{ shown: 1, weak: 5 }] }).reads, Core.nextHand(Core.readGame(old), Core.seeded(1)).reads.length], [true, undefined, undefined, 4]);
   eq('cards not seen: 40 minus its hand, the vira and what was played', [Core.unseen({ ...base, played: ['2o'] }, 0).length, Core.sure(base, 0, '5p'), Core.sure(base, 0, '3o')], [35, true, false]);
   eq('strength and weight: the zap is worth most', [Core.weight('5p', '4o'), Core.weight('4e', '4o'), Core.strength(['5p', '3o'], '4o')], [5, 0.2, 8]);
   eq('AI plays a hand of eleven only when both hands are strong', [Core.aiEleven({ ...base, hands: [[], ['5p', '3o', '3e'], [], ['2o', '5c', 'Ae']] }, 1), Core.aiEleven({ ...base, hands: [[], ['4e', '6o', '7e'], [], ['4c', '6p', 'Qe']] }, 1)], [true, false]);

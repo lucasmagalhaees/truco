@@ -309,7 +309,7 @@ export const RAISE_NEED: Record<number, number> = { 3: 6.5, 6: 8, 9: 9.5, 12: 11
 export const WEAK_BY = 2;
 /** How many raises (or answers) a first guess is worth before what a seat has shown counts more: little for the hard
  *  player, who learns fast, more for the medium one. */
-export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 12 };
+export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4 };
 /** The first guess before anything is seen: how often a raise is a bluff, and how often a seat runs from a raise. */
 export const BLUFF_GUESS = 0.2, RUN_GUESS = 0.35;
 const unread = (n: number): Read[] => Array.from({ length: n }, () => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
@@ -464,7 +464,7 @@ function playOut(g: Game, hands: Card[][], level: Level): Team | null {
 /** The chances of `seat`'s pair taking and losing this hand, for a player that knows only its own cards and the table
  *  (the hard one remembers the whole hand; see unseen): it deals the unseen cards to the others many times and plays
  *  each deal out. A raise in the air says something: unless the one who asked is bluffing, their hand deserves it, so
- *  only those deals count, weighed by how often that seat seems to bluff. */
+ *  deals where it does count more, and how much more depends on how often that seat seems to bluff. */
 export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMPLES[g.level] || SAMPLES.medio): { win: number; lose: number } {
   // the medium player does not remember the rounds already played: those cards may come back in what it imagines
   const t = tm(g, seat), ask = g.ask, mine = g.hands[seat];
@@ -481,10 +481,15 @@ export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMP
   }
   const odds = (o: { win: number; lose: number; n: number }) => ({ win: o.win / o.n, lose: o.lose / o.n });
   if (!ask || tm(g, ask.by) === t) return odds(all);
-  const b = bluffRate(g, ask.by), a = odds(all);
-  const f = fair.n >= 4 ? odds(fair) : { win: a.win / 2, lose: 1 - a.win / 2 };   // hardly any deal deserves it: assume the worst
-  return { win: b * a.win + (1 - b) * f.win, lose: b * a.lose + (1 - b) * f.lose };
+  // Bayes: a deal where the asker's hand deserves the raise explains it fully; a deal where it does not, only as a
+  // bluff, which happens with chance `beta` per weak hand: the rate that makes the seat's bluff rate come out right
+  const b = bluffRate(g, ask.by), q0 = FAIR_BASE[ask.value], beta = Math.min(1, (b * q0) / ((1 - b) * (1 - q0)));
+  const n = fair.n + beta * (all.n - fair.n);
+  return { win: (fair.win + beta * (all.win - fair.win)) / n, lose: (fair.lose + beta * (all.lose - fair.lose)) / n };
 }
+/** How often a hand dealt at random deserves each raise (measured with 20000 deals, 18/10/2026): the base rate that
+ *  turns a seat's bluff rate into how often it raises on a weak hand. */
+export const FAIR_BASE: Record<number, number> = { 3: 0.26, 6: 0.11, 9: 0.04, 12: 0.01 };
 /** The chance of winning the game from a score, as a fair coin walk to 12 would give it: by the points still missing. */
 export const gameChance = (mine: number, theirs: number): number =>
   (mine >= WIN_POINTS ? 1 : theirs >= WIN_POINTS ? 0 : (WIN_POINTS - theirs) / (2 * WIN_POINTS - mine - theirs));
@@ -510,9 +515,11 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
   if (g.level === 'dificil' && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
   // points: the hand's worth now against what was asked (so a doze from nove is paid when the hand is won more than one
   // time in eight); near the end of the game the hard player weighs what each outcome does to the game instead
-  const play = g.level === 'dificil' && Math.max(m, o) + ask.value >= WIN_POINTS
+  // with three pairs, running only takes this pair out of the hand: the asker scores only if the other pair runs too
+  const three = teamsOf(g) === 3, cost = three ? g.value / 2 : g.value;
+  const play = g.level === 'dificil' && !three && Math.max(m, o) + ask.value >= WIN_POINTS
     ? win * gameChance(m + ask.value, o) + lose * gameChance(m, o + ask.value) + (1 - win - lose) * gameChance(m, o) >= run
-    : (win - lose) * ask.value >= -g.value;
+    : (win - lose) * ask.value >= -cost;
   if (play) return { a: 'accept', bluff: false };
   return { a: rand && rand() < 0.05 ? 'accept' : 'run', bluff: false };
 }
