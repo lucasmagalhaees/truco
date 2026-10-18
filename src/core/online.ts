@@ -44,7 +44,14 @@ export const tooBig = (bytes: number): boolean => !(bytes <= MSG_MAX);
 export const roomFull = (conns: number): boolean => conns >= CONN_MAX;
 
 export interface Member { seat: Seat; name: string; token: string; online: boolean }
-export interface Room { code: string; level: Level; members: Member[]; game: Game | null }
+/** How three people play: 'duplas' is the table of four, two of them in a pair against the third with a computer
+ *  partner; 'tres' is three pairs at a table of six, each person with a computer partner (its rules are not in the core
+ *  yet: see SUPPORTS_THREE). With two or four people there is nothing to choose and the format is not looked at. */
+export type Format = 'duplas' | 'tres';
+export const FORMATS: Format[] = ['duplas', 'tres'];
+/** Whether the core plays the 'tres' format. Until it does, the lobby shows it as coming soon and start refuses it. */
+export const SUPPORTS_THREE = false;
+export interface Room { code: string; level: Level; members: Member[]; game: Game | null; format: Format }
 export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; v: Answer } | { a: 'eleven'; v: boolean } | { a: 'next' };
 /** What a phone may send. */
 export type ClientMsg =
@@ -52,11 +59,12 @@ export type ClientMsg =
   | { t: 'start' } | { t: 'again' } | { t: 'leave' }
   | { t: 'drop' }                                  // the connection closed: sent by the server itself, never read off the wire
   | { t: 'bot'; seat: Seat }                       // the host puts the computer in the seat of someone who left
+  | { t: 'format'; format: Format; alone?: Seat }  // the host, with three people: how they play, and who pairs with a computer
   | ({ t: 'act' } & Action);
 /** What a phone receives: the room as that person sees it. */
-export interface RoomView { t: 'room'; code: string; host: boolean; seat: Seat; level: Level; members: { seat: Seat; name: string; online: boolean }[]; game: Game | null }
+export interface RoomView { t: 'room'; code: string; host: boolean; seat: Seat; level: Level; format: Format; members: { seat: Seat; name: string; online: boolean }[]; game: Game | null }
 
-export const newRoom = (code: string): Room => ({ code, level: 'medio', members: [], game: null });
+export const newRoom = (code: string): Room => ({ code, level: 'medio', members: [], game: null, format: 'duplas' });
 /** A room code: CODE_LEN letters that are hard to confuse. */
 export const roomCode = (rand: () => number): string => Array.from({ length: CODE_LEN }, () => CODE_ABC[Math.floor(rand() * CODE_ABC.length)]).join('');
 export const isCode = (x: unknown): x is string => typeof x === 'string' && new RegExp(`^[${CODE_ABC}]{${CODE_LEN}}$`).test(x);
@@ -103,7 +111,7 @@ export function roomView(room: Room, token: string): RoomView | null {
   if (!me) return null;
   const r = (s: number): number => (s - me.seat + 4) % 4;
   return {
-    t: 'room', code: room.code, host: host(room) === me, seat: me.seat, level: room.level,
+    t: 'room', code: room.code, host: host(room) === me, seat: me.seat, level: room.level, format: room.format,
     members: room.members.map(m => ({ seat: r(m.seat), name: m.name, online: m.online })).sort((a, b) => a.seat - b.seat),
     game: room.game ? viewFor(room.game, me.seat) : null
   };
@@ -136,9 +144,19 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
   // during it, a dropped connection keeps the seat to come back to; leaving for good puts the computer there at once
   if (msg.t === 'drop') return { room: { ...room, members: room.members.map(m => (m === me ? { ...m, online: false } : m)) } };
   if (msg.t === 'leave') return { room: toComputer(room, me) };
+  if (msg.t === 'format') {
+    if (!isHost) return { room, error: 'Só quem criou a sala escolhe como vão jogar.' };
+    if (room.game) return { room, error: 'A partida já começou.' };
+    if (room.members.length !== 3) return { room, error: 'Isso é só para sala com 3 pessoas.' };
+    if (msg.format === 'tres') return { room: { ...room, format: 'tres' } };
+    const alone = msg.alone === undefined ? null : room.members.find(m => m.seat === msg.alone);
+    if (msg.alone !== undefined && !alone) return { room, error: 'Essa pessoa não está na sala.' };
+    return { room: { ...room, format: 'duplas', members: alone ? pairUp(room.members, me, alone) : room.members } };
+  }
   if (msg.t === 'start' || msg.t === 'again') {
     if (!isHost) return { room, error: 'Só quem criou a sala começa a partida.' };
     if (room.game && room.game.phase !== 'over') return { room, error: 'A partida já está rolando.' };
+    if (threeOf(room) && !SUPPORTS_THREE) return { room, error: 'As 3 duplas ainda não estão prontas. Escolha 2 contra 1.' };
     return { room: { ...room, game: startGame(room, rand) } };
   }
   if (msg.t === 'bot') {
@@ -154,6 +172,16 @@ export function handle(room: Room, token: string, msg: ClientMsg, rand: () => nu
     return next === g ? { room, error: 'Agora não é a sua vez.' } : { room: { ...room, game: next } };
   }
   return { room, error: 'Mensagem desconhecida.' };
+}
+/** Whether the room plays three pairs: three people, and the host chose it. */
+const threeOf = (room: Room): boolean => room.format === 'tres' && room.members.length === 3;
+/** Three people seated as two against one: `alone` plays with a computer partner, the other two sit across from each
+ *  other. The host keeps seat 0 (that is how the room knows its host): if the host is the one alone, the pair takes 1 and
+ *  3 and the computer sits at 2; otherwise the host's partner takes 2, `alone` takes 1 and the computer sits at 3. */
+function pairUp(members: Member[], hostM: Member, alone: Member): Member[] {
+  const others = members.filter(m => m !== hostM && m !== alone);
+  const seatOf = (m: Member): Seat => (m === hostM ? 0 : hostM === alone ? (m === others[0] ? 1 : 3) : m === alone ? 1 : 2);
+  return members.map(m => ({ ...m, seat: seatOf(m) }));
 }
 /** Someone out of the game for good: the computer plays their seat from now on. If the host went, the next person in the
  *  room is the host (see host). */
@@ -191,6 +219,7 @@ export function readMsg(raw: unknown): ClientMsg | null {
   if (o.t === 'join') return { t: 'join', name: String(o.name ?? ''), token: String(o.token ?? ''), ...(LEVELS.includes(o.level as Level) ? { level: o.level as Level } : {}), ...(o.back === true ? { back: true } : {}) };
   if (o.t === 'start' || o.t === 'again' || o.t === 'leave') return { t: o.t };
   if (o.t === 'bot' && Number.isInteger(o.seat)) return { t: 'bot', seat: o.seat as number };
+  if (o.t === 'format' && FORMATS.includes(o.format as Format)) return { t: 'format', format: o.format as Format, ...(Number.isInteger(o.alone) ? { alone: o.alone as number } : {}) };
   if (o.t === 'act') {
     if (o.a === 'play' && Number.isInteger(o.k)) return { t: 'act', a: 'play', k: o.k as number };
     if (o.a === 'truco' || o.a === 'next') return { t: 'act', a: o.a };
@@ -204,5 +233,6 @@ export function readRoom(x: unknown): Room | null {
   const r = x as Room;
   if (!r || typeof r !== 'object' || !isCode(r.code) || !LEVELS.includes(r.level) || !Array.isArray(r.members)) return null;
   if (!r.members.every(m => m && typeof m.name === 'string' && typeof m.token === 'string' && Number.isInteger(m.seat) && typeof m.online === 'boolean')) return null;
-  return { code: r.code, level: r.level, members: r.members, game: r.game && typeof r.game === 'object' ? r.game : null };
+  // rooms saved before the format existed play as they did: the table of four
+  return { code: r.code, level: r.level, members: r.members, game: r.game && typeof r.game === 'object' ? r.game : null, format: FORMATS.includes(r.format) ? r.format : 'duplas' };
 }
