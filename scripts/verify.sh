@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command that answers "is this still correct?".
-#   scripts/verify.sh           types (app and room server) + build + docs + core + unit + contract + production-check self-test + end-to-end (both themes, one phone and two phones in a room) + offline and update (service worker) + code coverage minimums
+#   scripts/verify.sh           types (app and room server) + build + docs + core + unit + contract + production-check self-test + end-to-end (both themes, one phone and two phones in a room) + the room server's limits + offline and update (service worker) + code coverage minimums
 #   scripts/verify.sh --quick   types + build + docs + core + unit + contract + production-check self-test (a few seconds; what the Stop hook runs)
 # Every test runs against dist/, what the build produces and what ships. The one exception is `core`: the same cases as
 # `unit`, run in Node against src/core built by itself, to show the core stands without a page.
@@ -59,6 +59,7 @@ if [ "$full" -eq 1 ]; then
   run e2e-light python3 tests/e2e.py light
   run online-dark  python3 tests/e2e_online.py dark
   run online-light python3 tests/e2e_online.py light
+  run limits    node tests/room_limits.mjs
   run pwa       python3 tests/pwa.py
   run coverage  python3 tests/cov.py --min-functions 95 --min-chars 90
 fi

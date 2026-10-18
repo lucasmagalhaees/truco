@@ -29,10 +29,15 @@ const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
   const m = (req.url || '').match(/^\/salas\/([A-Z0-9]+)$/);
   if (!m || !Core.isCode(m[1])) { socket.write('HTTP/1.1 404 Not Found\r\n\r\n'); socket.destroy(); return; }
+  const code = m[1], r = rooms.get(code) || { room: Core.newRoom(code), sockets: new Set(), timer: null };
+  if (Core.roomFull(r.sockets.size)) { socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n'); socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, ws => {
-    const code = m[1], r = rooms.get(code) || { room: Core.newRoom(code), sockets: new Set(), timer: null };
-    rooms.set(code, r); r.sockets.add(ws); ws.token = null;
+    rooms.set(code, r); r.sockets.add(ws); ws.token = null; ws.bucket = Core.newBucket(Date.now());
     ws.on('message', data => {
+      // the same limits as server/worker.ts, before the rules see anything
+      if (Core.tooBig(data.length)) return ws.close(Core.CLOSE_BIG, 'mensagem grande demais');
+      const step = Core.allow(ws.bucket, Date.now()); ws.bucket = step.bucket;
+      if (!step.ok) return ws.close(Core.CLOSE_FAST, 'mensagens demais');
       const msg = Core.readMsg(String(data));
       if (!msg) return send(ws, { t: 'error', why: 'Mensagem desconhecida.' });
       if (msg.t === 'join') ws.token = msg.token;

@@ -198,6 +198,20 @@ export default function cases(Core) {
   const roll = Core.seeded(8), T = ['token-ana-1', 'token-bia-2', 'token-caio-3', 'token-duda-4', 'token-eva-5'];
   let room = Core.newRoom(Core.roomCode(Core.seeded(3)));
   eq('room codes: 5 letters that are hard to confuse', [Core.isCode(room.code), Core.isCode('AB0DE'), Core.isCode('abcde'), room.code.length], [true, false, false, Core.CODE_LEN]);
+
+  /* limits against abuse, before the rules see a message */
+  let bk = Core.newBucket(1000), oks = 0;
+  for (let k = 0; k < Core.RATE_BURST + 5; k++) { const st = Core.allow(bk, 1000); bk = st.bucket; if (st.ok) oks++; }
+  eq('rate: a burst of RATE_BURST goes through at once, the rest is refused', oks, Core.RATE_BURST);
+  const later1 = Core.allow(bk, 1000 + 1000 / Core.RATE_PER_S);
+  eq('rate: after 1/RATE_PER_S s one more message is earned, and only one', [later1.ok, Core.allow(later1.bucket, 1000 + 1000 / Core.RATE_PER_S).ok], [true, false]);
+  eq('rate: a long pause refills up to RATE_BURST, never past it', Core.allow(bk, 1e9).bucket.left, Core.RATE_BURST - 1);
+  eq('rate: a clock going back earns nothing', [Core.allow(bk, 0).ok, Core.allow(bk, 0).bucket.at], [false, 1000]);
+  eq('rate: a person tapping 4 times a second for a minute is never cut', (() => { let b = Core.newBucket(0); for (let t = 0; t < 60000; t += 250) { const st = Core.allow(b, t); if (!st.ok) return false; b = st.bucket; } return true; })(), true);
+  eq('size: up to MSG_MAX bytes goes through; past it, or not a number, does not', [Core.tooBig(Core.MSG_MAX), Core.tooBig(Core.MSG_MAX + 1), Core.tooBig(NaN), Core.tooBig(0)], [false, true, true, false]);
+  eq('size: the biggest join a phone sends fits', Core.tooBig(JSON.stringify({ t: 'join', name: 'x'.repeat(16), token: 'y'.repeat(64), level: 'dificil' }).length), false);
+  eq('connections: a room takes CONN_MAX, not one more', [Core.roomFull(0), Core.roomFull(Core.CONN_MAX - 1), Core.roomFull(Core.CONN_MAX)], [false, false, true]);
+  eq('close codes: 1009 too big, 1008 too fast', [Core.CLOSE_BIG, Core.CLOSE_FAST], [1009, 1008]);
   const join = (r, tk, name, level) => Core.handle(r, tk, { t: 'join', name, token: tk, level }, roll);
   eq('joining: a name is needed, and a real token', [join(room, T[0], '  ').error, Core.handle(room, 'x', { t: 'join', name: 'Ana', token: 'x' }, roll).error], ['Escreve seu nome.', 'Não deu pra entrar: recarregue a página.']);
   room = join(room, T[0], '  Ana   Maria ', 'dificil').room;

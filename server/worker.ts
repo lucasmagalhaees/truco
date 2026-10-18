@@ -5,10 +5,11 @@
    on every wake. Deployed by .github/workflows/salas.yml (wrangler.toml at the root). */
 import { DurableObject } from 'cloudflare:workers';
 import { Core } from '../src/core';
-import type { Room as RoomState } from '../src/core';
+import type { Bucket, Room as RoomState } from '../src/core';
 
 interface Env { ROOMS: DurableObjectNamespace<Room> }
-interface Tag { code: string; token: string | null }
+/** What each connection carries through hibernation: its room, its person once they joined, and its message allowance. */
+interface Tag { code: string; token: string | null; bucket?: Bucket }
 /** A room with nobody connected is forgotten after this long. */
 const IDLE_FORGET = 24 * 60 * 60e3;
 
@@ -25,9 +26,10 @@ export default {
 export class Room extends DurableObject<Env> {
   async fetch(req: Request): Promise<Response> {
     const code = new URL(req.url).pathname.split('/').pop() as string;
+    if (Core.roomFull(this.ctx.getWebSockets().length)) return new Response('sala cheia de conexões', { status: 429 });
     const pair = new WebSocketPair(), [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ code, token: null } satisfies Tag);
+    server.serializeAttachment({ code, token: null, bucket: Core.newBucket(Date.now()) } satisfies Tag);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -52,8 +54,12 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data).length : data.byteLength;
+    if (Core.tooBig(bytes)) { ws.close(Core.CLOSE_BIG, 'mensagem grande demais'); return; }
+    const tag = ws.deserializeAttachment() as Tag, step = Core.allow(tag.bucket ?? Core.newBucket(Date.now()), Date.now()); // connections from before the limits have no bucket
+    tag.bucket = step.bucket; ws.serializeAttachment(tag);
+    if (!step.ok) { ws.close(Core.CLOSE_FAST, 'mensagens demais'); return; }
     const msg = Core.readMsg(typeof data === 'string' ? data : new TextDecoder().decode(data));
-    const tag = ws.deserializeAttachment() as Tag;
     if (!msg) { ws.send(JSON.stringify({ t: 'error', why: 'Mensagem desconhecida.' })); return; }
     if (msg.t === 'join') { tag.token = msg.token; ws.serializeAttachment(tag); }
     if (!tag.token) { ws.send(JSON.stringify({ t: 'error', why: 'Entre na sala primeiro.' })); return; }

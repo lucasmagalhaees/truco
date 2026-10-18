@@ -43,6 +43,7 @@ O que cada peça do harness cobre:
 | `tests/contract.py` + `tests/fixtures/source/` | Escrever leitor para um formato de API imaginado |
 | `tests/docs_check.py` | Documentação citar número, arquivo ou chave que não existe mais |
 | `tests/e2e.py` | Tudo passar isolado e o fluxo real pela interface estar quebrado |
+| `tests/room_limits.mjs` | Alguém derrubar ou encher uma sala com mensagens gigantes, enxurrada ou centenas de conexões, e um jogador normal ser cortado por engano |
 | `tests/pwa.py` | Dizer que o app abre sem internet e avisa de versão nova sem nunca ter visto acontecer |
 | `tests/cov.py` (cobertura medida pelo navegador) | Achar que está testado sem estar |
 | `scripts/check_production.py` (workflow `Produção`, depois de cada merge) | CI verde e deploy feito, mas a produção servindo outra versão |
@@ -89,7 +90,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 | `src/core/types.ts` | As formas dos dados: `Game`, `Card`, `Play`, `Phase`, `Ask`, `Shout`, `RealTable`, `AppState`, `Entry`, `Json` |
 | `src/core/game.ts` | As regras (`newGame`, `playCard`, `roundWinner`, `handWinner`, `raise`, `answer`, `decideEleven`, `nextHand`, `whoActs`), a força das cartas (`power`, `manilhaRank`, `ranking`, `suitDuel`), as IAs por nível (`aiCard`, `aiRaise`, `aiAnswer`, `aiEleven`, `aiAct`), o treino (`drill`, `drillOk`) e `seeded`/`shuffle` (o acaso entra como função) |
 | `src/core/teams.ts` | Os clubes da Série A 2026 (`TEAMS`, `TEAMS_CHECKED`), `teamById`, `playersOf` (com os nomes trocados pela pessoa) e `lineup` (quem senta onde, no modo elenco ou rivais) |
-| `src/core/online.ts` | A sala: `viewFor` (a partida como cada pessoa vê), `roomView`, `handle` (entrar, voltar, sair, começar, recomeçar, jogar, IA no lugar de quem saiu), `aiDelay` e `aiStep` (as IAs no servidor), `readMsg` e `readRoom` (o que chega pela rede e o que foi guardado) |
+| `src/core/online.ts` | A sala: `viewFor` (a partida como cada pessoa vê), `roomView`, `handle` (entrar, voltar, sair, começar, recomeçar, jogar, IA no lugar de quem saiu), `aiDelay` e `aiStep` (as IAs no servidor), `readMsg` e `readRoom` (o que chega pela rede e o que foi guardado), e os limites contra abuso (`allow`, `tooBig`, `roomFull`), com o tempo entrando como parâmetro |
 | `src/core/assist.ts` | O assistente da mesa real: `tell`, `untell`, `nextRound`, `advise`, `tableSay` e `hear` (lê o que foi falado) |
 | `src/core/save.ts` | `readGame`, `readReal` e `readState`: lê o que foi guardado, descartando o que não fecha |
 | `src/core/source.ts` | Os leitores da fonte de dados (`normEntry`, `normEntries`). Único lugar que conhece o formato dela |
@@ -113,7 +114,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 
 ### `server/`: o servidor de salas
 
-`server/worker.ts` roda na Cloudflare (Workers com Durable Objects, configurado em `wrangler.toml`): cada código de sala é um Durable Object que guarda a sala e as conexões. Ele só passa mensagens para `handle` do núcleo, salva a sala, manda a cada conexão o `roomView` dela e acorda as IAs por alarme. Usa a hibernação de WebSocket: sala parada não conta tempo. Sala sem ninguém por 24 h é apagada. Os tipos são conferidos pelo `tsc` com `server/tsconfig.json` (no `npm run typecheck`). Nos testes, `tests/room_server.mjs` faz o mesmo papel em Node, com o mesmo núcleo e as mesmas mensagens, sem armazenamento nem alarme.
+`server/worker.ts` roda na Cloudflare (Workers com Durable Objects, configurado em `wrangler.toml`): cada código de sala é um Durable Object que guarda a sala e as conexões. Ele só passa mensagens para `handle` do núcleo, salva a sala, manda a cada conexão o `roomView` dela e acorda as IAs por alarme. Usa a hibernação de WebSocket: sala parada não conta tempo. Sala sem ninguém por 24 h é apagada. Antes das regras, os limites contra abuso do núcleo (D8): código de sala inválido nem cria sala (404); mensagem acima de 1024 bytes (`MSG_MAX`) fecha a conexão com 1009; cada conexão manda até 20 mensagens de uma vez e ganha 5 por segundo (`RATE_BURST`, `RATE_PER_S`), passou disso fecha com 1008; uma sala aceita até 12 conexões ao mesmo tempo (`CONN_MAX`), a seguinte recebe 429. Os tipos são conferidos pelo `tsc` com `server/tsconfig.json` (no `npm run typecheck`). Nos testes, `tests/room_server.mjs` faz o mesmo papel em Node, com o mesmo núcleo, as mesmas mensagens e os mesmos limites, sem armazenamento nem alarme; `tests/room_limits.mjs` abre sockets nele e confere os limites.
 
 `src/sw.js` é o service worker. É JavaScript puro, fora dos módulos e do `tsc`: roda em outro contexto, sem página, e o build só o copia para `dist/sw.js` trocando a versão.
 
@@ -159,12 +160,12 @@ Uma coluna de até 720 px, pensada para 393 px de largura. Tema claro e escuro, 
 ```bash
 npm ci                       # Vite e TypeScript
 pip install -r tests/requirements.txt && playwright install chromium
-scripts/verify.sh            # tudo: tipos, build, docs, core, unit, contract, autoteste da checagem de produção, e2e claro e escuro, pwa e cobertura
+scripts/verify.sh            # tudo: tipos, build, docs, core, unit, contract, autoteste da checagem de produção, e2e claro e escuro, limites do servidor de salas, pwa e cobertura
 scripts/verify.sh --quick    # sem o e2e (poucos segundos)
 node tests/core.mjs          # os casos do núcleo, sem navegador
 npm run dev                  # servidor de desenvolvimento do Vite
 ```
-O `verify.sh` começa pelo `tsc` e pelo build; se um dos dois falha, os testes nem rodam. **Todo teste usa `dist/`**, o que o build gerou: o que é testado é o que é publicado. Todos abrem `dist/index.html` do disco, menos o `pwa.py`, que serve `dist/` por um servidor local (service worker não existe em página aberta do disco). A exceção é o `core.mjs`, que constrói `src/core` sozinho e roda no Node.
+O `verify.sh` começa pelo `tsc` e pelo build; se um dos dois falha, os testes nem rodam. **Todo teste usa `dist/`**, o que o build gerou: o que é testado é o que é publicado. Todos abrem `dist/index.html` do disco, menos o `pwa.py`, que serve `dist/` por um servidor local (service worker não existe em página aberta do disco). A exceção é o `core.mjs`, que constrói `src/core` sozinho e roda no Node; o `room_limits.mjs` também não abre página: fala com o `room_server.mjs` por socket.
 
 Os casos do núcleo ficam em `tests/unit.cases.mjs`. Regra nova entra ali primeiro. Dois executores rodam os mesmos casos: `unit.py` no navegador, contra `window.__APP.Core` da página gerada, e `core.mjs` no Node. Entre eles: os desempates de manilha por naipe, as cangadas, todas as combinações de rodada que decidem a mão, a mão de onze e a de ferro, os pedidos até o doze, o blefe mostrado, a IA de cada nível, uma partida inteira de IA contra IA em cada nível, 200 exercícios de treino conferidos contra as regras, o assistente da mesa real e a leitura do que foi falado.
 

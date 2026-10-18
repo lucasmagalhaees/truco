@@ -57,6 +57,10 @@ CONSTANTS = [
     (r"export const TEAMS_CHECKED = '14/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
     (r'export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;', 'depois de 0,9 s (`ROOM_THINK`), mais 0,7 s depois de uma rodada fechada (`ROOM_ROUND_PAUSE`)'),
     (r'export const NAME_MAX = 16, CODE_LEN = 5;', 'um código de 5 letras (`CODE_LEN`)'),
+    (r'export const MSG_MAX = 1024;', 'mensagem acima de 1024 bytes (`MSG_MAX`) fecha a conexão com 1009'),
+    (r'export const RATE_BURST = 20, RATE_PER_S = 5;', 'até 20 mensagens de uma vez e ganha 5 por segundo (`RATE_BURST`, `RATE_PER_S`)'),
+    (r'export const CONN_MAX = 12;', 'até 12 conexões ao mesmo tempo (`CONN_MAX`)'),
+    (r'export const CLOSE_BIG = 1009, CLOSE_FAST = 1008;', 'passou disso fecha com 1008'),
     (r"export const ROOM_SERVER = 'wss://truco-salas.lucasbarbosa1738.workers.dev';", 'O endereço dele é `wss://truco-salas.lucasbarbosa1738.workers.dev` (`ROOM_SERVER` no `vite.config.js`)'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
 ]

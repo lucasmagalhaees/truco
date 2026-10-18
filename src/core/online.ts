@@ -17,6 +17,30 @@ export const NAME_MAX = 16, CODE_LEN = 5;
 /** Letters for room codes: no 0/O, 1/I/L, so a code read out loud is not mistaken. */
 export const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+/* ---------- limits against abuse ----------
+   The rules below only see messages that got past these. The server keeps the time and the counts; these say yes or no. */
+/** The longest message a phone of ours sends is a join (a NAME_MAX name, a 64-letter token): well under a kilobyte. */
+export const MSG_MAX = 1024;
+/** Each connection may send RATE_BURST messages at once, earning back RATE_PER_S a second. A person taps a few times a
+ *  second at most; the reconnect after a drop sends one join. */
+export const RATE_BURST = 20, RATE_PER_S = 5;
+/** Connections one room accepts at the same time: four people, each with room for a second tab or a reconnect. */
+export const CONN_MAX = 12;
+/** WebSocket close codes: 1009 for a message too big, 1008 (policy) for too many too fast. */
+export const CLOSE_BIG = 1009, CLOSE_FAST = 1008;
+/** A connection's allowance: how many messages it may still send, as of `at` (ms). */
+export interface Bucket { left: number; at: number }
+export const newBucket = (now: number): Bucket => ({ left: RATE_BURST, at: now });
+/** One more message at `now`: the allowance after it, and whether it may go through. A clock going back earns nothing. */
+export function allow(b: Bucket, now: number): { bucket: Bucket; ok: boolean } {
+  const left = Math.min(RATE_BURST, b.left + Math.max(0, now - b.at) * RATE_PER_S / 1000), at = Math.max(now, b.at);
+  return left >= 1 ? { bucket: { left: left - 1, at }, ok: true } : { bucket: { left, at }, ok: false };
+}
+/** Whether a message of `bytes` is past MSG_MAX. */
+export const tooBig = (bytes: number): boolean => !(bytes <= MSG_MAX);
+/** Whether a room with `conns` connections open takes no more. */
+export const roomFull = (conns: number): boolean => conns >= CONN_MAX;
+
 export interface Member { seat: Seat; name: string; token: string; online: boolean }
 export interface Room { code: string; level: Level; members: Member[]; game: Game | null }
 export type Action = { a: 'play'; k: number } | { a: 'truco' } | { a: 'answer'; v: Answer } | { a: 'eleven'; v: boolean } | { a: 'next' };

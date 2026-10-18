@@ -78,6 +78,17 @@ Modelo de uma decisão:
 - **Servidor no ar (17/10/2026):** https://truco-salas.lucasbarbosa1738.workers.dev, publicado pelo workflow `Salas`; uma mão jogada nele por duas abas (ver `docs/verificacao.md`).
 - **Não sei:** a demora pelo 4G.
 
+## D8. Limites do servidor de salas contra abuso
+
+- **Contexto (17/10/2026):** "Online mais robusto", escolhido entre as melhorias propostas. O servidor está aberto na internet: qualquer um que saiba o endereço pode abrir sockets e mandar mensagens, e cada mensagem conta na cota grátis da Cloudflare (D7).
+- **Decisão:** limites no núcleo (`src/core/online.ts`), puros e testados, aplicados pelo `server/worker.ts` e pelo `tests/room_server.mjs` antes de qualquer regra:
+  - Mensagem de até 1 KB (`MSG_MAX`). A maior que o app manda é a de entrar (nome de 16 letras e token de até 64), bem abaixo disso. Acima, a conexão fecha com 1009.
+  - Por conexão, um balde de 20 mensagens que enche 5 por segundo (`RATE_BURST`, `RATE_PER_S`). Uma pessoa toca poucas vezes por segundo; a volta depois de cair manda uma mensagem só. Estourou, fecha com 1008. O balde vai junto com a conexão na hibernação.
+  - Até 12 conexões por sala (`CONN_MAX`): 4 pessoas com folga para uma segunda aba ou uma volta que chega antes da conexão velha cair. A 13ª recebe 429.
+  - Código de sala que não é código (`isCode`) já dava 404 sem criar sala; ficou como estava.
+- **Interpretações que precisaram ser feitas:** os números acima são escolha minha, sem medição de uso real; fechar a conexão (em vez de só ignorar a mensagem) para que um cliente com defeito apareça logo, e não fique em silêncio.
+- **Não sei:** como o celular da pessoa reage a ser cortado (ele tenta voltar sozinho, `RETRY`); não há limite de salas por endereço, só por sala.
+
 ## Pendências
 
 | Pendência | Quem resolve |
