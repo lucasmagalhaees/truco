@@ -114,6 +114,23 @@ with sync_playwright() as p:
     assert txt(third, '#ocode-err') == 'O código tem 5 letras.' and third.get_attribute('#ocode', 'aria-invalid') == 'true' and third.evaluate('document.activeElement.id') == 'ocode'
     assert third.locator('#lobby').count() == 0 and third.locator('#oname-err').is_hidden()
 
+    # ---------- three people: the host chooses how they play (two against one, and who plays with a computer) ----------
+    third.fill('#ocode', code); third.click('[data-act=joinroom]'); third.wait_for_selector('#lobby #format')
+    host.wait_for_selector('#format [data-act=roomalone]')
+    assert host.locator('#format [data-act=roomformat][data-f=duplas].on').count() == 1
+    assert host.locator('#format [data-act=roomformat][data-f=tres]').is_disabled() and 'em breve' in txt(host, '#format [data-f=tres]')
+    assert 'Zé' in txt(host, '#lseat2') and txt(guest, '#format b') == 'Você' and txt(third, '#format b') == '<b>Amigo</b>', 'by default the third sits with the host; the second plays with the computer'
+    assert guest.locator('#format button').count() == 0 and third.locator('#format button').count() == 0, 'only the host chooses'
+    host.click('#format [data-act=roomalone][data-s="0"]')                # the host plays with the computer: the other two pair up
+    guest.wait_for_function('document.getElementById("lseat2").textContent.includes("Zé")')
+    third.wait_for_function('document.getElementById("lseat2").textContent.includes("Amigo")')
+    assert 'Sua dupla' in txt(guest, '#lseat2') and 'Lucas' in txt(guest, '#lseat1') + txt(guest, '#lseat3') and 'IA (Cida)' in txt(host, '#lseat2')
+    assert 'Lucas' in txt(third, '#format b') and overflow(host) == 0 and overflow(third) == 0
+    host.screenshot(path=str(SHOTS / f'o1b-tres-pessoas-{TAG}.png'), full_page=True)
+    third.click('[data-act=leaveroom]'); third.wait_for_selector('#online')
+    host.wait_for_function('!document.getElementById("format")')
+    assert '<b>Amigo</b>' in txt(host, '#lseat1') and 'Começar com 2 pessoas' in txt(host, '[data-act=startroom]')
+
     # ---------- the game: each sees only their own cards, from their own seat ----------
     host.click('[data-act=startroom]')
     host.wait_for_function('window.__APP.room && window.__APP.room.game'); guest.wait_for_function('window.__APP.room && window.__APP.room.game')
