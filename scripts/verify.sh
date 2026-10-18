@@ -59,6 +59,7 @@ if [ "$full" -eq 1 ]; then
   run e2e-light python3 tests/e2e.py light
   run online-dark  python3 tests/e2e_online.py dark
   run online-light python3 tests/e2e_online.py light
+  run online-sleep python3 tests/e2e_online.py dark dormindo
   run limits    node tests/room_limits.mjs
   run pwa       python3 tests/pwa.py
   run coverage  python3 tests/cov.py --min-functions 95 --min-chars 90
