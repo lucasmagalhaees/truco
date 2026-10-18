@@ -235,6 +235,10 @@ export default function cases(Core) {
   eq('the first is the host at seat 0 and sets the level; the second sits against them', [room.members.map(m => [m.seat, m.name]), room.level, Core.roomView(room, T[0]).host, Core.roomView(room, T[1]).host], [[[0, 'Ana Maria'], [1, 'Bia']], 'dificil', true, false]);
   eq('the room as each one sees it: themselves at seat 0', [Core.roomView(room, T[1]).members, Core.roomView(room, 'nobody')], [[{ seat: 0, name: 'Bia', online: true }, { seat: 3, name: 'Ana Maria', online: true }], null]);
   eq('only the host starts; strangers are refused', [Core.handle(room, T[1], { t: 'start' }, roll).error, Core.handle(room, 'token-stranger', { t: 'start' }, roll).error], ['Só quem criou a sala começa a partida.', 'Você não está nessa sala.']);
+  const hostTable = { names: ['Você', 'Scorpion', 'Ryu', 'Sub-Zero'], sides: ['street-fighter/shotokan', 'mortal-kombat/netherrealm'] };
+  const themed = Core.handle(room, T[0], Core.readMsg({ t: 'start', table: hostTable }), roll).room.game;
+  eq('online, the host\'s table names the computer players and colours the pairs; a table that does not hold together is left out', [themed.names, themed.sides, Core.readMsg({ t: 'start', table: { names: ['a'], sides: [null, null] } }), Core.readMsg({ t: 'again', table: { ...hostTable, sides: ['nada', null] } })],
+    [['Ana Maria', 'Bia', 'Ryu', 'Sub-Zero'], ['street-fighter/shotokan', 'mortal-kombat/netherrealm'], { t: 'start' }, { t: 'again' }]);
   const left = Core.handle(join(room, T[2], 'Caio').room, T[2], { t: 'leave' }, roll).room;
   eq('before the game, leaving frees the seat', left.members.length, 2);
   room = Core.handle(room, T[0], { t: 'start' }, roll).room;

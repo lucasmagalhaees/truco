@@ -78,26 +78,60 @@ with sync_playwright() as p:
         pg.click(f'[data-act={act}][data-v={v}]'); assert S().get(key) == want, (act, v, S())
     assert 'não fica guardado' in txt('#version') and pg.locator('[data-act=checkupdate]').count() == 0, txt('#version')
 
-    # ---------- the club: names, colours, the rivals mode ----------
+    # ---------- the theme: a team, names, colours, rivals across themes, a table seat by seat ----------
     top_bg = lambda: pg.evaluate('getComputedStyle(document.querySelector(".top")).backgroundColor')
+    eles_bg = lambda: pg.evaluate('getComputedStyle(document.documentElement).getPropertyValue("--rival").trim()')
     plain_top = top_bg()
-    pg.click('[data-act=team][data-v=flamengo]')
-    assert S()['team'] == 'flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
+    tabs = pg.locator('#club [data-act=kind][data-k=team]').all_inner_texts()
+    assert [t.strip().lower() for t in tabs] == ['futebol', 'animes', 'jogos'], tabs     # the tabs come from the catalogue
+    pg.click('[data-act=team][data-v="futebol/flamengo"]')
+    assert S()['team'] == 'futebol/flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
     assert 'Pedro' in txt('#squad') and 'Você e Pedro contra Lucas Paquetá e Carrascal' in txt('#lineup'), txt('#lineup')
     pg.click('[data-act=editplayers]'); pg.fill('#pl1', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
-    assert S()['custom'] == {'flamengo': ['Pedro', '<b>Gerson</b>', 'Carrascal']} and '<b>Gerson</b>' in txt('#lineup') and pg.locator('#lineup b b').count() == 0, 'a name typed shows as text'
+    assert S()['custom'] == {'futebol/flamengo': ['Pedro', '<b>Gerson</b>', 'Carrascal']} and '<b>Gerson</b>' in txt('#lineup') and pg.locator('#lineup b b').count() == 0, 'a name typed shows as text'
     pg.click('[data-act=editplayers]'); pg.click('[data-act=resetplayers]'); assert 'custom' not in S() and 'Lucas Paquetá' in txt('#lineup')
-    pg.click('[data-act=mode][data-v=rivals]'); assert S().get('rival') and pg.locator('#club [data-act=rival][data-v=flamengo]').count() == 0, 'your own club is not a rival'
-    pg.click('[data-act=rival][data-v=palmeiras]'); assert 'Você e Pedro contra Vitor Roque e Flaco López' in txt('#lineup')
+    pg.click('[data-act=mode][data-v=rivals]'); assert S().get('rival') and pg.locator('#club [data-act=rival][data-v="futebol/flamengo"]').count() == 0, 'your own team is not a rival'
+    pg.click('[data-act=rival][data-v="futebol/palmeiras"]'); assert 'Você e Pedro contra Vitor Roque e Flaco López' in txt('#lineup')
     assert overflow() == 0; shot(f'e1-time-{THEME}.png')
-    reload(); assert S()['team'] == 'flamengo' and S()['rival'] == 'palmeiras' and top_bg() == 'rgb(200, 16, 46)', 'the club stays on the device'
+    reload(); assert S()['team'] == 'futebol/flamengo' and S()['rival'] == 'futebol/palmeiras' and top_bg() == 'rgb(200, 16, 46)', 'the team stays on the device'
     pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
-    assert g['names'] == ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'] and g['sides'] == ['flamengo', 'palmeiras']
+    assert g['names'] == ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'] and g['sides'] == ['futebol/flamengo', 'futebol/palmeiras']
     assert 'Vitor Roque' in txt('#seat1') and 'Pedro' in txt('#seat2') and 'Flaco López' in txt('#seat3')
     assert pg.evaluate('getComputedStyle(document.querySelector(".chip.eles")).backgroundColor') == 'rgb(0, 100, 55)', 'the rival\'s colour on "Eles"'
     assert overflow() == 0; shot(f'e1-rivais-{THEME}.png')
     pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
-    pg.click('[data-act=mode][data-v=own]'); assert 'rival' not in S()
+    # an anime team against a football club: the anime tab, then a rival from another theme
+    pg.click('#club [data-act=kind][data-k=team][data-v=anime]')
+    assert pg.locator('#club .packname').all_inner_texts() == [x.upper() for x in ['Blue Lock', 'Naruto Clássico', 'Dragon Ball']] or [x.strip().lower() for x in pg.locator('#club .packname').all_inner_texts()] == ['blue lock', 'naruto clássico', 'dragon ball']
+    pg.click('[data-act=team][data-v="naruto/time-7"]')
+    assert S()['team'] == 'naruto/time-7' and top_bg() == 'rgb(244, 123, 32)', top_bg()
+    assert 'Naruto' in txt('#squad') and 'líder' in txt('#squad')
+    pg.click('#club [data-act=kind][data-k=rival][data-v=futebol]'); pg.click('[data-act=rival][data-v="futebol/santos"]')
+    assert 'Você e Naruto contra Neymar e Gabigol' in txt('#lineup'), txt('#lineup')
+    assert eles_bg() == '#f2f2f2', eles_bg()
+    shot(f'e1-anime-{THEME}.png')
+    # a table seat by seat: Ryu with you, against Scorpion and Sub-Zero; then the order swapped
+    pg.click('[data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
+    pg.click('#club [data-act=kind][data-k=seat][data-v=jogos]')
+    pg.click('[data-act=slot][data-v="0"]'); pg.click('[data-act=seat][data-v="street-fighter/shotokan/0"]')
+    pg.click('[data-act=seat][data-v="mortal-kombat/netherrealm/0"]'); pg.click('[data-act=seat][data-v="mortal-kombat/lin-kuei/0"]')
+    assert S()['seats'] == {'partner': 'street-fighter/shotokan/0', 'opp': ['mortal-kombat/netherrealm/0', 'mortal-kombat/lin-kuei/0']}, S()['seats']
+    assert 'Você e Ryu contra Scorpion e Sub-Zero' in txt('#lineup'), txt('#lineup')
+    assert top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#111111', (top_bg(), eles_bg())     # the teams' colours: Shotokan, Netherrealm
+    pg.click('[data-act=swapopp]'); assert 'Você e Ryu contra Sub-Zero e Scorpion' in txt('#lineup')
+    pg.click('[data-act=colorby][data-v=char]')                                              # colours of the partner himself, and of the first opponent
+    assert S()['colorBy'] == 'char' and top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#1d4ed8', (top_bg(), eles_bg())
+    pg.click('[data-act=slot][data-v="0"]'); pg.click('#club [data-act=kind][data-k=seat][data-v=anime]'); pg.click('[data-act=seat][data-v="dragon-ball/guerreiros-z/0"]')
+    assert 'Você e Goku contra Sub-Zero e Scorpion' in txt('#lineup') and top_bg() == 'rgb(249, 115, 22)', top_bg()
+    pg.click('[data-act=colorby][data-v=pack]'); assert S()['colorBy'] == 'pack' and top_bg() == 'rgb(234, 88, 12)' and eles_bg() == '#111111', (top_bg(), eles_bg())
+    assert overflow() == 0; shot(f'e1-montar-{THEME}.png')
+    reload(); assert 'Você e Goku contra Sub-Zero e Scorpion' in txt('#lineup'), 'the table seat by seat stays on the device'
+    pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
+    assert g['names'] == ['Você', 'Sub-Zero', 'Goku', 'Scorpion'] and g['sides'] == ['dragon-ball', 'mortal-kombat'], g['sides']
+    pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
+    pg.click('[data-act=drawseats]'); assert 'seats' in S() and len({S()['seats']['partner'], *S()['seats']['opp']}) == 3
+    pg.click('[data-act=colorby][data-v=team]'); assert 'colorBy' not in S()
+    pg.click('[data-act=mode][data-v=own]'); assert 'rival' not in S() and 'seats' not in S()
     pg.click('[data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in txt('#lineup')
 
     # ---------- ranking and glossary ----------
@@ -278,4 +312,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): início, seu time (nomes, cores, nomes trocados, modo rivais), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
