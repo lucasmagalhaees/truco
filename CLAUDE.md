@@ -90,7 +90,7 @@ Sem DOM, sem rede e sem armazenamento (conferido pelo `docs_check.py`, e pelo `t
 | `src/core/types.ts` | As formas dos dados: `Game`, `Card`, `Play`, `Phase`, `Ask`, `Shout`, `RealTable`, `AppState`, `Entry`, `Json` |
 | `src/core/game.ts` | As regras (`newGame`, `playCard`, `roundWinner`, `handWinner`, `raise`, `answer`, `decideEleven`, `nextHand`, `whoActs`), a força das cartas (`power`, `manilhaRank`, `ranking`, `suitDuel`), as IAs por nível (`aiCard`, `aiRaise`, `aiAnswer`, `aiEleven`, `aiAct`), o treino (`drill`, `drillOk`) e `seeded`/`shuffle` (o acaso entra como função) |
 | `src/core/teams.ts` | O catálogo de temas, sem nomear nenhum: os tipos `Pack`, `Group`, `Character`, `Seats`; as equipes de todos os packs (`TEAMS`), as categorias para as abas (`kinds`), `packById`, `teamById`, `teamsOf`, `charById`, `charName`, `qualify` (id antigo de clube vira `futebol/<id>`), `colorsOf` (personagem → equipe → pack), `contrast` e `accentOn`, `playersOf` (com os nomes trocados pela pessoa), `readSeats`, `drawSeats` e `lineup` (quem senta onde: equipe, rivais ou mesa montada, com as cores escolhidas) |
-| `src/core/packs/index.ts` | O registro dos temas (`PACKS`), na ordem das abas |
+| `src/core/packs/index.ts` | O registro dos temas (`PACKS`), na ordem das abas. Tema novo: um arquivo nesta pasta com um `Pack`, registrado aqui (D9) |
 | `src/core/packs/futebol.ts` | Os 20 clubes da Série A 2026, com as cores e três jogadores, e `TEAMS_CHECKED` |
 | `src/core/packs/blue-lock.ts`, `src/core/packs/naruto.ts`, `src/core/packs/dragon-ball.ts` | Os animes: equipes de três personagens, com cores |
 | `src/core/packs/street-fighter.ts`, `src/core/packs/mortal-kombat.ts` | Os jogos de luta: equipes de três personagens, com cores |

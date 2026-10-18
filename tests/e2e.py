@@ -114,10 +114,10 @@ with sync_playwright() as p:
     pg.click('[data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
     pg.click('#club [data-act=kind][data-k=seat][data-v=jogos]')
     pg.click('[data-act=slot][data-v="0"]'); pg.click('[data-act=seat][data-v="street-fighter/shotokan/0"]')
-    pg.click('[data-act=seat][data-v="mortal-kombat/netherrealm/0"]'); pg.click('[data-act=seat][data-v="mortal-kombat/lin-kuei/0"]')
-    assert S()['seats'] == {'partner': 'street-fighter/shotokan/0', 'opp': ['mortal-kombat/netherrealm/0', 'mortal-kombat/lin-kuei/0']}, S()['seats']
+    pg.click('[data-act=seat][data-v="mortal-kombat/shirai-ryu/0"]'); pg.click('[data-act=seat][data-v="mortal-kombat/lin-kuei/0"]')
+    assert S()['seats'] == {'partner': 'street-fighter/shotokan/0', 'opp': ['mortal-kombat/shirai-ryu/0', 'mortal-kombat/lin-kuei/0']}, S()['seats']
     assert 'Você e Ryu contra Scorpion e Sub-Zero' in txt('#lineup'), txt('#lineup')
-    assert top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#111111', (top_bg(), eles_bg())     # the teams' colours: Shotokan, Netherrealm
+    assert top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#facc15', (top_bg(), eles_bg())     # the teams' colours: Shotokan, Shirai Ryu
     pg.click('[data-act=swapopp]'); assert 'Você e Ryu contra Sub-Zero e Scorpion' in txt('#lineup')
     pg.click('[data-act=colorby][data-v=char]')                                              # colours of the partner himself, and of the first opponent
     assert S()['colorBy'] == 'char' and top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#1d4ed8', (top_bg(), eles_bg())
