@@ -66,7 +66,9 @@ with sync_playwright() as p:
         pg.click(f'[data-act=go][data-v="{path}"]'); pg.wait_for_selector(f'#panel[data-route="{path}"]')
     def back(want):
         pg.click('#panel [data-act=back]'); pg.wait_for_selector(f'#panel[data-route="{want}"]')
-    lineup = lambda: txt('#tablenow')
+    # who sits at the table, without the teams in parentheses (D15 added them; they are checked on their own below)
+    full_lineup = lambda: txt('#tablenow')
+    lineup = lambda: re.sub(r' \([^)]*\)', '', full_lineup()).replace('Você e', 'você e')
     assert route() == 'jogar' and pg.locator('#start').count() == 1 and pg.locator('select').count() == 0, 'no select of the system'
     assert pg.locator('#tabs [role=tab]').count() == 5 and pg.get_attribute('#tab-jogar', 'aria-selected') == 'true' and pg.locator('#tabs [aria-selected=true]').count() == 1
     assert 'Nenhuma partida terminada' in txt('#tally')
@@ -93,8 +95,13 @@ with sync_playwright() as p:
     reload(); assert dark() == (other == 'dark'), 'the chosen theme stays'
     assert route() == 'ajustes', 'the open tab stays too (in the address and in this browser)'
     pg.click('[data-act=theme][data-v=auto]'); assert dark() == (THEME == 'dark') and pg.evaluate('document.documentElement.dataset.theme') is None
-    for act, v, key, want in (('speed', 'rapida', 'speed', 'rapida'), ('speed', 'normal', 'speed', None), ('fx', 'off', 'quiet', True), ('fx', 'on', 'quiet', None), ('hints', 'off', 'hints', False), ('hints', 'on', 'hints', None)):
+    assert pg.get_attribute('[data-act=auto][data-v=on]', 'aria-pressed') == 'true' and 'auto' not in S() and '3 s' in txt('#autotext'), '"Avançar sozinho" is on by default'
+    for act, v, key, want in (('speed', 'rapida', 'speed', 'rapida'), ('speed', 'normal', 'speed', None), ('fx', 'off', 'quiet', True), ('fx', 'on', 'quiet', None), ('hints', 'off', 'hints', False), ('hints', 'on', 'hints', None), ('auto', 'off', 'auto', False), ('auto', 'on', 'auto', None)):
         pg.click(f'[data-act={act}][data-v={v}]'); assert S().get(key) == want, (act, v, S())
+    pg.click('[data-act=speed][data-v=calma]'); assert '4,5 s' in txt('#autotext'), 'the pause follows the speed'
+    pg.click('[data-act=speed][data-v=normal]')
+    # the games below go hand by hand with "Próxima mão" (the setting off: as before D15); one stretch further down has it on
+    pg.click('[data-act=auto][data-v=off]'); assert S()['auto'] is False and pg.get_attribute('[data-act=auto][data-v=off]', 'aria-pressed') == 'true'
     assert 'não fica guardado' in txt('#version') and pg.locator('[data-act=checkupdate]').count() == 0, txt('#version')
     def colorby(v):
         tab('ajustes'); pg.click(f'[data-act=colorby][data-v={v}]')
@@ -112,6 +119,7 @@ with sync_playwright() as p:
     pg.click('#teams [data-act=team][data-v="futebol/flamengo"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert S()['team'] == 'futebol/flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
     assert 'Pedro' in txt('#squad') and 'você e Pedro contra Lucas Paquetá e Carrascal' in lineup(), lineup()
+    assert 'Você e Pedro (Flamengo) contra' in full_lineup() and 'os outros dois da equipe Flamengo' in full_lineup() and 'Nenhuma' in txt('#steps'), ('no rival team: the other two of your own, and it says so', full_lineup())
     pg.go_back(); pg.wait_for_selector('#panel[data-route="ajustes"]')          # choosing took the screens on the way off the history: back is the tab before
     pg.go_forward(); pg.wait_for_selector('#panel[data-route="equipe"]')
     pg.click('[data-act=editplayers]'); pg.fill('#pl1', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
@@ -121,13 +129,19 @@ with sync_playwright() as p:
     assert pg.locator('#teams [data-act=rival][data-v="futebol/flamengo"]').count() == 0, 'your own team is not a rival'
     pg.click('#teams [data-act=rival][data-v="futebol/palmeiras"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert 'você e Pedro contra Vitor Roque e Flaco López' in lineup()
-    assert overflow() == 0; shot(f'e1-time-{THEME}.png')
+    # team against team (D15): your team, then the other team whole, then the sentence; the other ways one screen down
+    assert 'Você e Pedro (Flamengo) contra Vitor Roque e Flaco López (Palmeiras)' in full_lineup(), full_lineup()
+    assert pg.locator('#steps .entry').count() == 2 and 'Palmeiras' in txt('#steps') and 'Pedro é a sua dupla' in txt('#steps')
+    assert pg.locator('#modes [data-act=go][data-v="equipe/mais"]').count() == 1 and pg.locator('[data-v="equipe/mais/montar"], [data-v="equipe/mais/hv"]').count() == 0, 'putting a table together is not on the main way'
+    assert overflow() == 0; shot(f'e1-time-{THEME}.png'); shot(f'e8-equipe-x-equipe-{THEME}.png')
+    into('equipe/rivais'); assert 'Adversária agora: Palmeiras' in txt('#panel') and pg.locator('#panel [data-act=mode][data-v=own]').count() == 1; back('equipe')
     reload(); assert S()['team'] == 'futebol/flamengo' and S()['rival'] == 'futebol/palmeiras' and top_bg() == 'rgb(200, 16, 46)', 'the team stays on the device'
     tab('jogar'); assert 'você e Pedro contra Vitor Roque e Flaco López' in lineup(), 'Jogar says who sits at the table too'
     pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
     assert g['names'] == ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'] and g['sides'] == ['futebol/flamengo', 'futebol/palmeiras']
     assert 'Vitor Roque' in txt('#seat1') and 'Pedro' in txt('#seat2') and 'Flaco López' in txt('#seat3') and pg.is_hidden('#tabs'), 'the game takes the whole screen'
     assert pg.evaluate('getComputedStyle(document.querySelector(".chip.eles")).backgroundColor') == 'rgb(0, 100, 55)', 'the rival\'s colour on "Eles"'
+    assert txt('#chip0').startswith('Nós: Flamengo') and txt('#chip1').startswith('Eles: Palmeiras') and 'Nós: Flamengo' in txt('#matchup') and 'Eles: Palmeiras' in txt('#matchup'), ('the teams by name on the score and over the table', txt('#score'))
     assert overflow() == 0; shot(f'e1-rivais-{THEME}.png')
     pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
     assert route() == 'jogar' and pg.is_visible('#tabs'), 'ending a game lands on Jogar'
@@ -145,11 +159,13 @@ with sync_playwright() as p:
     assert S()['team'] == 'naruto/time-7' and top_bg() == 'rgb(244, 123, 32)', top_bg()
     assert 'Naruto' in txt('#squad') and 'líder' in txt('#squad')
     into('equipe/rivais'); into('equipe/rivais/futebol'); pg.click('#teams [data-act=rival][data-v="futebol/santos"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
-    assert 'você e Naruto contra Neymar e Gabigol' in lineup(), lineup()
+    assert 'você e Naruto contra Neymar e Gabigol' in lineup() and 'Você e Naruto (Time 7) contra Neymar e Gabigol (Santos)' in full_lineup(), full_lineup()
     assert eles_bg() == '#f2f2f2', eles_bg()
     shot(f'e1-anime-{THEME}.png')
     # a table seat by seat: Ryu with you, against Scorpion and Sub-Zero; then the order swapped
-    into('equipe/montar'); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
+    def montar():
+        into('equipe/mais'); into('equipe/mais/montar')
+    montar(); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
     pg.click('#picker [data-act=kind][data-k=seat][data-v=jogos]')
     assert pg.locator('#seatpacks [role=tab]').count() == 2, 'the universes of the kind, as tabs: never one list of everything'
     pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=street-fighter]'); pg.click('[data-act=seat][data-v="street-fighter/shotokan/0"]')
@@ -162,28 +178,28 @@ with sync_playwright() as p:
     pg.click('[data-act=swapopp]'); assert 'você e Ryu contra Sub-Zero e Scorpion' in lineup()
     colorby('char')                                                                         # colours of the partner himself, and of the first opponent
     assert S()['colorBy'] == 'char' and top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#1d4ed8', (top_bg(), eles_bg())
-    tab('equipe'); into('equipe/montar')
+    tab('equipe'); montar()
     pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=dragon-ball]'); pg.click('[data-act=seat][data-v="dragon-ball/guerreiros-z/0"]')
     assert 'você e Goku contra Sub-Zero e Scorpion' in lineup() and top_bg() == 'rgb(249, 115, 22)', top_bg()
     colorby('pack'); assert S()['colorBy'] == 'pack' and top_bg() == 'rgb(234, 88, 12)' and eles_bg() == '#111111', (top_bg(), eles_bg())
-    tab('equipe'); into('equipe/montar')
+    tab('equipe'); montar()
     assert overflow() == 0; shot(f'e1-montar-{THEME}.png')
-    reload(); assert route() == 'equipe/montar' and 'você e Goku contra Sub-Zero e Scorpion' in lineup(), 'the table seat by seat stays on the device, and the screen in the address'
+    reload(); assert route() == 'equipe/mais/montar' and 'você e Goku contra Sub-Zero e Scorpion' in lineup(), 'the table seat by seat stays on the device, and the screen in the address'
     tab('jogar'); pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
     assert g['names'] == ['Você', 'Sub-Zero', 'Goku', 'Scorpion'] and g['sides'] == ['dragon-ball', 'mortal-kombat'], g['sides']
     pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
-    tab('equipe'); into('equipe/montar')
+    tab('equipe'); montar()
     pg.click('[data-act=drawseats]'); assert 'seats' in S() and len({S()['seats']['partner'], *S()['seats']['opp']}) == 3
     colorby('team'); assert 'colorBy' not in S()
     # the same person never sits twice: Nagi of Time V, then Nagi of Manshine City in the next seat moves the first one out
-    tab('equipe'); into('equipe/montar')
+    tab('equipe'); montar()
     pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=blue-lock]')
     pg.click('[data-act=seat][data-v="blue-lock/time-v/0"]'); pg.click('[data-act=seat][data-v="blue-lock/manshine-city/1"]')
     names = pg.evaluate('window.__APP.Core.lineup(null, null, window.__APP.S.custom, window.__APP.S.seats).names')
     assert len(set(names)) == 4 and names.count('Nagi') == 1, names
     # heroes against villains: drawn by side, in one universe or mixed, and you may be the villain
     side = lambda c: pg.evaluate(f'window.__APP.Core.sideOf("{c}")')
-    back('equipe'); into('equipe/hv'); pg.click('#panel [data-act=mode][data-v=hv]'); st = S()
+    back('equipe/mais'); into('equipe/mais/hv'); pg.click('#panel [data-act=mode][data-v=hv]'); st = S()
     assert st['hv'] == {} and side(st['seats']['partner']) == 'heroi' and all(side(o) == 'vilao' for o in st['seats']['opp']), st['seats']
     pg.click('#hvpack [data-act=hvpack][data-v=naruto]'); st = S()
     assert st['hv'] == {'pack': 'naruto'} and all(c.startswith('naruto/') for c in [st['seats']['partner'], *st['seats']['opp']]), st['seats']
@@ -193,9 +209,9 @@ with sync_playwright() as p:
     assert eles_bg() == first, (eles_bg(), first)                                           # "Eles" in the opponents' colours
     pg.click('[data-act=drawseats]'); assert 'Sortear de novo' in txt('#club') and pg.evaluate('!!window.__APP.Core.readSeats(window.__APP.S.seats)')
     assert overflow() == 0; shot(f'e1-herois-{THEME}.png')
-    back('equipe'); into('equipe/montar'); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'hv' not in S() and 'seats' in S()
+    back('equipe/mais'); into('equipe/mais/montar'); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'hv' not in S() and 'seats' in S()
     pg.click('#panel [data-act=mode][data-v=own]'); assert 'rival' not in S() and 'seats' not in S()
-    back('equipe'); pg.click('#club [data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in lineup()
+    back('equipe/mais'); back('equipe'); pg.click('#club [data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in lineup()
 
     # ---------- ranking and glossary ----------
     tab('treinar'); into('treinar/ranking')
@@ -282,8 +298,17 @@ with sync_playwright() as p:
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['5c', '4e', '6o'], ['5p', '4c', '6e'], ['Ke', '7o', 'Qe'], ['Jo', 'Jc', '6c']]})
     assert pg.locator('#hand .pc.man').count() == 1 and 'copas' in txt('#hand') and pg.locator('#hand .pc small').count() == 3, 'rodinhas: the manilha and the places'
     assert 'manilha: 5' in txt('#vira')
-    pg.click('[data-act=truco]'); settle()
-    g = G(); assert g['value'] == 3 and g['phase'] == 'play' and g['raisedBy'] == 0 and 'Aceito' in txt('#seat1') + txt('#seat1 .bubble') or g['value'] == 3, g
+    # you ask: the card says so by name, your chair stands out, and the one who answers for them is named (D15)
+    pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=truco]')
+    assert txt('#asked') == 'Você pediu TRUCO!' and txt('#answerer') == 'Responde: Biu' and pg.locator('#seat0.asking .asktag').count() == 1 and pg.locator('#seat1.answering').count() == 1, (txt('#action'))
+    assert txt('#stamp').startswith('TRUCO!') and txt('#stamp small') == 'Você pediu TRUCO!', txt('#stamp')
+    shot(f'e8-pedido-voce-{THEME}.png')
+    reload(); pg.evaluate('Math.random = () => 0.99')         # the test's long wait is gone after a reload: Biu answers now, same chance as above
+    settle()
+    g = G()
+    assert g['phase'] == 'play' and g['shout'] == {'seat': 1, 'word': 'aceito'}, (g['phase'], g['shout'])     # Biu (zap in hand) accepts
+    assert txt('#said') == 'Biu aceitou. A mão vale 3.' and txt('#stamp small') == 'Biu aceitou', (txt('#said'), txt('#stamp'))
+    assert g['value'] == 3 and g['phase'] == 'play' and g['raisedBy'] == 0 and 'Aceito' in txt('#seat1') + txt('#seat1 .bubble') or g['value'] == 3, g
     assert pg.locator('[data-act=truco]').count() == 0, 'no raising twice in a row'
     pg.click('#hand [data-act=play][data-k="0"]')
     while True:                     # the others may raise on the way (a bluffed seis, say): accept and go on
@@ -309,9 +334,13 @@ with sync_playwright() as p:
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['4e', '2e', 'Ac'], ['6e', '7o', 'Qe'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
     pg.evaluate('Math.random = () => 0.01')       # chance says: bluff
     pg.click('#hand [data-act=play][data-k="0"]'); settle(); g = G(); assert g['phase'] == 'truco' and g['ask']['by'] == 1 and g['ask'].get('bluff') is True, g['phase']
-    assert 'pediu truco' in txt('#action') and 'Cida cochicha' in txt('#tip') and 'TRUCO' in txt('#seat1 .bubble').upper()
+    assert txt('#asked') == 'Biu pediu TRUCO!' and 'Cida cochicha' in txt('#tip') and 'TRUCO' in txt('#seat1 .bubble').upper(), txt('#action')
+    assert txt('#answerer') == 'Responde: você, pela sua dupla.' and pg.locator('#seat1.asking .asktag').count() == 1 and 'PEDIU TRUCO' in txt('#seat1 .asktag').upper(), 'the chair of who asked stands out'
+    assert txt('#stamp small') == 'Biu pediu TRUCO!', txt('#stamp')
+    assert overflow() == 0; shot(f'e8-pedido-nome-{THEME}.png')
     pg.evaluate('Math.random = window.__realRandom')
     pg.click('[data-act=answer][data-v=run]')
+    assert txt('#stamp').startswith('Era blefe!') and txt('#stamp small') == 'Você correu', txt('#stamp')
     g = G(); assert g['phase'] == 'handEnd' and g['score'][1] == 1 and 'Era blefe!' in txt('#shown') and pg.locator('#shown .pc').count() == 3, g['result']
     assert overflow() == 0; shot(f'e5-blefe-{THEME}.png')
 
@@ -319,9 +348,13 @@ with sync_playwright() as p:
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['3o', '2e', 'Ac'], ['5p', '5c', '3e'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
     pg.click('[data-act=truco]'); settle(); g = G()
     assert g['phase'] == 'truco' and g['ask'] == {'by': 1, 'value': 6} and g['value'] == 3, g['ask']
+    assert txt('#asked') == 'Biu pediu SEIS de volta!' and pg.locator('#seat1.asking').count() == 1 and pg.locator('#seat0.asking').count() == 0, txt('#asked')
     assert 'Nove!' in txt('[data-act=answer][data-v=raise]')
-    pg.click('[data-act=answer][data-v=raise]'); settle(); g = G()
+    pg.click('[data-act=answer][data-v=raise]')
+    assert txt('#stamp small') == 'Você pediu NOVE de volta!', txt('#stamp')
+    settle(); g = G()
     assert g['ask']['value'] == 12 and g['value'] == 9, g['ask']            # he went to doze over your nove
+    assert txt('#asked') == 'Biu pediu DOZE de volta!', txt('#asked')
     assert pg.locator('[data-act=answer][data-v=raise]').count() == 0, 'nothing above doze'
     pg.click('[data-act=answer][data-v=run]'); assert G()['score'][1] == 9 and 'Correu' not in ''
 
@@ -344,12 +377,24 @@ with sync_playwright() as p:
     assert len(G()['hands'][0]) == 2
     shot(f'e6-ferro-{THEME}.png')
 
+    # ---------- "Avançar sozinho" on (D15): the end of a hand stays a moment, no button, then the next hand comes by itself ----------
+    pg.click('[data-act=end]'); pg.click('[data-act=end]'); tab('ajustes'); pg.click('[data-act=auto][data-v=on]'); assert 'auto' not in S()
+    stack({'vira': '7c', 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0, 1], 'hands': [['3o'], ['3e'], ['4o'], ['4c']]})
+    pg.evaluate('window.__APP.ui.wait = 700')                  # the pause to read, fixed for the test (and the computer players' thinking)
+    pg.click('#hand [data-act=play][data-k="0"]'); pg.wait_for_function('window.__APP.S.game.phase === "handEnd"', timeout=10000)
+    assert pg.locator('[data-act=next]').count() == 0 and pg.is_visible('#autonext') and 'sozinha' in txt('#autonext') and 'Nós 1' in txt('#score'), 'the hand ends with the result and the score, and no button'
+    assert pg.locator('#center .pc').count() == 4, 'the last cards stay on the table during the pause'
+    shot(f'e8-avancar-sozinho-{THEME}.png')
+    pg.wait_for_function('window.__APP.S.game.n === 2', timeout=5000); g = G()
+    assert g['phase'] in ('play', 'eleven') and g['score'] == [1, 0] and len(g['hands'][0]) == 3, 'the next hand was dealt by itself'
+
     # ---------- the end of a game: you take the last hand, confetti, the summary, the tally ----------
     stack({'vira': '7c', 'score': [11, 3], 'value': 1, 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0], 'hist': [{'team': 1, 'points': 3, 'how': 'Eles levaram a mão.', 'value': 3}], 'hands': [['Qp'], ['4e'], ['5e'], ['6e']]})
     reload()
     assert 'Nós 11' in txt('#score') and pg.locator('#hand [data-act=play]').count() == 1
     pg.click('#hand [data-act=play][data-k="0"]'); settle(); pg.wait_for_function('window.__APP.S.game.phase === "over"')
     g = G(); assert g['winner'] == 0 and g['score'] == [12, 3]
+    pg.wait_for_timeout(300); assert G()['phase'] == 'over' and pg.locator('[data-act=again]').count() == 1, 'with "Avançar sozinho" on, the end of a game still waits'
     assert 'Vocês venceram' in txt('#action') and pg.locator('#summary li').count() == 2 and pg.evaluate('document.getElementById("confetti").children.length') > 0
     assert S()['tally'] == {'w': 1, 'l': 0}
     assert overflow() == 0; shot(f'e7-fim-{THEME}.png')
@@ -365,14 +410,14 @@ with sync_playwright() as p:
     # ---------- every screen of the tree: by its address, no screen absurdly tall, a capture of each ----------
     tall = {}
     for r in ('jogar', 'jogar/online', 'treinar', 'treinar/ranking', 'treinar/glossario', 'treinar/regras', 'real', 'equipe', 'equipe/time',
-              'equipe/time/futebol', 'equipe/time/anime', 'equipe/time/anime/naruto', 'equipe/time/jogos', 'equipe/rivais', 'equipe/montar', 'equipe/hv', 'ajustes'):
+              'equipe/time/futebol', 'equipe/time/anime', 'equipe/time/anime/naruto', 'equipe/time/jogos', 'equipe/rivais', 'equipe/mais', 'equipe/mais/montar', 'equipe/mais/hv', 'ajustes'):
         pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]')
         assert (r.count('/') > 0) == (pg.locator('#panel [data-act=back]').count() == 1), f'a way back below the root of a tab: {r}'
         h = pg.evaluate('document.documentElement.scrollHeight'); tall[r] = round(h / 852, 1)
         assert h <= 3 * 852 and overflow() == 0, (r, h)
         shot(f'e0-{r.replace("/", "-")}-{THEME}.png')
     # the table seat by seat and heroes against villains in use: the picker, a kind and a universe at a time, stays short
-    for r, mode in (('equipe/montar', 'seats'), ('equipe/hv', 'hv')):
+    for r, mode in (('equipe/mais/montar', 'seats'), ('equipe/mais/hv', 'hv')):
         pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]'); pg.click(f'#panel [data-act=mode][data-v={mode}]')
         assert pg.locator('#picker').count() == 1, r
         h = pg.evaluate('document.documentElement.scrollHeight'); tall[r + ' (em uso)'] = round(h / 852, 1)
@@ -408,4 +453,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')

@@ -2,7 +2,8 @@
 
 Usage: python3 tests/e2e_online.py [dark|light] [dormindo]   (needs dist/ built: npm run build; and npm ci, for the ws package)
 Starts tests/room_server.mjs on this machine (the same core and messages as server/worker.ts on Cloudflare, without
-the storage and the alarms) with the computer players thinking 30 ms, and opens two phone-sized pages from the disk: the
+the storage and the alarms) with the computer players thinking 30 ms and a finished hand staying 2.5 s before the server
+deals the next one (D15), and opens two phone-sized pages from the disk: the
 host creates a room, the friend opens the invitation link and joins, they play. Every action is a tap on the screen;
 the only thing set by the test is the server's address (ui.server). Nothing else on the network is reached.
 With "dormindo" the server runs with HIBERNATE=1: the room goes to JSON and back through Core.readRoom between every two
@@ -21,7 +22,7 @@ TAG = THEME + ('-dormindo' if SLEEP else '')             # names of screenshots 
 PAGE = (ROOT / 'dist' / 'index.html').as_uri()
 
 def serve(port=0):
-    proc = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), str(port), '30'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    proc = subprocess.Popen(['node', str(ROOT / 'tests' / 'room_server.mjs'), str(port), '30', '2500'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                             env={**os.environ, 'HIBERNATE': '1' if SLEEP else '0'})
     line = proc.stdout.readline()
     m = re.search(r'ws://127\.0\.0\.1:(\d+)', line)
@@ -187,18 +188,27 @@ with sync_playwright() as p:
         if whose(guest) and G(guest)['phase'] == 'play' and guest.locator('[data-act=truco]').count():
             guest.click('[data-act=truco]'); asked = True
             host.wait_for_function('(() => { const g = window.__APP.room.game; return g.phase === "truco" && g.ask && g.ask.by === 1; })()')
-            assert 'Amigo' in txt(host, '#action') and re.search(r'pediu (truco|seis|nove|doze)', txt(host, '#action')) and host.locator('#tip').count() == 0, ('no whisper from a partner whose cards are hidden', txt(host, '#action'))
+            assert host.locator('#tip').count() == 0, ('no whisper from a partner whose cards are hidden', txt(host, '#action'))
+            # who asked, by name, on the card and on the chair; on the friend's phone, who answers (D15)
+            assert re.fullmatch(r'<b>Amigo</b> pediu (TRUCO|SEIS|NOVE|DOZE)!', txt(host, '#asked')) and host.locator('#seat1.asking .asktag').count() == 1 and host.locator('#asked b').count() == 0, txt(host, '#asked')
+            guest.wait_for_function('(() => { const g = window.__APP.room.game; return g.phase === "truco" && g.ask && g.ask.by === 0; })()')
+            assert re.fullmatch(r'Você pediu (TRUCO|SEIS|NOVE|DOZE)!', txt(guest, '#asked')) and txt(guest, '#answerer') == 'Responde: Lucas' and guest.locator('#seat3.answering').count() == 1, (txt(guest, '#action'))
+            assert '<b>Amigo</b> pediu' in txt(host, '#stamp small'), txt(host, '#stamp')
+            host.screenshot(path=str(SHOTS / f'o2-pedido-nome-{TAG}.png'), full_page=True)
             host.click('[data-act=answer][data-v=run]'); break
         move(host if whose(host) else guest)
     host.wait_for_function('["handEnd", "over"].includes(window.__APP.room.game.phase)'); guest.wait_for_function('["handEnd", "over"].includes(window.__APP.room.game.phase)')
     hg, gg = G(host), G(guest)
     assert hg['score'] == [gg['score'][1], gg['score'][0]], (hg['score'], gg['score'])
+    if asked: guest.wait_for_function('document.querySelector("#stamp small") && document.querySelector("#stamp small").textContent === "Lucas correu"')
     if asked: assert hg['score'][1] >= 1 and 'correu' in txt(host, '#action') and 'Eles correram' in ' '.join(gg['log']) or 'correu' in ' '.join(gg['log']), gg['log'][-3:]
     host.screenshot(path=str(SHOTS / f'o2-mao-{TAG}.png'), full_page=True)
     guest.screenshot(path=str(SHOTS / f'o2-mao-amigo-{TAG}.png'), full_page=True)
     assert overflow(host) == 0 and overflow(guest) == 0
-    guest.click('[data-act=next]')
-    host.wait_for_function('window.__APP.room.game.n === 2')
+    # the next hand comes by itself from the server, after the pause, with no button on either phone (D15)
+    for pg in (host, guest):
+        assert pg.locator('[data-act=next]').count() == 0 and 'sozinha' in txt(pg, '#autonext'), txt(pg, '#action')
+    host.wait_for_function('window.__APP.room.game.n === 2', timeout=10000); guest.wait_for_function('window.__APP.room.game.n === 2', timeout=10000)
 
     # ---------- the friend drops out and comes back to the same seat ----------
     cov.keep(guest); guest.reload(); guest.wait_for_function('window.__APP && window.__APP.S'); guest.evaluate(f'window.__APP.ui.server = "{SERVER}"')
@@ -274,7 +284,6 @@ with sync_playwright() as p:
         for who, pg in phones.items():
             g = G(pg)
             if not g or g['phase'] in ('handEnd', 'over'):
-                if g and g['phase'] == 'handEnd' and who == 'host' and pg.locator('[data-act=next]').count(): pg.click('[data-act=next]'); moved = True
                 continue
             if pg.evaluate('(g) => window.__APP.Core.whoActs(g)', g) != 0: continue
             if g['phase'] == 'truco':
@@ -298,4 +307,4 @@ with sync_playwright() as p:
     assert not errs, errs
     b.close()
 srv.kill()
-print(f'e2e online ok ({TAG}): Jogar → Jogar online pela árvore (e o voltar do navegador), convite abrindo direto em Jogar online, sair da sala de volta lá, sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, três duplas pela tela com o pedido respondido pelas duas duplas e uma saindo da mão, sem estouro de largura e sem erro de script')
+print(f'e2e online ok ({TAG}): quem pediu pelo nome no cartão, na cadeira e no carimbo, quem responde, a próxima mão saindo sozinha do servidor, Jogar → Jogar online pela árvore (e o voltar do navegador), convite abrindo direto em Jogar online, sair da sala de volta lá, sem servidor desligado, criar sala, link de convite, entrar, nome como texto, lugares, código errado, sala já começada recusada, cada um só vê as próprias cartas e se vê embaixo, partida pelos dois celulares, truco do amigo, placar espelhado, próxima mão, erro no campo sem nome e com código errado, cair e voltar ao mesmo lugar, faixa de conexão caída e sem conexão com o botão, sair pondo a IA na hora, sala apagada pelo servidor, três duplas pela tela com o pedido respondido pelas duas duplas e uma saindo da mão, sem estouro de largura e sem erro de script')
