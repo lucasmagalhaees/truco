@@ -430,8 +430,9 @@ export function aiRaise(g: Game, seat: Seat, rand: () => number): 'no' | 'yes' |
   if (sureThing(g, seat)) return 'yes';
   if (g.level === 'extremo') {
     const { win } = extremeOdds(g, seat, rand);
-    if (win >= RAISE_FOR) return 'yes';
-    return win >= 0.15 && rand() < bluffOdds(g, seat) ? 'bluff' : 'no';
+    // a hand that is won anyway is sometimes kept quiet in the first round, so the raise comes later and gets paid
+    if (win >= RAISE_FOR) return win >= EXTREME_TRAP && !g.rounds.length && rand() < EXTREME_TRAP_RATE ? 'no' : 'yes';
+    return win >= 0.15 && rand() < extremeBluff(g, seat) ? 'bluff' : 'no';
   }
   if (g.level === 'dificil') {
     // the hard player raises for value when the hand looks won more often than not
@@ -521,7 +522,9 @@ function answerPlan(g: Game, seat: Seat, rand?: () => number): { a: Answer; bluf
   const { win, lose } = g.level === 'extremo' ? extremeOdds(g, seat, roll) : handOdds(g, seat, roll);
   if (ask.value < WIN_POINTS && win >= RAISE_BACK) return { a: 'raise', bluff: false };
   // the hard player now and then raises back on a weak hand, against a seat that runs a lot
-  if ((g.level === 'dificil' || g.level === 'extremo') && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
+  if (g.level === 'dificil' && ask.value < WIN_POINTS && win >= 0.3 && roll() < 0.25 * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
+  // the extreme one only with a real chance, and rarely: a raise back risks the most
+  if (g.level === 'extremo' && ask.value < WIN_POINTS && win >= EXTREME_BACK_MIN && roll() < EXTREME_BACK_BLUFF * runRate(g, ask.by) / RUN_GUESS) return { a: 'raise', bluff: true };
   // points: the hand's worth now against what was asked (so a doze from nove is paid when the hand is won more than one
   // time in eight); near the end of the game the hard player weighs what each outcome does to the game instead
   // with three pairs, running only takes this pair out of the hand: the asker scores only if the other pair runs too
@@ -546,6 +549,21 @@ export const EXTREME_SAMPLES = 100;
 /** The chance per weak hand of raising anyway that makes a seat's bluff rate come out right, given how often a hand
  *  dealt at random deserves a raise. */
 const bluffWeight = (g: Game, s: Seat): number => { const b = bluffRate(g, s); return Math.min(1, (b * FAIR_BASE) / ((1 - b) * (1 - FAIR_BASE))); };
+/** How often the extreme player bluffs at a chance to raise: where a bluff works (a round already taken, or the last
+ *  round), scaled by the square of how often the pair that would answer runs (against the first guess), so against a pair that always pays it hardly bluffs and
+ *  against one that runs a lot it bluffs more; a raise above truco is bluffed half as often. Measured with
+ *  scripts/ia_medida.mjs (pedidos), 18/10/2026: 10–25% of its raises are bluffs. */
+export const EXTREME_BLUFF = { where: 0.14, elsewhere: 0.03, max: 0.3 };
+/** From what chance of taking the hand the extreme player may keep quiet in the first round, and how often. */
+export const EXTREME_TRAP = 0.85, EXTREME_TRAP_RATE = 0.3;
+/** The least chance with which the extreme player bluffs a raise back, and how often it does at most. */
+export const EXTREME_BACK_MIN = 0.42, EXTREME_BACK_BLUFF = 0.08;
+export function extremeBluff(g: Game, seat: Seat): number {
+  const t = tm(g, seat), where = standing(g, t) > 0 || g.rounds.length === 2 ? EXTREME_BLUFF.where : EXTREME_BLUFF.elsewhere;
+  const foe = responder(g, askOf(g, seat, nextValue(g.value))), up = g.value >= 3 ? 0.5 : 1;
+  const r = runRate(g, foe) / RUN_GUESS;
+  return Math.min(EXTREME_BLUFF.max, where * up * r * r);
+}
 /** Deals of the cards `seat` has not seen to the hidden hands, each weighed by how well it fits the raises of this hand. */
 export function imagine(g: Game, seat: Seat, rand: () => number, n = EXTREME_SAMPLES): { hands: Card[][]; w: number }[] {
   const pool = unseen(g, seat), r = seeded(Math.floor(rand() * 4294967296)), out: { hands: Card[][]; w: number }[] = [];
