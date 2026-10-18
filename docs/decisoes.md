@@ -168,6 +168,23 @@ Modelo de uma decisão:
   - Durante a partida, o voltar do navegador não encerra a partida (só o "Encerrar", com dois toques).
 - **Não sei:** se o Lucas prefere outra ordem ou outros nomes de aba; se a barra embaixo atrapalha no iPhone com o app na Tela de Início (só conferido no Chromium).
 
+## D14. Nível extremo, a IA que conta as cartas
+
+- **Contexto (18/10/2026, pedido do Lucas):** um quarto nível, acima do difícil, que conta as cartas como gente e decide carta, truco, aceite, corrida e blefe pela conta, sem nunca olhar carta escondida. Pagar o doze vindo do nove não pode ser sempre. Depois de jogar: "o extremo precisa de balanceamento, principalmente no pedido de truco".
+- **Decisão:**
+  - O extremo (`extremo` em `LEVELS`) imagina as cartas que não viu nas mãos ocultas (`EXTREME_SAMPLES` sorteios por decisão), pesa cada sorteio pelo que cada um pediu à vista (pedido com mão fraca só conta como blefe, na taxa de blefe daquele lugar em `reads`) e joga cada sorteio até o fim. Escolhe a carta que mais leva a mão nos mesmos sorteios; pede com chance de levar de 62% ou mais (`RAISE_FOR`); responde pela conta de pontos da partida (`gameChance`), o que paga o doze vindo do nove quando a chance passa de 1/8 e corre com mão perdida. Um teste troca as cartas ocultas e confere que nenhuma decisão muda (mesa de 4 e de 6).
+  - Balanceamento do pedido (18/10/2026): o blefe do extremo é próprio (`extremeBluff`, `EXTREME_BLUFF`): mais onde funciona (rodada já ganha ou última rodada), escalado pelo quadrado de quanto a dupla que responderia corre, metade acima do truco, com teto; o aumento de volta blefado só com chance de verdade e raro (`EXTREME_BACK_MIN`, `EXTREME_BACK_BLUFF`); com a mão quase ganha na 1ª rodada, às vezes segura e pede depois (`EXTREME_TRAP`, `EXTREME_TRAP_RATE`), para não ser previsível e ser pago.
+  - Medido com `node scripts/ia_medida.mjs 400` (sementes fixas), antes (main `3fa0927`) → depois:
+    - extremo contra difícil, 400 partidas: 60% → 63% das partidas; contra médio 61% → 61%; contra a pessoa simulada que blefa 60% → 65%.
+    - pedidos do extremo contra o difícil (300 partidas): pede em 55% → 52% das mãos; blefe em 16% → 13% dos pedidos; blefe no seis 35% → 15%, no doze 29% → 6%; aumento de volta blefado 56% → 22% dos aumentos; com mão forte na 1ª rodada pede em 96% → 80% das chances.
+    - contra quem corre muito, blefa mais (16% dos pedidos, 70% dão certo); contra quem paga tudo, menos (12% → 9%).
+    - tempo por decisão (responder um truco e escolher a carta), Node nesta máquina: 8,2 ms.
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - "Crível" foi lido como: pedir em cerca de metade das mãos, blefe entre 10% e 25% dos pedidos e mais contra quem corre, aumento de volta quase só com chance de verdade, e nem sempre pedir na hora com a mão ganha.
+  - Contra a pessoa, o extremo aprende só do que ela mostrou na partida (`reads`), com o mesmo peso inicial do difícil (`READ_PRIOR`).
+  - Na tabela do doze, com o nove já na mesa, a mão "média" é paga 83–95% das vezes: é a conta (basta levar mais de uma vez em oito), não um exagero; a faixa que separa os níveis é a fraca (36–51% sem histórico ou contra quem só pede com mão, 92% contra quem já foi pego blefando).
+- **Não sei:** se o extremo fica bom de jogar contra uma pessoa de verdade (só medido contra outras IAs e pessoas simuladas); o tempo de decisão num celular (medido no Node desta máquina).
+
 ## D15. Quem pediu fica claro, avançar sozinho e equipe contra equipe
 
 - **Contexto (18/10/2026, o Lucas jogando):** "Na tela precisa ficar claro quem pediu truco, fale o nome do personagem." "Quando uma rodada acabar ou já puder puxar a nova rodada, faça isso automaticamente (pode colocar opções nos ajustes)." "Ainda tá confusa a escolha das equipes; seria mais fácil, em vez de misturar tudo, ser uma equipe toda contra a outra equipe toda."

@@ -7,6 +7,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). Versões: 
 ### Adicionado
 - Quem pediu fica claro (D15): "Biu pediu TRUCO!" no cartão, a cadeira de quem pediu destacada, o carimbo com o nome embaixo, "Responde: <nome>", "<nome> aceitou", "<nome> correu", "pediu SEIS de volta". Também online e nas 3 duplas.
 - Avançar sozinho (Ajustes, ligado por padrão): a próxima mão sai sozinha depois de uma pausa pela velocidade; o fim da partida espera. Online, o servidor dá a próxima mão.
+- Nível extremo (D14): a IA que conta as cartas, imaginando as cartas que não viu, sem nunca olhar as escondidas; pedido de truco balanceado (blefa mais contra quem corre, quase nada contra quem paga, aumento de volta só com chance de verdade). Ganha do difícil em 63% de 400 partidas.
 - Equipe contra equipe: a aba Equipe em dois passos (sua equipe, equipe adversária) com o resumo; o nome das equipes no placar e sobre a mesa.
 
 ### Mudado
