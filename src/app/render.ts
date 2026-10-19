@@ -220,7 +220,7 @@ function equipeScreen(r: string[]): Screen {
     <nav class="entries" id="steps">
     ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla${mode === 'own' || mode === 'rivals' ? '' : ' (fora de uso)'}` : 'Futebol, animes, jogos')}
     ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}${t && Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ' (rival direto)' : ''}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
-    ${current}<nav class="entries" id="modes">${entry('equipe/mais', 'Mais jeitos de montar a mesa', `Personagem por personagem, Heróis x Vilões${mode === 'seats' || mode === 'hv' ? ' · em uso' : ''}`)}</nav>` };
+    ${t && (mode === 'own' || mode === 'rivals') ? suggestCard(t.id, rv) : ''}${current}<nav class="entries" id="modes">${entry('equipe/mais', 'Mais jeitos de montar a mesa', `Personagem por personagem, Heróis x Vilões${mode === 'seats' || mode === 'hv' ? ' · em uso' : ''}`)}</nav>` };
 }
 
 /* ---------- playing online ---------- */
