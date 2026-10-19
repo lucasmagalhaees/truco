@@ -411,6 +411,38 @@ with sync_playwright() as p:
     tab('ajustes'); pg.click('[data-act=hints][data-v=on]'); tab('jogar')
     saved = json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")')); assert saved['game'] is None and saved['tally']['w'] == 1
 
+    # ---------- the record of a match-up and the rematch (D17): Flamengo x Fluminense, won on the last card ----------
+    pg.evaluate('() => { const a = window.__APP; a.S.team = "futebol/flamengo"; a.S.rival = "futebol/fluminense"; delete a.S.seats; delete a.S.hv; a.S.level = "dificil"; localStorage.setItem("truco.v1", JSON.stringify(a.S)); }')
+    reload(); tab('jogar'); assert pg.locator('#h2h').count() == 0, 'no record before the first game of the match-up'
+    def win_stacked():
+        pg.evaluate('''() => { const a = window.__APP; Object.assign(a.S.game, { vira: "7c", score: [11, 3], value: 1, phase: "play", dealer: 3, starter: 0, turn: 0, rounds: [0], table: [], played: [], ask: null, eleven: null, blind: false, hands: [["Qp"], ["4e"], ["5e"], ["6e"]] }); localStorage.setItem("truco.v1", JSON.stringify(a.S)); }''')
+        reload(); pg.evaluate('Math.random = () => 0.99')
+        pg.click('#hand [data-act=play][data-k="0"]'); settle(); pg.wait_for_function('window.__APP.S.game.phase === "over"')
+    pg.click('[data-act=new]'); first = G(); assert first['level'] == 'dificil' and first['names'][2] == 'Pedro' and first['names'][1] == 'Hulk'
+    win_stacked(); assert G()['winner'] == 0
+    assert S()['h2h'] == {'futebol/flamengo|futebol/fluminense': {'w': 1, 'l': 0}}, S().get('h2h')
+    assert 'Agora 1 a 0 pra você no confronto Flamengo x Fluminense' in txt('#h2hend') and txt('#action [data-act=again]') == 'Revanche'
+    has_next = pg.evaluate('typeof window.__APP.Core.suggestRivals === "function"')
+    assert pg.locator('[data-act=nextrival]').count() == (1 if has_next else 0), 'the next rival only with suggestions in the core'
+    assert overflow() == 0; shot(f'e9-revanche-{THEME}.png')
+    pg.click('#action [data-act=again]'); g = G()
+    assert g['phase'] != 'over' and g['n'] == 1 and g['score'] == [0, 0] and g['level'] == 'dificil' and g['names'] == first['names'] and g['sides'] == first['sides'], 'Revanche: the same match-up, dealt at once'
+    win_stacked(); assert 'Agora 2 a 0 pra você' in txt('#h2hend')
+    reload(); assert S()['h2h']['futebol/flamengo|futebol/fluminense'] == {'w': 2, 'l': 0}, 'the record stays after a reload'
+    pg.click('[data-act=home]'); assert txt('#h2h') == 'Flamengo x Fluminense: 2 a 0 pra você.'
+    tab('equipe'); assert txt('#vs #h2h') == 'Flamengo x Fluminense: 2 a 0 pra você.'
+    pg.evaluate('location.hash = "#equipe/rivais/futebol"'); pg.wait_for_selector('#panel[data-route="equipe/rivais/futebol"]')
+    pills = pg.evaluate('[...document.querySelectorAll("#teams .item")].map(e => [e.dataset.v, e.querySelector(".pill") && e.querySelector(".pill").textContent])')
+    assert ['futebol/fluminense', '2–0'] in pills and all(p is None for v, p in pills if v != 'futebol/fluminense'), pills
+    assert overflow() == 0; shot(f'e9-h2h-rivais-{THEME}.png')
+    if has_next:
+        pg.evaluate('location.hash = "#jogar"'); pg.wait_for_selector('#panel[data-route="jogar"]'); pg.click('[data-act=new]'); win_stacked()
+        nxt = pg.get_attribute('[data-act=nextrival]', 'data-act') and S()['rival']; pg.click('[data-act=nextrival]')
+        assert S()['rival'] != nxt and S()['team'] == 'futebol/flamengo' and G()['phase'] != 'over', 'Próximo rival: your team against the next suggested one'
+        pg.click('[data-act=end]'); pg.click('[data-act=end]')
+    # back to the bar table for the rest
+    pg.evaluate('() => { const a = window.__APP; delete a.S.team; delete a.S.rival; a.S.level = "medio"; localStorage.setItem("truco.v1", JSON.stringify(a.S)); }'); reload()
+
     # ---------- every screen of the tree: by its address, no screen absurdly tall, a capture of each ----------
     tall = {}
     for r in ('jogar', 'jogar/online', 'treinar', 'treinar/ranking', 'treinar/glossario', 'treinar/regras', 'real', 'equipe', 'equipe/time',
@@ -460,4 +492,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, revanche e histórico do confronto (fim de jogo, Jogar, Equipe, pastilha na adversária, depois de recarregar), sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')

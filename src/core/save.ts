@@ -1,6 +1,7 @@
 /* What was saved on the device, read back. A saved game that does not hold together is dropped, so a damaged state
    never breaks the page: the tally, the level and the settings still come back. */
 import { LEVELS, VALUES, WIN_POINTS } from './game';
+import { readH2h } from './h2h';
 import { colorsOf, qualify, readSeats, sidedPacks } from './teams';
 import type { AppState, Game, Level, Phase, RealTable, Speed } from './types';
 
@@ -76,7 +77,7 @@ function readTeams(team: unknown, rival: unknown, seats: unknown, by: unknown, h
 
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; seats?: unknown; colorBy?: unknown; hv?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; seats?: unknown; colorBy?: unknown; hv?: unknown; custom?: unknown; h2h?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; train?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -90,6 +91,7 @@ export function readState(x: unknown): AppState {
     ...(o.auto === false ? { auto: false as const } : {}),
     ...readTeams(o.team, o.rival, o.seats, o.colorBy, o.hv),
     ...readCustom(o.custom),
+    ...readH2h(o.h2h),
     ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),
     ...(o.online && typeof o.online === 'object' && /^[A-Z0-9]{5}$/.test(String((o.online as { code?: unknown }).code)) && /^[A-Za-z0-9-]{8,64}$/.test(String((o.online as { token?: unknown }).token))
       ? { online: { code: String((o.online as { code: string }).code), token: String((o.online as { token: string }).token), ...((o.online as { played?: unknown }).played === true ? { played: true as const } : {}) } } : {})

@@ -411,6 +411,22 @@ export default function cases(Core) {
   eq('read state: unknown settings are dropped, bad numbers read as 0', Core.readState({ level: 'deus', theme: 'pink', speed: 'turbo', quiet: 1, hints: 0, tally: { w: -1, l: 2.5 }, train: { ok: 'a' }, team: 'real-madrid', rival: 'x', custom: { flamengo: ['a'], xyz: ['a', 'b', 'c'] } }), empty);
   eq('read state: "Avançar sozinho" is on unless saved off (D15); anything but false reads as on', [Core.readState({ auto: false }).auto, 'auto' in Core.readState({ auto: true }), 'auto' in Core.readState({ auto: 'no' }), 'auto' in Core.readState({})], [false, false, false, false]);
   eq('read state: a rival equal to the club is dropped', Core.readState({ team: 'bahia', rival: 'bahia' }).rival, undefined);
+  /* the record of each match-up (D17) */
+  const fla = 'futebol/flamengo', flu = 'futebol/fluminense', t7 = 'naruto/time-7';
+  eq('h2h key: the same for A x B and B x A, sorted, old bare club ids moved to the football pack', [Core.h2hKey(fla, flu), Core.h2hKey(flu, fla), Core.h2hKey('fluminense', 'flamengo'), Core.h2hKey(t7, fla)], [`${fla}|${flu}`, `${fla}|${flu}`, `${fla}|${flu}`, `${fla}|${t7}`]);
+  eq('h2h key: no match-up with itself, without a rival, with a pack or a character, or with nonsense', [Core.h2hKey(fla, fla), Core.h2hKey(fla, null), Core.h2hKey(fla, 'naruto'), Core.h2hKey(fla, `${t7}/0`), Core.h2hKey('x', 7)], [null, null, null, null, null]);
+  let rec = {};
+  for (const [a, b, won] of [[fla, flu, true], [fla, flu, true], [flu, fla, false], [fla, flu, false], [flu, fla, true]]) rec = Core.h2hAdd(rec, a, b, won);
+  eq('h2h: wins and losses add up, whichever side the person played; seen from each side', [rec[`${fla}|${flu}`], Core.h2hOf(rec, fla, flu), Core.h2hOf(rec, flu, fla), Core.h2hOf(rec, fla, t7), Core.h2hOf(undefined, fla, flu)], [{ w: 3, l: 2 }, { w: 3, l: 2 }, { w: 2, l: 3 }, { w: 0, l: 0 }, { w: 0, l: 0 }]);
+  eq('h2h: a pair that is no match-up leaves the record as it was (a copy)', [Core.h2hAdd(rec, fla, fla, true), Core.h2hAdd(undefined, fla, null, true)], [rec, {}]);
+  const tids = Core.TEAMS.map(t => t.id);
+  let big = {}, pairs = 0;
+  for (let i = 0; i < tids.length && pairs < Core.H2H_MAX + 5; i++) for (let j = i + 1; j < tids.length && pairs < Core.H2H_MAX + 5; j++) { big = Core.h2hAdd(big, tids[i], tids[j], true); pairs++; }
+  const firstKey = Core.h2hKey(tids[0], tids[1]), lastKey = Object.keys(big).at(-1);
+  eq('h2h: only the H2H_MAX most recent match-ups are kept; the oldest goes first; playing one again makes it recent', [Core.H2H_MAX, Object.keys(big).length, firstKey in big, Object.keys(Core.h2hAdd(big, tids[0], tids[6], false)).at(-1) === Core.h2hKey(tids[0], tids[6])], [200, 200, false, true]);
+  eq('read state: the record comes back as it was, the most recent last', [Core.readState(JSON.parse(JSON.stringify({ h2h: big }))).h2h, Object.keys(Core.readState({ h2h: big }).h2h).at(-1) === lastKey], [big, true]);
+  eq('read state: a state saved before the record opens without it', 'h2h' in Core.readState({ team: fla, rival: flu, tally: { w: 1, l: 0 } }), false);
+  eq('read state: rubbish in the record is dropped, the rest kept', [Core.readState({ h2h: { [`${fla}|${flu}`]: { w: 2, l: 1 }, [`${flu}|${fla}`]: { w: 1, l: 1 }, [`${fla}|${fla}`]: { w: 1, l: 0 }, 'x|y': { w: 1, l: 0 }, [`${fla}|${t7}|z`]: { w: 1, l: 0 }, [`${fla}|${t7}`]: { w: -1, l: 'a' }, [`${t7}|${flu}`]: null, [`${fla}|naruto/sannin`]: { w: 0, l: 0 } } }).h2h, ...['no', [1], 7, null, { a: 1 }].map(x => 'h2h' in Core.readState({ h2h: x }))], [{ [`${fla}|${flu}`]: { w: 2, l: 1 } }, false, false, false, false, false]);
   const broken = [{ ...h, names: ['a'] }, { ...h, sides: ['xyz', null] }, { ...h, level: 'x' }, { ...h, score: [13, 0] }, { ...h, hands: [['Xx'], [], [], []] }, { ...h, vira: '9o' }, { ...h, phase: 'dance' }, { ...h, value: 2 }, { ...h, phase: 'truco', ask: null }, { ...h, phase: 'eleven', eleven: null }, { ...h, rounds: [0, 0, 0, 0] }, { ...h, table: [{ seat: 7, card: '3o' }] }, { ...h, log: [1] }, { ...h, blind: 'no' }, { ...h, last: { plays: [], winner: 9 } }, { ...h, ask: { by: 9, value: 3 } }, { ...h, shout: { seat: 'x' } }, { ...h, result: { why: 1 } }];
   eq('read game: what does not hold together is null', broken.map(Core.readGame), broken.map(() => null));
   eq('read real table: what does not hold together is empty', [Core.readReal({ ...rt, hand: ['3o', '4o', '5o', '6o'] }), Core.readReal({ ...rt, target: 'x' }), Core.readReal(null)], [Core.emptyTable(), Core.emptyTable(), Core.emptyTable()]);

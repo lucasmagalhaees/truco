@@ -3,7 +3,7 @@ import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, shoutLine, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, saveS, setS, table, TABS, ui } from './state';
+import { S, applyTheme, matchup, nextRival, saveS, setS, table, TABS, ui } from './state';
 import { back, backTo, closeOver, go, openOver } from './nav';
 import type { Tab } from './state';
 import { applyUpdate, checkNow } from './update';
@@ -33,6 +33,9 @@ function play(next: Game): void {
   setS({ ...S, game: next });
   if (next.phase === 'over' && before && before.phase !== 'over' && next.winner !== null) {
     S.tally = { w: S.tally.w + (next.winner === 0 ? 1 : 0), l: S.tally.l + (next.winner === 1 ? 1 : 0) };
+    // the match-up's record (D17): only games on this device; a game in a room never comes through here
+    const m = matchup();
+    if (m) S.h2h = Core.h2hAdd(S.h2h, m[0], m[1], next.winner === 0);
   }
   saveS(); ui.confirmEnd = false;
   render();
@@ -78,6 +81,8 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
+/** Revanche (D17): the same match-up again, the same table and level as the game that just ended, dealt at once. */
+function rematch(g: Game): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, g.level, { names: g.names, sides: g.sides })); toast('Revanche!'); }
 function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
  *  on the tab they were opened from. */
@@ -280,6 +285,8 @@ export function initEvents(): void {
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
+    else if (a === 'again' && g && g.phase === 'over') rematch(g);
+    else if (a === 'nextrival') { const r = nextRival(); if (r) { S.rival = r; newGame(); } }
     else if (a === 'new' || a === 'again') newGame();
     else if (a === 'home') home();
     else if (a === 'real') { openOver('assistente'); ui.real = true; render(); window.scrollTo(0, 0); }

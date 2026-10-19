@@ -36,6 +36,19 @@ export function applyTheme(): void {
 }
 /** The table the person chose (theme team, rivals, or seat by seat), with the colours as chosen in the settings. */
 export const table = (): { names: string[]; sides: [string | null, string | null] } => Core.lineup(S.team, S.rival, S.custom, S.seats, S.colorBy || 'team');
+/** The match-up in play, team against team (D17): the person's team and the rival team, or null (bar table, own team
+ *  only, or a table put together seat by seat, which has no match-up). */
+export const matchup = (): [string, string] | null => (!S.seats && S.team && S.rival && S.team !== S.rival ? [S.team, S.rival] : null);
+/** The next rival suggested for the person's team, after the current one (D17), or null: without a team, or while the
+ *  core has no suggestions (`suggestRivals` comes from the rival suggestions; until then the button stays hidden). */
+export function nextRival(): string | null {
+  const suggest = (Core as unknown as { suggestRivals?: (id: string) => unknown[] }).suggestRivals;
+  if (typeof suggest !== 'function' || !S.team || S.seats) return null;
+  const ids = suggest(S.team).map(x => (typeof x === 'string' ? x : (x as { id?: unknown } | null)?.id)).filter((x): x is string => typeof x === 'string' && !!Core.teamById(x) && x !== S.team);
+  if (!ids.length) return null;
+  const at = S.rival ? ids.indexOf(S.rival) : -1;
+  return ids[(at + 1) % ids.length] === S.rival ? null : ids[(at + 1) % ids.length];
+}
 /** The colours of the theme: the person's pair on the masthead and on "Nós", the other pair's on "Eles". During a
  *  game, the ones of that game; otherwise, the ones chosen. Without a theme, the bar table's own colours. */
 export function applyClub(game?: Game | null): void {

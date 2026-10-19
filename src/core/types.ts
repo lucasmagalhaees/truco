@@ -135,6 +135,9 @@ export interface AppState {
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };
+  /** Wins and losses of each match-up, team against team, played on this device (not online), D17: keyed by the two
+   *  team ids sorted (`h2hKey`), `w` for the first of the key and `l` for the second; the H2H_MAX most recent. */
+  h2h?: Record<string, { w: number; l: number }>;
 }
 
 /** An entry as the source describes it, once read by `normEntry`. */

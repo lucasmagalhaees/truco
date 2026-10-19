@@ -202,6 +202,18 @@ Modelo de uma decisão:
   - O nome da equipe no placar é cortado com reticências quando não cabe.
 - **Não sei:** se os tempos agradam; se o carimbo com o nome fica legível no iPhone (só conferido no Chromium); se o "Aceito!" carimbado cansa.
 
+## D17. Revanche e histórico por confronto
+
+- **Contexto (18/10/2026, pedido do Lucas):** no fim da partida, "Revanche" (mesmo confronto, mesmas equipes e nível, começa direto) e "Próximo rival" (a sua equipe contra o próximo rival sugerido); e o histórico de vitórias e derrotas de cada confronto, guardado no aparelho e mostrado na aba Equipe, na aba Jogar, na escolha da adversária e no fim de jogo.
+- **Decisão:**
+  - **Revanche** usa a mesa e o nível guardados na partida que acabou (`names`, `sides`, `level`), não os ajustes de agora; vale também na mesa de bar e na mesa montada. Ocupa o lugar do "Jogar de novo", que fazia a mesma coisa (pela mesa escolhida, que não muda durante a partida): dois botões iguais no fim de jogo confundiriam, e a tela tem um botão principal só. O `data-act="again"` ficou.
+  - **Próximo rival** vem de `suggestRivals(<sua equipe>)` (D16, feita em outro branch, `feat/rival-sugerido`): o rival seguinte ao de agora na lista, dando a volta; se a lista só tem o rival de agora, o botão não aparece. Sem equipe escolhida (mesa de bar) ou na mesa montada, não aparece. Enquanto `Core.suggestRivals` não existir, o botão fica escondido (`typeof … === 'function'`), sem quebrar nada.
+  - **O que é um confronto:** a sua equipe contra uma equipe adversária (`S.team` e `S.rival`, sem `S.seats`). Sem adversária (os outros dois da sua equipe), mesa de bar, mesa montada e Heróis x Vilões não contam: não há duas equipes.
+  - **Chave simétrica** (`h2hKey`): os dois ids `pack/equipe` em ordem, separados por `|`; `w` são as vitórias da primeira equipe da chave e `l` as da segunda. Assim Flamengo x Fluminense e Fluminense x Flamengo são o mesmo confronto, e quem jogou com o Fluminense conta para o Fluminense. Na tela, o placar é visto do lado da sua equipe de agora ("3 a 1 pra você", "3 a 1 pra eles", "2 a 2").
+  - **Limite:** os `H2H_MAX` (200) confrontos mais recentes; jogar um confronto o põe no fim, e o mais antigo sai primeiro.
+  - **Online não conta**, nem separado: a mesa online é de quem criou a sala, com gente nos lugares, e a partida chega pelo servidor; misturar com o histórico contra a IA confundiria. Se o Lucas quiser, um histórico online separado é outro campo.
+- **Não sei:** se a pastilha "3–1" na lista de equipes é entendida sem legenda (tem `aria-label`); se "pra você" / "pra eles" é a forma que o Lucas fala.
+
 ## Pendências
 
 | Pendência | Quem resolve |

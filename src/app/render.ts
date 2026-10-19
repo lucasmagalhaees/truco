@@ -1,7 +1,7 @@
 import { Core } from '../core';
 import type { Card, Drill, Game, Pack, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
-import { S, applyClub, table, TABS, ui } from './state';
+import { S, applyClub, matchup, nextRival, table, TABS, ui } from './state';
 import type { Tab } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
@@ -123,7 +123,15 @@ function vsLine(): string {
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
 }
 function tableNow(): string {
-  return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.</p>`;
+  return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.</p>${h2hLine()}`;
+}
+/** A record in words, from the person's side: "3 a 1 pra você", "3 a 1 pra eles", "2 a 2". */
+const h2hSay = (r: { w: number; l: number }): string => (r.w > r.l ? `${r.w} a ${r.l} pra você` : r.w < r.l ? `${r.l} a ${r.w} pra eles` : `${r.w} a ${r.l}`);
+/** The record of the match-up in play (D17): "Flamengo x Fluminense: 3 a 1 pra você"; nothing before the first game. */
+function h2hLine(): string {
+  const m = matchup(), r = m ? Core.h2hOf(S.h2h, m[0], m[1]) : null;
+  if (!m || !r || !(r.w + r.l)) return '';
+  return `<p class="hint" id="h2h">${esc(Core.teamById(m[0])?.name || '')} x ${esc(Core.teamById(m[1])?.name || '')}: ${h2hSay(r)}.</p>`;
 }
 function vHome(): string {
   const sc = screenOf(ui.route), tab = ui.route[0] as Tab;
@@ -182,8 +190,10 @@ function equipeScreen(r: string[]): Screen {
     }
     const pack = kind.packs.length === 1 ? kind.packs[0] : kind.packs.find(x => x.id === r[3]);
     if (!pack) return { title: esc(kind.name), depth: 3, body: `<nav class="entries" id="packs">${kind.packs.map(x => entry(`equipe/${base}/${kind.id}/${x.id}`, esc(x.name), `${Core.packTeams(x).length} equipes`, swatch(x.colors))).join('')}</nav>` };
+    // next to each possible rival, the record against it, if they ever met (D17): "3–1", yours first
+    const pill = (id: string): string => { if (base !== 'rivais' || !t) return ''; const h = Core.h2hOf(S.h2h, t.id, id); return h.w + h.l ? `<span class="pill" aria-label="Você ${h.w} a ${h.l}">${h.w}–${h.l}</span>` : ''; };
     const depth = kind.packs.length === 1 ? 3 : 4, list = Core.packTeams(pack).filter(x => base === 'time' || x.id !== S.team);
-    return { title: esc(pack.name), depth, body: `<div class="list" id="teams">${list.map(x => `<button class="item${cur === x.id ? ' on' : ''}" data-act="${act}" data-v="${esc(x.id)}" data-back="1" aria-pressed="${cur === x.id}">${swatch(x.colors)}<span class="etext"><b>${esc(x.name)}</b><small>${esc(Core.playersOf(x.id, S.custom).join(', '))}</small></span>${cur === x.id ? '<span class="tick" aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>` };
+    return { title: esc(pack.name), depth, body: `<div class="list" id="teams">${list.map(x => `<button class="item${cur === x.id ? ' on' : ''}" data-act="${act}" data-v="${esc(x.id)}" data-back="1" aria-pressed="${cur === x.id}">${swatch(x.colors)}<span class="etext"><b>${esc(x.name)}</b><small>${esc(Core.playersOf(x.id, S.custom).join(', '))}</small></span>${pill(x.id)}${cur === x.id ? '<span class="tick" aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>` };
   };
   if (r[1] === 'time' || r[1] === 'rivais') return pickTeam(r[1]);
   if (r[1] === 'mais') {
@@ -204,7 +214,7 @@ function equipeScreen(r: string[]): Screen {
     : mode === 'none' ? '' : `<section class="card" id="club"><p class="hint">${mode === 'hv' ? 'Heróis x Vilões em uso.' : 'Mesa montada em uso.'}</p><button class="btn ghost block" data-act="mode" data-v="own">Voltar para equipe contra equipe</button></section>`;
   const theirs = rv ? Core.playersOf(rv.id, S.custom) : null;
   const cap = (x: string): string => x.charAt(0).toUpperCase() + x.slice(1);
-  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">${mode === 'seats' || mode === 'hv' ? 'Sua mesa' : 'Equipe contra equipe'}</span><p class="now" id="tablenow">${cap(vsLine())}.</p></section>
+  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">${mode === 'seats' || mode === 'hv' ? 'Sua mesa' : 'Equipe contra equipe'}</span><p class="now" id="tablenow">${cap(vsLine())}.</p>${h2hLine()}</section>
     <nav class="entries" id="steps">
     ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla${mode === 'own' || mode === 'rivals' ? '' : ' (fora de uso)'}` : 'Futebol, animes, jogos')}
     ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
@@ -519,7 +529,12 @@ function vAction(g: Game): string {
   }
   return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : `${pairSay(g, g.winner)} venceram.`}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score.join(' a ')}.</p>${shown}
     ${inRoom() ? (net.view?.host ? '<button class="btn block" data-act="againroom">Jogar de novo com a mesma sala</button>' : `<p class="hint">Quem criou a sala pode começar outra.</p>`) + '<button class="btn ghost block" data-act="leaveroom">Sair da sala</button>'
-      : '<button class="btn block" data-act="again">Jogar de novo</button><button class="btn ghost block" data-act="home">Início</button>'}</section>`;
+      : `${endH2h()}<button class="btn block" data-act="again">Revanche</button>${nextRival() ? `<button class="btn ghost block" data-act="nextrival">Próximo rival: ${esc(Core.teamById(nextRival())?.name || '')}</button>` : ''}<button class="btn ghost block" data-act="home">Início</button>`}</section>`;
+}
+/** At the end of a game on this device, the match-up's record with it (D17): "Agora 4 a 1 pra você no confronto." */
+function endH2h(): string {
+  const m = matchup(), r = m ? Core.h2hOf(S.h2h, m[0], m[1]) : null;
+  return m && r && r.w + r.l ? `<p class="now" id="h2hend">Agora ${h2hSay(r)} no confronto ${esc(Core.teamById(m[0])?.name || '')} x ${esc(Core.teamById(m[1])?.name || '')}.</p>` : '';
 }
 /** With three pairs, on a raise: which pairs still have to answer, and which ran and are out of the hand. */
 function vWho(g: Game): string {

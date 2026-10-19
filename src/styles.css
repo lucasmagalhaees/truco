@@ -400,6 +400,8 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .chev{flex:none;font-size:26px;line-height:1;color:var(--muted)}
 .item.on{background:var(--bg)}
 .tick{flex:none;font-weight:800;color:var(--accent)}
+/* a match-up's record next to a team (D17): small and neutral, never in a team's colours */
+.pill{flex:none;padding:2px 8px;border-radius:999px;border:1px solid var(--cardline);color:var(--muted);font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .entry:focus-visible,.item:focus-visible{outline:3px solid var(--accent-bg);outline-offset:-3px}
 /* a team's colours, small: the only place they show in the lists */
 .sw{flex:none;width:10px;align-self:stretch;min-height:28px;border-radius:999px;background:linear-gradient(var(--a) 0 55%,var(--b) 55%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}

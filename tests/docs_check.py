@@ -66,6 +66,7 @@ CONSTANTS = [
     (r'export const CONN_MAX = 12;', 'até 12 conexões ao mesmo tempo (`CONN_MAX`)'),
     (r'export const CLOSE_BIG = 1009, CLOSE_FAST = 1008;', 'passou disso fecha com 1008'),
     (r"export const ROOM_SERVER = 'wss://truco-salas.lucasbarbosa1738.workers.dev';", 'O endereço dele é `wss://truco-salas.lucasbarbosa1738.workers.dev` (`ROOM_SERVER` no `vite.config.js`)'),
+    (r'export const H2H_MAX = 200;', 'os `H2H_MAX` confrontos mais recentes, 200'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
 ]
 for pattern, phrase in CONSTANTS:
