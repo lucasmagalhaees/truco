@@ -128,6 +128,8 @@ export interface AppState {
    *  person changed, by team. `seats`: a table put together seat by seat (it wins over team and rival). `colorBy`:
    *  which colours the app takes (absent: the team's). */
   team?: string; rival?: string; custom?: Record<string, string[]>;
+  /** The rival was put there by the suggestion (D16), not chosen by hand: choosing another team of your own changes it. */
+  rivalAuto?: true;
   seats?: { partner: string; opp: [string, string] }; colorBy?: 'pack' | 'char';
   /** Heroes against villains: the table in `seats` was drawn that way, in one pack (`pack`; absent: mixed) and with the
    *  person on the villains' side if `side` says so. */

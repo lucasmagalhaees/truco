@@ -117,11 +117,28 @@ function voice(): void {
   }, error => { ui.listening = false; render(); if (error && error !== 'no-speech' && error !== 'aborted') toast(error === 'not-allowed' ? 'O microfone não foi liberado.' : 'Não deu pra ouvir agora.'); });
 }
 
+/** The rival in place `i` of the team's suggested ones, marked as suggested; none if the team has no suggestion. */
+function suggested(i: number): void {
+  const r = Core.suggestRivals(S.team)[i];
+  if (r) { S.rival = r.id; S.rivalAuto = true; } else { delete S.rival; delete S.rivalAuto; }
+}
 /** The theme: a ready team, rivals, or the table seat by seat; the names of the players; the tabs of the pickers. */
 function club(a: string, v: string, d: DOMStringMap): void {
   const s = S.seats;
   // choosing a team or a rival is the main way (team against team): it takes the place of a table put together
-  if (a === 'team') { if (v) S.team = v; else delete S.team; if (!v || S.rival === v) delete S.rival; delete S.seats; delete S.hv; ui.editing = false; }
+  if (a === 'team') {
+    if (v) S.team = v; else delete S.team;
+    // the first suggested rival comes in (D16), unless the person chose one by hand (and it is not the team itself)
+    if (!v) { delete S.rival; delete S.rivalAuto; }
+    else if (!S.rival || S.rivalAuto || S.rival === v) suggested(0);
+    delete S.seats; delete S.hv; ui.editing = false; ui.otherRival = false;
+  }
+  else if (a === 'suggest') {
+    // each tap: the next suggested rival, back to the first after the last
+    const list = Core.suggestRivals(S.team), i = list.findIndex(r => r.id === S.rival);
+    suggested(i + 1 < list.length ? i + 1 : 0); delete S.seats; delete S.hv;
+  }
+  else if (a === 'otherrival') ui.otherRival = true;
   else if (a === 'mode') {
     if (v === 'hv') { S.hv = {}; S.seats = Core.drawSided(rand, null, 'heroi'); ui.slot = 0; }
     else if (v === 'seats') {
@@ -133,11 +150,11 @@ function club(a: string, v: string, d: DOMStringMap): void {
       ui.slot = 0;
     } else {
       delete S.seats; delete S.hv;
-      if (v === 'own') delete S.rival;
-      else { if (!S.team) S.team = Core.TEAMS[0].id; if (!S.rival) S.rival = (Core.TEAMS.find(t => t.id !== S.team) as { id: string }).id; }
+      if (v === 'own') { delete S.rival; delete S.rivalAuto; }
+      else { if (!S.team) S.team = Core.TEAMS[0].id; if (!S.rival) suggested(0); }
     }
   }
-  else if (a === 'rival') { S.rival = v; delete S.seats; delete S.hv; }
+  else if (a === 'rival') { S.rival = v; delete S.rivalAuto; delete S.seats; delete S.hv; ui.otherRival = false; }
   else if (a === 'kind' && d.k) {
     // another kind or universe opens on its own team; the team chip opens that team
     const k: Record<string, string> = { ...ui.kind, [d.k]: v };
@@ -276,7 +293,7 @@ export function initEvents(): void {
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx', 'auto'].includes(a)) setting(a, d.v || '');
     else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || '', d); backTo(1); }
-    else if (['team', 'mode', 'rival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
+    else if (['team', 'mode', 'rival', 'suggest', 'otherrival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
