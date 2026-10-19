@@ -11,7 +11,9 @@ export type Colors = [string, string, string];
 /** Which side of the story a character is on, where the story has sides (none in football). */
 export type Side = 'heroi' | 'vilao';
 export type Character = string | { name: string; colors?: Colors; side?: Side };
-export interface Group { id: string; name: string; colors?: Colors; side?: Side; players: [Character, Character, Character] }
+/** `rivals`: up to RIVALS_MAX direct rivals, qualified ids (`pack/group`), the first being the direct one; `why` the
+ *  reason of each, in the same order, a few words ("o Fla-Flu"). */
+export interface Group { id: string; name: string; colors?: Colors; side?: Side; players: [Character, Character, Character]; rivals?: string[]; why?: string[] }
 export interface Pack {
   id: string; kind: string; kindName: string; name: string;
   /** What the first of a group is called: "craque", "líder". */
@@ -154,4 +156,37 @@ export function lineup(team?: string | null, rival?: string | null, custom?: Rec
   if (!r || r.id === t.id) return { names: ['Você', mine[1], mine[0], mine[2]], sides: [keyOf(`${t.id}/0`, by), null] };
   const theirs = playersOf(r.id, custom);
   return { names: ['Você', theirs[0], mine[0], theirs[1]], sides: [keyOf(`${t.id}/0`, by), keyOf(`${r.id}/0`, by)] };
+}
+
+/** How many rivals are suggested for a team, at most. */
+export const RIVALS_MAX = 3;
+/** A suggested rival: the team, why, and where the suggestion came from (the data, the other team's data, the side of
+ *  the story, or only the same pack). */
+export interface RivalPick { id: string; why: string; how: 'dados' | 'volta' | 'lado' | 'pack' }
+/** The side most of a group's characters are on (their own, or the group's); null with no sides or a tie. */
+function groupSide(g: Group): Side | null {
+  const sides = g.players.map(c => (typeof c === 'string' ? undefined : c.side) || g.side);
+  const h = sides.filter(x => x === 'heroi').length, v = sides.filter(x => x === 'vilao').length;
+  return h > v ? 'heroi' : v > h ? 'vilao' : null;
+}
+/** The rivals suggested for a team (D16), 1 to RIVALS_MAX, always of its own pack (Naruto against Naruto: a team of
+ *  another pack is chosen by hand only), never itself, never twice, always the same for the same data: (a) the ones its data declares, in order; (b) teams whose data declare it, with their reason; (c) in the same
+ *  pack, teams on the other side of the story (heroes against villains, by the side most of each one's characters are
+ *  on); (d) the other teams of the pack, in the pack's order from the one after it. Empty only for an unknown id or a
+ *  pack with one team. `packs` is for the tests. */
+export function suggestRivals(id: string | null | undefined, packs: Pack[] = PACKS): RivalPick[] {
+  const all = packs.flatMap(p => p.groups.map(g => ({ p, g, id: `${p.id}/${g.id}` })));
+  const me = all.find(x => x.id === id);
+  if (!me) return [];
+  const out: RivalPick[] = [];
+  const add = (rid: string, why: string, how: RivalPick['how']): void => {
+    if (out.length < RIVALS_MAX && rid !== me.id && rid.startsWith(`${me.p.id}/`) && !out.some(o => o.id === rid) && all.some(x => x.id === rid)) out.push({ id: rid, why, how });
+  };
+  (me.g.rivals || []).forEach((r, i) => add(r, (me.g.why || [])[i] || 'rival declarado', 'dados'));
+  for (const x of all) { const i = (x.g.rivals || []).indexOf(me.id); if (i >= 0) add(x.id, (x.g.why || [])[i] || 'rival declarado', 'volta'); }
+  const mine = me.p.groups, at = mine.indexOf(me.g), order = [...mine.slice(at + 1), ...mine.slice(0, at)];
+  const side = groupSide(me.g);
+  if (side) for (const g of order) { const s2 = groupSide(g); if (s2 && s2 !== side) add(`${me.p.id}/${g.id}`, side === 'heroi' ? 'vilões contra heróis' : 'heróis contra vilões', 'lado'); }
+  for (const g of order) add(`${me.p.id}/${g.id}`, `do mesmo tema (${me.p.name})`, 'pack');
+  return out;
 }

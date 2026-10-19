@@ -19,13 +19,13 @@ export function setS(next: AppState): void { S = next; }
  *  `drill` the training question on screen and `picked` the answer given to it (null: not answered yet); `streak` right
  *  answers in a row; `vira` the vira chosen in the ranking of the glossary; `wait` a fixed thinking time for the
  *  computer players, in ms, that only the tests set (null: the one of the chosen speed). */
-export interface Ui { server: string | null; editing: boolean; kind: Record<string, string>; slot: 0 | 1 | 2; confirmEnd: boolean; busy: boolean; drill: Drill | null; picked: string | null; streak: number; vira: string; wait: number | null; real: boolean; sheet: Target | null; heard: string; listening: boolean; route: string[] }
+export interface Ui { server: string | null; editing: boolean; kind: Record<string, string>; slot: 0 | 1 | 2; confirmEnd: boolean; busy: boolean; drill: Drill | null; picked: string | null; streak: number; vira: string; wait: number | null; real: boolean; sheet: Target | null; heard: string; listening: boolean; route: string[]; otherRival: boolean }
 /** `server` the room server's address, set only by the tests (null: the build's); `editing` the names of the team's players open for changing; `kind` the theme tab open in each picker (team, rival, seat); `slot` the seat being filled when the table is put together (0 partner, 1 and 2 the opponents); `real` the real-table assistant on screen; `sheet` where the card picked in the grid of 40 goes (null: closed);
- *  `heard` the last words the microphone understood; `listening` the microphone is on; `route` the tab and the screens open in it on the start screen (see nav.ts). */
+ *  `heard` the last words the microphone understood; `listening` the microphone is on; `route` the tab and the screens open in it on the start screen (see nav.ts); `otherRival` the tree of teams open under the suggested rival (D16). */
 /** The tabs of the start screen. */
 export type Tab = 'jogar' | 'treinar' | 'real' | 'equipe' | 'ajustes';
 export const TABS: Tab[] = ['jogar', 'treinar', 'real', 'equipe', 'ajustes'];
-export const ui: Ui = { route: ['jogar'], server: null, editing: false, kind: {}, slot: 0, confirmEnd: false, busy: false, drill: null, picked: null, streak: 0, vira: '7o', wait: null, real: false, sheet: null, heard: '', listening: false };
+export const ui: Ui = { route: ['jogar'], server: null, editing: false, kind: {}, slot: 0, confirmEnd: false, busy: false, drill: null, picked: null, streak: 0, vira: '7o', wait: null, real: false, sheet: null, heard: '', listening: false, otherRival: false };
 
 /** The theme: the device's, unless one was chosen. The choice goes on <html> and into the colour of the browser bars. */
 export function applyTheme(): void {

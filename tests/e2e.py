@@ -118,14 +118,30 @@ with sync_playwright() as p:
     assert pg.locator('#teams .item').count() == 20 and txt('#screentitle') == 'Série A 2026'
     pg.click('#teams [data-act=team][data-v="futebol/flamengo"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert S()['team'] == 'futebol/flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
-    assert 'Pedro' in txt('#squad') and 'você e Pedro contra Lucas Paquetá e Carrascal' in lineup(), lineup()
-    assert 'Você e Pedro (Flamengo) contra' in full_lineup() and 'os outros dois da equipe Flamengo' in full_lineup() and 'Nenhuma' in txt('#steps'), ('no rival team: the other two of your own, and it says so', full_lineup())
+    # the direct rival comes in with the team (D16): Flamengo brings Fluminense, and the sentence says it
+    assert S()['rival'] == 'futebol/fluminense' and S()['rivalAuto'] is True, S().get('rival')
+    assert 'Pedro' in txt('#squad') and 'Você e Pedro (Flamengo) contra Hulk e Thiago Silva (Fluminense, rival direto)' in full_lineup(), full_lineup()
+    assert 'Fluminense (rival direto)' in txt('#steps'), txt('#steps')
     pg.go_back(); pg.wait_for_selector('#panel[data-route="ajustes"]')          # choosing took the screens on the way off the history: back is the tab before
     pg.go_forward(); pg.wait_for_selector('#panel[data-route="equipe"]')
-    pg.click('[data-act=editplayers]'); pg.fill('#pl1', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
-    assert S()['custom'] == {'futebol/flamengo': ['Pedro', '<b>Gerson</b>', 'Carrascal']} and '<b>Gerson</b>' in lineup() and pg.locator('#tablenow b b').count() == 0, 'a name typed shows as text'
-    pg.click('[data-act=editplayers]'); pg.click('[data-act=resetplayers]'); assert 'custom' not in S() and 'Lucas Paquetá' in lineup()
-    into('equipe/rivais'); into('equipe/rivais/futebol')
+    # the star is renamed (with the direct rival in, the other two of the team are not at the table)
+    pg.click('[data-act=editplayers]'); pg.fill('#pl0', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
+    assert S()['custom'] == {'futebol/flamengo': ['<b>Gerson</b>', 'Lucas Paquetá', 'Carrascal']} and '<b>Gerson</b>' in lineup() and pg.locator('#tablenow b b').count() == 0, 'a name typed shows as text'
+    pg.click('[data-act=editplayers]'); pg.click('[data-act=resetplayers]'); assert 'custom' not in S() and 'Hulk' in lineup()
+    # one button goes through the three suggested rivals, and back to the first; the tree waits behind "Escolher outra"
+    into('equipe/rivais')
+    assert 'Rival direto 1 de 3: Fluminense — o Fla-Flu' in txt('#rivalnow') and pg.locator('#kinds').count() == 0 and pg.locator('#suggestbtn').count() == 1, txt('#panel')
+    shot(f'e9-rival-sugerido-{THEME}.png')
+    seen = []
+    for _ in range(3):
+        pg.click('#suggestbtn'); seen.append((S()['rival'], txt('#rivalnow')))
+    assert [r for r, _ in seen] == ['futebol/vasco', 'futebol/botafogo', 'futebol/fluminense'] and 'Rival direto 2 de 3: Vasco — o Clássico dos Milhões' in seen[0][1] and 'Rival direto 3 de 3: Botafogo' in seen[1][1] and 'Rival direto 1 de 3: Fluminense' in seen[2][1], seen
+    assert S()['rivalAuto'] is True and overflow() == 0
+    pg.click('#panel [data-act=mode][data-v=own]'); assert 'rival' not in S() and 'rivalAuto' not in S()
+    assert 'Rival direto sugerido: Fluminense' in txt('#rivalhint') and pg.locator('#kinds').count() == 1
+    back('equipe'); assert 'os outros dois da equipe Flamengo' in full_lineup() and 'Nenhuma' in txt('#steps'), ('no rival team: the other two of your own, and it says so', full_lineup())
+    into('equipe/rivais'); pg.click('#suggestbtn'); assert S()['rival'] == 'futebol/fluminense'
+    pg.click('#otherrival'); pg.wait_for_selector('#kinds'); into('equipe/rivais/futebol')
     assert pg.locator('#teams [data-act=rival][data-v="futebol/flamengo"]').count() == 0, 'your own team is not a rival'
     pg.click('#teams [data-act=rival][data-v="futebol/palmeiras"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert 'você e Pedro contra Vitor Roque e Flaco López' in lineup()
@@ -158,7 +174,13 @@ with sync_playwright() as p:
     pg.click('#teams [data-act=team][data-v="naruto/time-7"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert S()['team'] == 'naruto/time-7' and top_bg() == 'rgb(244, 123, 32)', top_bg()
     assert 'Naruto' in txt('#squad') and 'líder' in txt('#squad')
-    into('equipe/rivais'); into('equipe/rivais/futebol'); pg.click('#teams [data-act=rival][data-v="futebol/santos"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
+    # a rival chosen by hand (Palmeiras) stays when the team changes; the suggestion is there as an option
+    assert S()['rival'] == 'futebol/palmeiras' and 'rivalAuto' not in S(), S().get('rival')
+    into('equipe/rivais'); assert 'Adversária agora: Palmeiras, escolhida por você' in txt('#rivalnow') and 'Rival direto sugerido: Irmãos da Areia — Naruto × Gaara no Exame Chunin' in txt('#rivalhint'), txt('#suggest')
+    pg.click('#suggestbtn'); assert S()['rival'] == 'naruto/areia' and 'Rival direto 1 de 3: Irmãos da Areia' in txt('#rivalnow')
+    back('equipe'); assert 'Você e Naruto (Time 7) contra Gaara e Kankuro (Irmãos da Areia, rival direto)' in full_lineup(), full_lineup()
+    shot(f'e9-rival-anime-{THEME}.png')
+    into('equipe/rivais'); pg.click('#otherrival'); into('equipe/rivais/futebol'); pg.click('#teams [data-act=rival][data-v="futebol/santos"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert 'você e Naruto contra Neymar e Gabigol' in lineup() and 'Você e Naruto (Time 7) contra Neymar e Gabigol (Santos)' in full_lineup(), full_lineup()
     assert eles_bg() == '#f2f2f2', eles_bg()
     shot(f'e1-anime-{THEME}.png')

@@ -119,7 +119,7 @@ function vsLine(): string {
   const n = table().names.map(esc), t = Core.teamById(S.team), rv = Core.teamById(S.rival), seats = S.seats ? Core.readSeats(S.seats) : null;
   if (seats) { const tn = (c: string): string => esc(Core.charById(c)?.team.name || ''); return `mesa montada: você e <b>${n[2]}</b> (${tn(seats.partner)}) contra <b>${n[1]}</b> (${tn(seats.opp[0])}) e <b>${n[3]}</b> (${tn(seats.opp[1])})`; }
   if (!t) return `mesa de bar: você e <b>${n[2]}</b> contra <b>${n[1]}</b> e <b>${n[3]}</b>`;
-  if (rv) return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b> (${esc(rv.name)})`;
+  if (rv) return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b> (${esc(rv.name)}${Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ', rival direto' : ''})`;
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
 }
 function tableNow(): string {
@@ -161,6 +161,16 @@ function screenOf(r: string[]): Screen {
   if (tab === 'equipe') return equipeScreen(r);
   return { title: 'Ajustes', body: vSettings(), depth: 1 };
 }
+/** The suggested rivals of a team (D16): which one is in use ("Rival direto 2 de 3: Vasco — o Clássico dos Milhões"),
+ *  or, with a rival chosen by hand or none, the first one as an option; one button goes through them in order. */
+function suggestCard(team: string, rv: { id: string; name: string } | null): string {
+  const list = Core.suggestRivals(team), i = rv ? list.findIndex(x => x.id === rv.id) : -1;
+  if (!list.length) return rv ? `<p class="now">Adversária agora: <b>${esc(rv.name)}</b>.</p>` : '';
+  const say = (k: number): string => `<b>${esc((Core.teamById(list[k].id) as { name: string }).name)}</b> — ${esc(list[k].why)}`;
+  const now = i >= 0 ? `<p class="now" id="rivalnow">Rival direto ${i + 1} de ${list.length}: ${say(i)}.</p>`
+    : `${rv ? `<p class="now" id="rivalnow">Adversária agora: <b>${esc(rv.name)}</b>, escolhida por você.</p>` : ''}<p class="hint" id="rivalhint">Rival direto sugerido: ${say(0)}.</p>`;
+  return `<section class="card" id="suggest">${now}<button class="btn block" data-act="suggest" id="suggestbtn">Escolher rival sugerido</button>${list.length > 1 ? `<p class="hint">Cada toque passa para o próximo dos ${list.length} sugeridos.</p>` : ''}</section>`;
+}
 /** The Equipe tab (D15): the main way is team against team. (a) your team, kind → universe → team, whose first is your
  *  partner; (b) the other team, whole, by the same tree, whose first two play against you; (c) the table in one sentence.
  *  Without a rival team, the other two of your own team play against you, and the sentence says so. Putting the table
@@ -175,9 +185,11 @@ function equipeScreen(r: string[]): Screen {
     const title = base === 'time' ? 'Sua equipe' : 'Equipe adversária';
     if (!kind) {
       const head = base === 'rivais'
-        ? (t && p ? `<p class="hint">A equipe inteira contra a sua: os dois primeiros dela jogam contra você e ${esc(p[0])}. Pode ser de qualquer tema.</p>${rv ? `<p class="now">Adversária agora: <b>${esc(rv.name)}</b>.</p><button class="btn ghost block" data-act="mode" data-v="own">Sem equipe adversária</button>` : '<p class="hint">Sem escolher, os adversários são os outros dois da sua equipe.</p>'}` : '<p class="hint">Primeiro escolha a sua equipe; depois, a adversária.</p>')
+        ? (t && p ? `<p class="hint">A equipe inteira contra a sua: os dois primeiros dela jogam contra você e ${esc(p[0])}. Pode ser de qualquer tema.</p>${suggestCard(t.id, rv)}${rv ? '<button class="btn ghost block" data-act="mode" data-v="own">Sem equipe adversária</button>' : '<p class="hint">Sem escolher, os adversários são os outros dois da sua equipe.</p>'}` : '<p class="hint">Primeiro escolha a sua equipe; depois, a adversária.</p>')
         : `<p class="hint">O primeiro da equipe (o ${t ? esc(t.pack.lead) : 'craque ou o líder'}) é a sua dupla.</p>`;
       if (base === 'rivais' && !t) return { title, depth: 2, body: head + `<nav class="entries">${entry('equipe/time', 'Escolher a sua equipe')}</nav>` };
+      // the suggested rival in use: the tree of teams waits behind "Escolher outra"
+      if (base === 'rivais' && rv && S.rivalAuto && !ui.otherRival) return { title, depth: 2, body: `${head}<button class="btn ghost block" data-act="otherrival" id="otherrival">Escolher outra</button>` };
       return { title, depth: 2, body: `${head}<nav class="entries" id="kinds">${kinds.map(k => entry(`equipe/${base}/${k.id}`, esc(k.name), k.packs.length > 1 ? k.packs.map(x => esc(x.name)).join(', ') : `${Core.packTeams(k.packs[0]).length} equipes`)).join('')}</nav>` };
     }
     const pack = kind.packs.length === 1 ? kind.packs[0] : kind.packs.find(x => x.id === r[3]);
@@ -207,7 +219,7 @@ function equipeScreen(r: string[]): Screen {
   return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">${mode === 'seats' || mode === 'hv' ? 'Sua mesa' : 'Equipe contra equipe'}</span><p class="now" id="tablenow">${cap(vsLine())}.</p></section>
     <nav class="entries" id="steps">
     ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla${mode === 'own' || mode === 'rivals' ? '' : ' (fora de uso)'}` : 'Futebol, animes, jogos')}
-    ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
+    ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}${t && Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ' (rival direto)' : ''}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
     ${current}<nav class="entries" id="modes">${entry('equipe/mais', 'Mais jeitos de montar a mesa', `Personagem por personagem, Heróis x Vilões${mode === 'seats' || mode === 'hv' ? ' · em uso' : ''}`)}</nav>` };
 }
 
