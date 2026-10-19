@@ -140,6 +140,11 @@ with sync_playwright() as p:
     pg.click('#panel [data-act=mode][data-v=own]'); assert 'rival' not in S() and 'rivalAuto' not in S()
     assert 'Rival direto sugerido: Fluminense' in txt('#rivalhint') and pg.locator('#kinds').count() == 1
     back('equipe'); assert 'os outros dois da equipe Flamengo' in full_lineup() and 'Nenhuma' in txt('#steps'), ('no rival team: the other two of your own, and it says so', full_lineup())
+    # the same button sits on the Equipe screen itself, right under the two steps
+    got = []
+    for _ in range(3):
+        pg.click('#panel[data-route="equipe"] #suggestbtn'); got.append(S()['rival'])
+    assert got == ['futebol/fluminense', 'futebol/vasco', 'futebol/botafogo'] and 'Botafogo' in txt('#steps') and overflow() == 0, got
     into('equipe/rivais'); pg.click('#suggestbtn'); assert S()['rival'] == 'futebol/fluminense'
     pg.click('#otherrival'); pg.wait_for_selector('#kinds'); into('equipe/rivais/futebol')
     assert pg.locator('#teams [data-act=rival][data-v="futebol/flamengo"]').count() == 0, 'your own team is not a rival'
