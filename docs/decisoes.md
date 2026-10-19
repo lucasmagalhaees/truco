@@ -202,6 +202,28 @@ Modelo de uma decisão:
   - O nome da equipe no placar é cortado com reticências quando não cabe.
 - **Não sei:** se os tempos agradam; se o carimbo com o nome fica legível no iPhone (só conferido no Chromium); se o "Aceito!" carimbado cansa.
 
+## D16. Rival direto sugerido
+
+- **Contexto (18/10/2026, pedido do Lucas):** "quando eu escolher uma equipe, quero que sugira o rival direto dela; vai ter que fazer uma inteligência pra isso, mas fica muito melhor". Ajustes no mesmo dia: até 3 rivais por equipe, um botão só que passa de um para o outro; e "o rival sugerido é sempre do mesmo pack" (Naruto × Naruto, Futebol × Futebol).
+- **Decisão:**
+  - `suggestRivals(id)` em `src/core/teams.ts` devolve de 1 a `RIVALS_MAX` (3) rivais, cada um com o motivo, sempre do mesmo pack, nunca a própria equipe, sem repetir e sempre na mesma ordem: (a) os declarados nos dados (`rivals`, com o motivo em `why`, no `Group`); (b) as equipes que declaram esta, com o motivo delas; (c) no mesmo pack, as do outro lado da história (herói × vilão, pelo lado da maioria dos personagens de cada equipe); (d) as outras do pack, na ordem do pack a partir da seguinte. Um rival de outro pack nos dados é ignorado (testado).
+  - Escolhida a sua equipe, o primeiro sugerido entra como adversária (`S.rival`, marcado com `S.rivalAuto`). Adversária escolhida à mão (sem a marca, inclusive as guardadas antes desta versão) não é trocada quando a pessoa troca de equipe: a sugestão aparece como opção. "Sem equipe adversária" tira o rival; a próxima equipe escolhida volta a trazer o sugerido.
+  - Na tela da equipe adversária: "Rival direto 2 de 3: Vasco — o Clássico dos Milhões" e um botão só, "Escolher rival sugerido" (1º → 2º → 3º → 1º). Com o rival sugerido em uso, a árvore fica atrás de "Escolher outra"; à mão, continua podendo ser de qualquer tema. O resumo e o passo 2 dizem "rival direto" quando a adversária é uma das sugeridas.
+  - Os pares, escritos pelo agente de memória em 18/10/2026, **sem conferir na web** (os 3 de cada equipe, com o motivo, estão na tabela do PR e saem de `suggestRivals`):
+    - Série A 2026: Flamengo → Fluminense (Fla-Flu), Vasco (Clássico dos Milhões), Botafogo (Clássico da Rivalidade); Fluminense → Flamengo, Vasco (Clássico dos Gigantes), Botafogo (Clássico Vovô); Vasco → Flamengo, Fluminense, Botafogo; Botafogo → Flamengo, Fluminense, Vasco; Corinthians → Palmeiras (Derby), São Paulo (Majestoso), Santos (Clássico Alvinegro); Palmeiras → Corinthians, São Paulo (Choque-Rei), Santos (Clássico da Saudade); São Paulo → Corinthians, Palmeiras, Santos (San-São); Santos → Corinthians, Palmeiras, São Paulo; Grêmio ↔ Internacional (Gre-Nal); Atlético-MG ↔ Cruzeiro (clássico mineiro), Atlético-MG → Flamengo (rivalidade dos anos 80); Bahia ↔ Vitória (Ba-Vi); Athletico-PR ↔ Coritiba (Atletiba).
+    - Sem o clássico na Série A 2026, o mais perto que está, com isso no motivo: Bragantino ↔ Mirassol (interior paulista), depois os do Paulistão; Chapecoense → Athletico-PR, Grêmio, Internacional (Figueirense e Avaí fora; vizinhos do Sul); Remo → Bahia, Vitória (sem o Paysandu do Re-Pa; Norte × Nordeste).
+    - Naruto: Time 7 → Irmãos da Areia (Naruto × Gaara), Ninjas do Som, Ninjas da Névoa; Areia → Time 7; Time 8 → Time Gai (Hinata × Neji); Time 10 → Areia (Shikamaru × Temari); Time Gai → Time 7; Ninjas do Som → Time 7; Quarteto do Som → Time 10 (Tayuya × Shikamaru); Névoa → Time 7 (a ponte); Jônins → Névoa; Sannin → Ninjas do Som (os de Orochimaru).
+    - Dragon Ball: Guerreiros Z → Família de Freeza, Saiyajins, Androides; Saiyajins → Guerreiros Z; Freeza → Guerreiros Z; Namekuseijins → Freeza; Força Ginyu, Androides e Majin Boo → Guerreiros Z; Turma do Kame → Patrulha Vermelha, Escola do Grou; Grou → Kame; Patrulha → Kame.
+    - Blue Lock: Time Z ↔ Time V (primeira seleção), Time Z → Japão Sub-20, PXG; Bastard München → PXG (Isagi × Rin), Manshine City, Ubers; PXG → Bastard, Japão Sub-20 (Rin × Sae); Manshine City, Ubers e Barcha → Bastard; Japão Sub-20 → Time Z.
+    - Street Fighter: Shotokan ↔ Shadaloo (Ryu × M. Bison), Shotokan → Mestres da Ásia (Ryu × Sagat); Força Aérea e Lutadores do Mundo → Shadaloo; Mestres da Ásia → Shotokan.
+    - Mortal Kombat: Shaolin ↔ Exoterra (Liu Kang × Shao Kahn); Lin Kuei ↔ Shirai Ryu (Sub-Zero × Scorpion); Forças Especiais → Exoterra (o Black Dragon não existe no pack; Kano lutava pela Exoterra); Netherrealm ↔ Shaolin (Shinnok × Raiden).
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - Os 2º e 3º rivais de cada equipe e os "mais perto" dos clubes sem clássico na Série A (Bragantino, Mirassol, Chapecoense, Remo).
+  - "Escolhido à mão" é o que veio da árvore; a adversária guardada antes desta versão conta como escolhida à mão.
+  - "Sem equipe adversária" não é guardado como escolha: a próxima equipe traz o sugerido.
+  - O botão, com a adversária escolhida à mão, começa pelo 1º sugerido.
+- **Não sei:** se os pares e os nomes dos clássicos estão certos (memória, não conferido); se o 2º e 3º fazem sentido para quem conhece cada história.
+
 ## Pendências
 
 | Pendência | Quem resolve |

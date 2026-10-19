@@ -124,8 +124,9 @@ with sync_playwright() as p:
     assert 'Fluminense (rival direto)' in txt('#steps'), txt('#steps')
     pg.go_back(); pg.wait_for_selector('#panel[data-route="ajustes"]')          # choosing took the screens on the way off the history: back is the tab before
     pg.go_forward(); pg.wait_for_selector('#panel[data-route="equipe"]')
-    pg.click('[data-act=editplayers]'); pg.fill('#pl1', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
-    assert S()['custom'] == {'futebol/flamengo': ['Pedro', '<b>Gerson</b>', 'Carrascal']} and '<b>Gerson</b>' in lineup() and pg.locator('#tablenow b b').count() == 0, 'a name typed shows as text'
+    # the star is renamed (with the direct rival in, the other two of the team are not at the table)
+    pg.click('[data-act=editplayers]'); pg.fill('#pl0', '<b>Gerson</b>'); pg.click('[data-act=saveplayers]')
+    assert S()['custom'] == {'futebol/flamengo': ['<b>Gerson</b>', 'Lucas Paquetá', 'Carrascal']} and '<b>Gerson</b>' in lineup() and pg.locator('#tablenow b b').count() == 0, 'a name typed shows as text'
     pg.click('[data-act=editplayers]'); pg.click('[data-act=resetplayers]'); assert 'custom' not in S() and 'Hulk' in lineup()
     # one button goes through the three suggested rivals, and back to the first; the tree waits behind "Escolher outra"
     into('equipe/rivais')

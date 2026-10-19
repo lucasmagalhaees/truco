@@ -169,8 +169,8 @@ function groupSide(g: Group): Side | null {
   const h = sides.filter(x => x === 'heroi').length, v = sides.filter(x => x === 'vilao').length;
   return h > v ? 'heroi' : v > h ? 'vilao' : null;
 }
-/** The rivals suggested for a team (D16), 1 to RIVALS_MAX, never itself, never twice, always the same for the same
- *  data: (a) the ones its data declares, in order; (b) teams whose data declare it, with their reason; (c) in the same
+/** The rivals suggested for a team (D16), 1 to RIVALS_MAX, always of its own pack (Naruto against Naruto: a team of
+ *  another pack is chosen by hand only), never itself, never twice, always the same for the same data: (a) the ones its data declares, in order; (b) teams whose data declare it, with their reason; (c) in the same
  *  pack, teams on the other side of the story (heroes against villains, by the side most of each one's characters are
  *  on); (d) the other teams of the pack, in the pack's order from the one after it. Empty only for an unknown id or a
  *  pack with one team. `packs` is for the tests. */
@@ -180,7 +180,7 @@ export function suggestRivals(id: string | null | undefined, packs: Pack[] = PAC
   if (!me) return [];
   const out: RivalPick[] = [];
   const add = (rid: string, why: string, how: RivalPick['how']): void => {
-    if (out.length < RIVALS_MAX && rid !== me.id && !out.some(o => o.id === rid) && all.some(x => x.id === rid)) out.push({ id: rid, why, how });
+    if (out.length < RIVALS_MAX && rid !== me.id && rid.startsWith(`${me.p.id}/`) && !out.some(o => o.id === rid) && all.some(x => x.id === rid)) out.push({ id: rid, why, how });
   };
   (me.g.rivals || []).forEach((r, i) => add(r, (me.g.why || [])[i] || 'rival declarado', 'dados'));
   for (const x of all) { const i = (x.g.rivals || []).indexOf(me.id); if (i >= 0) add(x.id, (x.g.why || [])[i] || 'rival declarado', 'volta'); }
