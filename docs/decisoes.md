@@ -231,6 +231,12 @@ Modelo de uma decisão:
 - **Extremo:** um nove ou um doze passa a pedir uma mão melhor para contar como merecido (`DESERVE_STEP` a mais no seis, o dobro no nove e no doze), e o blefe lido de quem pede conta pela metade nesses pedidos (`BIG_RAISE_BLUFF`); o extremo aprende o blefe mais devagar (`READ_PRIOR` 8). Medido (60 partidas por linha, 21/10/2026): contra quem só pede com mão, o extremo paga o doze com mão fraca 26% (antes 36%) e com mão média 67% (antes 85%); contra quem já foi pego blefando continua pagando quase sempre. O extremo segue vencendo o difícil (63% em 200 partidas).
 - **Não verificado:** contra uma pessoa de verdade.
 
+## D20. Mais temas: Avatar, Def Jam, Nintendo, Sonic e Piratas do Caribe
+
+- **Contexto (21/10/2026, pedido do Lucas):** Avatar: A Lenda de Aang em Animes; Def Jam: Fight for NY, Nintendo (Mario, Zelda, Donkey Kong) e Sonic em Jogos; Piratas do Caribe numa categoria nova, Filmes.
+- **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
+- **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
+
 ## Pendências
 
 | Pendência | Quem resolve |

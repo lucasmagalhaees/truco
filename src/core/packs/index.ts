@@ -5,8 +5,13 @@ import { futebol } from './futebol';
 import { blueLock } from './blue-lock';
 import { naruto } from './naruto';
 import { dragonBall } from './dragon-ball';
+import { avatar } from './avatar';
 import { streetFighter } from './street-fighter';
 import { mortalKombat } from './mortal-kombat';
+import { defJam } from './def-jam';
+import { nintendo } from './nintendo';
+import { sonic } from './sonic';
+import { piratas } from './piratas';
 
-export const PACKS: Pack[] = [futebol, blueLock, naruto, dragonBall, streetFighter, mortalKombat];
+export const PACKS: Pack[] = [futebol, blueLock, naruto, dragonBall, avatar, streetFighter, mortalKombat, defJam, nintendo, sonic, piratas];
 export { TEAMS_CHECKED } from './futebol';

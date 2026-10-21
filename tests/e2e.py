@@ -113,7 +113,7 @@ with sync_playwright() as p:
     tab('equipe'); assert 'você e Cida contra Biu e Toinho' in lineup()
     into('equipe/time')
     kinds = pg.locator('#kinds .entry b').all_inner_texts()
-    assert [t.strip().lower() for t in kinds] == ['futebol', 'animes', 'jogos'], kinds     # the kinds come from the catalogue
+    assert [t.strip().lower() for t in kinds] == ['futebol', 'animes', 'jogos', 'filmes'], kinds     # the kinds come from the catalogue
     into('equipe/time/futebol')                                  # one universe in the kind: straight to the teams
     assert pg.locator('#teams .item').count() == 20 and txt('#screentitle') == 'Série A 2026'
     pg.click('#teams [data-act=team][data-v="futebol/flamengo"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
@@ -169,7 +169,7 @@ with sync_playwright() as p:
     # an anime team against a football club: kind, then universe, then team; then a rival from another theme
     tab('equipe'); into('equipe/time'); into('equipe/time/anime')
     packs = [x.strip().lower() for x in pg.locator('#packs .entry b').all_inner_texts()]
-    assert packs == ['blue lock', 'naruto clássico', 'dragon ball'], packs
+    assert packs == ['blue lock', 'naruto clássico', 'dragon ball', 'avatar: a lenda de aang'], packs
     into('equipe/time/anime/naruto'); assert txt('#screentitle') == 'Naruto Clássico'
     # the browser's back goes one screen back, and forward again
     pg.go_back(); pg.wait_for_selector('#panel[data-route="equipe/time/anime"]')
@@ -197,7 +197,7 @@ with sync_playwright() as p:
         into('equipe/mais'); into('equipe/mais/montar')
     montar(); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
     pg.click('#picker [data-act=kind][data-k=seat][data-v=jogos]')
-    assert pg.locator('#seatpacks [role=tab]').count() == 2, 'the universes of the kind, as tabs: never one list of everything'
+    assert pg.locator('#seatpacks [role=tab]').count() == 5, 'the universes of the kind, as tabs: never one list of everything'
     pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=street-fighter]'); sit('street-fighter/shotokan/0')
     assert pg.locator('[data-act=seat][data-v^="mortal-kombat/"]').count() == 0
     pg.click('#picker [data-act=kind][data-k=seatpack][data-v=mortal-kombat]')
