@@ -75,7 +75,9 @@ export default function cases(Core) {
   const run = Core.answer(tr, 'run');
   eq('ran: you take what the hand was worth before', [run.phase, run.score, run.result.points, run.result.shown.seat, run.result.shown.bluff], ['handEnd', [1, 0], 1, 0, false]);
   const six = Core.answer(tr, 'raise');
-  eq('raised to seis: worth 3 already, you answer now', [six.value, six.ask, Core.whoActs(six), six.shout.word, six.raisedBy], [3, { by: 1, value: 6 }, 0, 'seis', 0]);
+  eq('raised to seis: worth 3 already, you answer now', [six.value, six.ask, Core.whoActs(six), six.shout.word, six.raisedBy], [3, { by: 1, value: 6, to: 0 }, 0, 'seis', 0]);
+  const cida = Core.answer(Core.raise({ ...base, turn: 2 }, 2), 'raise');
+  eq('Cida asked truco and they raised back: Cida answers the seis, not you (D18)', [cida.ask, Core.whoActs(cida), Core.answer(cida, 'accept').log.at(-1)], [{ by: 3, value: 6, to: 2 }, 2, 'Cida aceitou. Vale 6.']);
   eq('ran from seis: they take 3', Core.answer(six, 'run').score, [0, 3]);
   const nove = Core.answer(six, 'raise'), doze = Core.answer(Core.answer(nove, 'raise'), 'accept');
   eq('nove, doze, and no raise above 12', [nove.ask.value, doze.value, Core.answer({ ...doze, phase: 'truco', ask: { by: 0, value: 12 } }, 'raise').ask.value, Core.answer(base, 'accept') === base], [9, 12, 12, true]);
