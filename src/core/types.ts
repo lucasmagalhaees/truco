@@ -125,15 +125,12 @@ export interface AppState {
   /** `auto` false: a finished hand waits for a tap on "Próxima mão" (absent: the next hand comes by itself, D15). */
   auto?: false;
   /** The person's team (a group of a theme pack, `pack/group`), the rival team in the rivals mode, and the names the
-   *  person changed, by team. `seats`: a table put together seat by seat (it wins over team and rival). `colorBy`:
-   *  which colours the app takes (absent: the team's). */
+   *  person changed, by team. `colorBy`: which
+   *  colours the app takes (absent: the team's). */
   team?: string; rival?: string; custom?: Record<string, string[]>;
   /** The rival was put there by the suggestion (D16), not chosen by hand: choosing another team of your own changes it. */
   rivalAuto?: true;
-  seats?: { partner: string; opp: [string, string] }; colorBy?: 'pack' | 'char';
-  /** Heroes against villains: the table in `seats` was drawn that way, in one pack (`pack`; absent: mixed) and with the
-   *  person on the villains' side if `side` says so. */
-  hv?: { pack?: string; side?: 'vilao' };
+  colorBy?: 'pack' | 'char';
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };

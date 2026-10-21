@@ -1,5 +1,5 @@
 import { Core } from '../core';
-import type { Card, Drill, Game, Pack, Play, RealTable, Seat, Target, Team, Word } from '../core';
+import type { Card, Drill, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
 import { S, applyClub, table, TABS, ui } from './state';
 import type { Tab } from './state';
@@ -116,8 +116,7 @@ const swatch = (c?: [string, string, string] | null): string => (c ? `<span clas
 /** Who sits at the table now, team against team, in one sentence: "você e Pedro (Flamengo) contra Vitor Roque e Flaco
  *  López (Palmeiras)". Without a rival team, the others of your own team, and the sentence says so. */
 function vsLine(): string {
-  const n = table().names.map(esc), t = Core.teamById(S.team), rv = Core.teamById(S.rival), seats = S.seats ? Core.readSeats(S.seats) : null;
-  if (seats) { const tn = (c: string): string => esc(Core.charById(c)?.team.name || ''); return `mesa montada: você e <b>${n[2]}</b> (${tn(seats.partner)}) contra <b>${n[1]}</b> (${tn(seats.opp[0])}) e <b>${n[3]}</b> (${tn(seats.opp[1])})`; }
+  const n = table().names.map(esc), t = Core.teamById(S.team), rv = Core.teamById(S.rival);
   if (!t) return `mesa de bar: você e <b>${n[2]}</b> contra <b>${n[1]}</b> e <b>${n[3]}</b>`;
   if (rv) return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b> (${esc(rv.name)}${Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ', rival direto' : ''})`;
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
@@ -173,12 +172,10 @@ function suggestCard(team: string, rv: { id: string; name: string } | null): str
 }
 /** The Equipe tab (D15): the main way is team against team. (a) your team, kind → universe → team, whose first is your
  *  partner; (b) the other team, whole, by the same tree, whose first two play against you; (c) the table in one sentence.
- *  Without a rival team, the other two of your own team play against you, and the sentence says so. Putting the table
- *  together seat by seat and Heróis x Vilões are further ways, one screen down ("Mais jeitos de montar a mesa"). A kind
- *  with one universe (football) skips the universe. */
+ *  Without a rival team, the other two of your own team play against you, and the sentence says so. A kind with one
+ *  universe (football) skips the universe. */
 function equipeScreen(r: string[]): Screen {
-  const t = Core.teamById(S.team), rv = Core.teamById(S.rival), seats = S.seats ? Core.readSeats(S.seats) : null, sided = Core.sidedPacks();
-  const mode = seats ? (S.hv ? 'hv' : 'seats') : rv ? 'rivals' : t ? 'own' : 'none';
+  const t = Core.teamById(S.team), rv = Core.teamById(S.rival);
   const p = t ? Core.playersOf(t.id, S.custom) : null;
   const pickTeam = (base: 'time' | 'rivais'): Screen => {
     const kinds = Core.kinds(), kind = kinds.find(k => k.id === r[2]), act = base === 'time' ? 'team' : 'rival', cur = base === 'time' ? S.team : S.rival;
@@ -198,29 +195,18 @@ function equipeScreen(r: string[]): Screen {
     return { title: esc(pack.name), depth, body: `<div class="list" id="teams">${list.map(x => `<button class="item${cur === x.id ? ' on' : ''}" data-act="${act}" data-v="${esc(x.id)}" data-back="1" aria-pressed="${cur === x.id}">${swatch(x.colors)}<span class="etext"><b>${esc(x.name)}</b><small>${esc(Core.playersOf(x.id, S.custom).join(', '))}</small></span>${cur === x.id ? '<span class="tick" aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>` };
   };
   if (r[1] === 'time' || r[1] === 'rivais') return pickTeam(r[1]);
-  if (r[1] === 'mais') {
-    const sub = r[2] === 'montar' || (r[2] === 'hv' && sided.length) ? r[2] : null;
-    if (!sub) return { title: 'Mais jeitos de montar a mesa', depth: 2, body: `<p class="hint">Fora do caminho principal: escolher cada lugar, personagem por personagem, ou um lado contra o outro.</p><nav class="entries" id="moremodes">
-      ${entry('equipe/mais/montar', 'Montar a mesa', `Cada lugar com quem você quiser${mode === 'seats' ? ' · em uso' : ''}`)}
-      ${sided.length ? entry('equipe/mais/hv', 'Heróis x Vilões', `Um lado contra o outro${mode === 'hv' ? ' · em uso' : ''}`) : ''}</nav>` };
-    const hvOn = sub === 'hv', title = hvOn ? 'Heróis x Vilões' : 'Montar a mesa';
-    if (hvOn ? mode !== 'hv' : mode !== 'seats') {
-      return { title, depth: 3, body: `<p>${hvOn ? 'Sua dupla do lado dos heróis (ou dos vilões), os dois adversários do outro lado, sorteados num universo.' : 'Escolha cada lugar: sua dupla e os dois adversários, de qualquer tema.'}</p><button class="btn block" data-act="mode" data-v="${hvOn ? 'hv' : 'seats'}">${hvOn ? 'Jogar Heróis x Vilões' : 'Montar a mesa'}</button>` };
-    }
-    return { title, depth: 3, body: tableNow() + vSeats() };
-  }
-  const current = (mode === 'own' || mode === 'rivals') && t && p ? `<section class="card" id="club"><p id="squad">${swatch(t.colors)} <b>${esc(t.name)}</b> (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(t.pack.lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>
+  const current = t && p ? `<section class="card" id="club"><p id="squad">${swatch(t.colors)} <b>${esc(t.name)}</b> (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(t.pack.lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>
       ${ui.editing ? `<div class="edit" id="edit">${p.map((x, i) => `<div class="field"><input id="pl${i}" maxlength="24" autocomplete="off" value="${esc(x)}" aria-label="${i ? `Jogador ${i + 1}` : esc(t.pack.lead)}"></div>`).join('')}
       <div class="pick"><button class="btn" data-act="saveplayers">Salvar nomes</button><button class="btn ghost" data-act="resetplayers">Voltar aos originais</button></div></div>`
       : `<div class="pick"><button class="btn ghost" data-act="editplayers">Trocar os nomes</button><button class="btn ghost" data-act="team" data-v="">Sem equipe</button></div>`}${t.pack.note ? `<p class="hint">${esc(t.pack.note)}</p>` : ''}</section>`
-    : mode === 'none' ? '' : `<section class="card" id="club"><p class="hint">${mode === 'hv' ? 'Heróis x Vilões em uso.' : 'Mesa montada em uso.'}</p><button class="btn ghost block" data-act="mode" data-v="own">Voltar para equipe contra equipe</button></section>`;
+    : '';
   const theirs = rv ? Core.playersOf(rv.id, S.custom) : null;
   const cap = (x: string): string => x.charAt(0).toUpperCase() + x.slice(1);
-  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">${mode === 'seats' || mode === 'hv' ? 'Sua mesa' : 'Equipe contra equipe'}</span><p class="now" id="tablenow">${cap(vsLine())}.</p></section>
+  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">Equipe contra equipe</span><p class="now" id="tablenow">${cap(vsLine())}.</p></section>
     <nav class="entries" id="steps">
-    ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla${mode === 'own' || mode === 'rivals' ? '' : ' (fora de uso)'}` : 'Futebol, animes, jogos')}
+    ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla` : 'Futebol, animes, jogos')}
     ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}${t && Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ' (rival direto)' : ''}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
-    ${t && (mode === 'own' || mode === 'rivals') ? suggestCard(t.id, rv) : ''}${current}<nav class="entries" id="modes">${entry('equipe/mais', 'Mais jeitos de montar a mesa', `Personagem por personagem, Heróis x Vilões${mode === 'seats' || mode === 'hv' ? ' · em uso' : ''}`)}</nav>` };
+    ${t ? suggestCard(t.id, rv) : ''}${current}` };
 }
 
 /* ---------- playing online ---------- */
@@ -288,50 +274,6 @@ function vNet(): string {
   const gone = v ? v.members.filter(m => !m.online) : [];
   if (!gone.length || !v) return '';
   return `<p class="explain" id="netstatus">${gone.map(m => `<b>${esc(m.name)}</b> saiu da sala`).join(', ')}. A partida espera voltar.${v.host ? gone.map(m => ` <button class="btn ghost" data-act="botseat" data-s="${m.seat}">IA no lugar de ${esc(m.name)}</button>`).join('') : ''}</p>`;
-}
-
-/* ---------- the theme: a table put together seat by seat ----------
-   Everything here comes from the catalogue (Core.kinds, Core.PACKS): no pack or kind is named in the screen. The
-   catalogue's colours only show as a small strip (swatch); buttons and lists keep the app's neutral palette. */
-/** The tabs of the kinds (Futebol, Animes, Jogos…), for the picker `k`; the open one is ui.kind[k], or the kind of `cur`. */
-function kindOf(k: string, cur?: string | null): string {
-  const all = Core.kinds(), want = ui.kind[k] || (cur ? (Core.charById(cur)?.team.pack.kind || Core.teamById(cur)?.pack.kind) : '') || all[0].id;
-  return all.some(x => x.id === want) ? want : all[0].id;
-}
-function kindTabs(k: string, open: string): string {
-  return `<div class="segm small kinds" role="tablist" aria-label="Tema">${Core.kinds().map(x => `<button role="tab" class="${x.id === open ? 'on' : ''}" data-act="kind" data-k="${k}" data-v="${esc(x.id)}" aria-selected="${x.id === open}">${esc(x.name)}</button>`).join('')}</div>`;
-}
-/** Characters for the seat being filled: one kind, one universe and one team at a time (tabs for the first two, small
- *  chips for the teams of the universe), and only the open team's three characters, so even the 20 clubs stay short. The
- *  open team is ui.kind.seatteam, else the one of whoever sits in the seat being filled, else the first of the universe. */
-function charPicker(chosen: string[]): string {
-  const open = kindOf('seat', chosen[ui.slot]), packs = (Core.kinds().find(x => x.id === open) as { packs: Pack[] }).packs;
-  const pack = packs.find(p => p.id === ui.kind.seatpack) || packs.find(p => p.id === Core.charById(chosen[ui.slot])?.team.pack.id) || packs[0];
-  const packTabs = packs.length > 1 ? `<div class="segm small kinds" role="tablist" aria-label="Universo" id="seatpacks">${packs.map(p => `<button role="tab" class="${p === pack ? 'on' : ''}" data-act="kind" data-k="seatpack" data-v="${esc(p.id)}" aria-selected="${p === pack}">${esc(p.name)}</button>`).join('')}</div>` : '';
-  const teams = Core.packTeams(pack), team = teams.find(t => t.id === ui.kind.seatteam) || teams.find(t => t.id === Core.charById(chosen[ui.slot])?.team.id) || teams[0];
-  const teamChips = `<div class="teamchips" role="tablist" aria-label="Equipe" id="seatteams">${teams.map(t => `<button role="tab" class="chip-btn team${t === team ? ' on' : ''}" data-act="kind" data-k="seatteam" data-v="${esc(t.id)}" aria-selected="${t === team}">${swatch(t.colors)}${esc(t.name)}</button>`).join('')}</div>`;
-  return `<div id="picker">${kindTabs('seat', open)}${packTabs}${teamChips}<div class="list"><div class="charrow">${swatch(team.colors)}<span>${esc(team.name)}</span><div class="chars">${[0, 1, 2].map(i => {
-    const id = `${team.id}/${i}`, on = chosen.includes(id);
-    return `<button class="chip-btn${on ? ' on' : ''}" data-act="seat" data-v="${esc(id)}" aria-pressed="${on}">${esc(Core.charName(id, S.custom))}</button>`;
-  }).join('')}</div></div></div></div>`;
-}
-const SLOT = ['Sua dupla', 'Adversário 1', 'Adversário 2'];
-/** The table seat by seat (and Heróis x Vilões, which is the same table drawn by side): the three seats, then who sits. */
-function vSeats(): string {
-  const seats = Core.readSeats(S.seats) as NonNullable<ReturnType<typeof Core.readSeats>>, chosen = [seats.partner, ...seats.opp], sided = Core.sidedPacks();
-  let h = '';
-  if (S.hv) {
-    const hv = S.hv, opt = (act: string, v: string, label: string, on: boolean): string => `<button class="${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" aria-pressed="${on}">${esc(label)}</button>`;
-    h += `<p class="hint">Universo</p><div class="segm small kinds" role="group" aria-label="Universo" id="hvpack">${opt('hvpack', '', 'Misturado', !hv.pack)}${sided.map(p => opt('hvpack', p.id, p.name, hv.pack === p.id)).join('')}</div>
-      <p class="hint">Você joga do lado dos</p><div class="segm small" role="group" aria-label="Seu lado" id="hvside">${opt('hvside', 'heroi', 'Heróis', hv.side !== 'vilao')}${opt('hvside', 'vilao', 'Vilões', hv.side === 'vilao')}</div>`;
-  }
-  h += `<p class="hint">Toque num lugar e depois em quem senta nele. A mesma pessoa não senta em dois lugares.</p><div class="slots" id="slots">${chosen.map((c, i) => {
-    const x = Core.charById(c) as NonNullable<ReturnType<typeof Core.charById>>;
-    return `<button class="slot${ui.slot === i ? ' on' : ''}" data-act="slot" data-v="${i}" aria-pressed="${ui.slot === i}">${swatch(Core.colorsOf(c))}<small>${SLOT[i]}</small><b>${esc(Core.charName(c, S.custom))}</b><small>${esc(x.team.name)}</small></button>`;
-  }).join('')}</div>
-    <div class="pick"><button class="btn ghost" data-act="swapopp">Trocar a ordem</button><button class="btn ghost" data-act="drawseats">${S.hv ? 'Sortear de novo' : 'Sortear'}</button></div>${charPicker(chosen)}
-    <button class="btn ghost block" data-act="mode" data-v="own">Desfazer a mesa montada</button>`;
-  return `<section class="card" id="club">${h}</section>`;
 }
 
 /* ---------- the assistant for a real table ---------- */
