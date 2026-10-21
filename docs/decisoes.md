@@ -142,7 +142,7 @@ Modelo de uma decisão:
   - As cores são inspiradas nas roupas e nas equipes; nenhuma imagem, logotipo ou desenho.
 - **Não sei:** se os nomes estão como o Lucas conhece em todos os casos (por exemplo "Rikum" ou "Recoome", "Exoterra" ou "Outworld"); se as cores agradam. Os nomes podem ser trocados no app.
 
-## D12. Heróis x Vilões
+## D12. Heróis x Vilões (removida em 21/10/2026 a pedido, D19)
 
 - **Contexto (18/10/2026):** o Lucas pediu um modo "Heróis x Vilões" (protagonistas contra antagonistas), onde fizer sentido.
 - **Decisão:** cada personagem pode ter `side: 'heroi' | 'vilao'` nos dados do pack; a equipe pode ter um padrão, e o personagem sobrescreve. O modo só aparece se algum pack tiver pelo menos dois heróis e dois vilões (`sidedPacks`). Na tela, "Heróis x Vilões" escolhe o universo (um pack, ou "Misturado" entre todos os que têm lados) e o lado da pessoa (heróis por padrão, ou vilões); a dupla sai do lado dela e os dois adversários do outro, sorteados (`drawSided`), com "Sortear de novo", e a mesa pode ser editada como no Montar. "Eles" fica nas cores dos adversários, como nos outros modos. Guardado em `S.hv` junto com `S.seats`.
@@ -230,6 +230,13 @@ Modelo de uma decisão:
 - **Decisão (escolhida pelo Lucas):** o aumento de volta é respondido por quem fez o pedido anterior, pessoa ou IA (`Ask.to`). A pessoa continua respondendo o que pedem direto para a dupla dela.
 - **Extremo:** um nove ou um doze passa a pedir uma mão melhor para contar como merecido (`DESERVE_STEP` a mais no seis, o dobro no nove e no doze), e o blefe lido de quem pede conta pela metade nesses pedidos (`BIG_RAISE_BLUFF`); o extremo aprende o blefe mais devagar (`READ_PRIOR` 8). Medido (60 partidas por linha, 21/10/2026): contra quem só pede com mão, o extremo paga o doze com mão fraca 26% (antes 36%) e com mão média 67% (antes 85%); contra quem já foi pego blefando continua pagando quase sempre. O extremo segue vencendo o difícil (63% em 200 partidas).
 - **Não verificado:** contra uma pessoa de verdade.
+## D19. A partida cabe na tela e sai o "Mais jeitos de montar a mesa"
+
+- **Contexto (21/10/2026):** o Lucas jogou no PC e no iPhone: "quando rolo pra baixo pra ver minha mão, a vira fica fora do campo e vice-versa; pra aceitar o truco tenho sempre que rolar pra baixo, tira toda a velocidade do jogo". E pediu para tirar "Mais jeitos de montar a mesa" inteiro.
+- **Decisão (partida):** a partida cabe inteira na janela, sem rolagem, de 360×640 a 1920×1080. A coluna tem a altura da janela (`100dvh`, com `100vh` de reserva e a safe-area); a mesa pega o que sobra e encolhe, e as cartas são medidas pela altura da janela (`clamp` em `dvh`). Vale, Mão, Rodadas e Nível viram uma linha de pílulas pequenas. O que pede algo da pessoa (responder truco, mão de onze, fim de mão, fim de jogo com o resumo) fica por cima da parte de baixo da mesa (`.dock`), logo acima da mão, que fica sempre embaixo. Ranking da vira, histórico e encerrar viram uma barra curta, e os dois primeiros abrem por cima da mesa. No desktop a coluna continua com 720 px e a mesa com no máximo 640 px de altura, centralizada. O aviso "Saiu uma versão nova" vira uma faixa fina dentro da coluna, e a mesa encolhe para caber.
+- **Decisão (mesa):** saem a tela Montar a mesa (`S.seats`), Heróis x Vilões (`S.hv`), a entrada na aba Equipe, as rotas `#equipe/mais/*` e o código que só servia a eles (`readSeats`, `drawSeats`, `drawSided`, `sidedPacks`, `sideOf`, `samePerson`, `charName`, o seletor de personagens). Estado salvo com `seats` ou `hv` abre sem erro: os dois campos são descartados e fica a equipe (e a rival) que estiver salva. Um endereço antigo `#equipe/mais/...` abre a tela Equipe. O `side` continua nos dados dos packs, porque a sugestão de rival (D16) usa o lado das equipes. As cores por tema, equipe ou dupla (`S.colorBy`) continuam, para equipe e rivais.
+- **Testes que saíram:** os do e2e e do núcleo que só conferiam montar a mesa e Heróis x Vilões (a ordem trocada, o sorteio, a mesma pessoa em dois lugares, os sorteios por lado); a escolha de cores passou a ser conferida com equipe contra equipe.
+- **Não sei:** como fica num iPhone de verdade (a barra do Safari muda o `dvh` enquanto aparece e some); medido só no Chromium do Playwright.
 
 ## D20. Mais temas: Avatar, Def Jam, Nintendo, Sonic e Piratas do Caribe
 

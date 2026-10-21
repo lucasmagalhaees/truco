@@ -302,9 +302,6 @@ details.card .log,details.card .ranking{margin-top:12px}
 .confetti i:nth-child(7n){background:#1f6b45}
 @keyframes fall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:1;transform:translateY(105vh) rotate(var(--r,360deg)) translateX(30px)}}
 
-/* the theme pickers: tabs of the kinds and of the universes */
-.kinds{flex-wrap:wrap}
-.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:64px;padding:6px 4px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--fg);min-width:0;overflow-wrap:anywhere;text-align:center}
 .slot small{font-size:11px;opacity:.85}
 .slot b{font:800 14px/1.1 var(--display)}
@@ -369,6 +366,62 @@ details.card .log,details.card .ranking{margin-top:12px}
 @keyframes up{from{transform:translateY(40%)}}
 
 @media (max-width:360px){.hc .pc{--w:72px}.slot .pc{--w:40px}.felt{min-height:300px}}
+/* a game fits the window, from 360×640 to a desktop, with no scrolling (D19): the column is the window's height, the
+   table takes what is left and shrinks (cards sized by the height), the hand stays at the bottom, and whatever asks
+   something of the person (a raise, the hand of eleven, the end of a hand) is docked over the bottom of the table */
+body.ingame{height:100vh;height:100dvh;display:flex;flex-direction:column;
+  --hw:clamp(50px,10vh,92px);--hw:clamp(50px,10dvh,92px);--sw:clamp(30px,5.4vh,56px);--sw:clamp(30px,5.4dvh,56px);
+  --bw:clamp(15px,3vh,26px);--bw:clamp(15px,3dvh,26px);--vw:clamp(28px,5vh,44px);--vw:clamp(28px,5dvh,44px)}
+body.ingame .top{flex:none}
+body.ingame .top .wrap{min-height:44px}
+body.ingame .brand{font-size:20px}
+body.ingame .chip{padding:5px 9px;font-size:14px}
+body.ingame .update{position:static;flex:none}
+body.ingame .update .wrap{min-height:34px;font-size:13px;gap:8px}
+body.ingame .update .btn{min-height:28px;padding:0 10px;font-size:13px}
+body.ingame main{flex:1;min-height:0;display:flex}
+body.ingame main .wrap{flex:1;min-height:0;width:100%;justify-content:center;gap:6px;padding-top:6px;padding-bottom:6px}
+body.ingame main .wrap>*{flex:none}
+.gtop{display:flex;flex-direction:column;gap:3px}
+body.ingame .status{display:flex;justify-content:center;flex-wrap:nowrap;gap:4px;min-width:0}
+body.ingame .status span{flex-direction:row;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;border-width:1.5px;white-space:nowrap}
+body.ingame .status small{font-size:9px;letter-spacing:.06em}
+body.ingame .status b{font-size:13px;line-height:1.1}
+body.ingame .status .dots{height:14px;gap:3px}
+body.ingame .status .dots i{width:10px;height:10px;border-width:1.5px}
+body.ingame .matchup{font-size:12px}
+body.ingame main .wrap>.tablebox{flex:1 1 auto;min-height:0;max-height:640px;position:relative;display:flex}
+body.ingame .felt{flex:1;min-height:0;min-width:0;padding:6px 4px;gap:2px;border-width:6px;border-radius:22px}
+body.ingame .felt.six{min-height:0}
+body.ingame .center,body.ingame .felt.six .center{min-height:0;row-gap:0}
+body.ingame .seat{gap:2px}
+body.ingame .seat .who{font-size:13px;padding:4px 8px}
+body.ingame .backs .pc,body.ingame .felt.six .backs .pc{--w:var(--bw)}
+body.ingame .seat.p-left .backs .pc+.pc,body.ingame .seat.p-right .backs .pc+.pc{margin-top:calc(var(--bw) * -1.05)}
+body.ingame .slot .pc,body.ingame .felt.six .slot .pc{--w:var(--sw)}
+body.ingame .vira .pc{--w:var(--vw)}
+body.ingame .hand{padding:2px 0 4px;gap:8px}
+body.ingame .hc .pc{--w:var(--hw)}
+body.ingame .hand.small .pc{--w:clamp(34px,6vh,46px);--w:clamp(34px,6dvh,46px)}
+body.ingame .explain{font-size:13px;padding:4px 10px;line-height:1.3}
+body.ingame .said,body.ingame .thinking{margin:0;font-size:14px}
+body.ingame .actions .btn{min-height:40px}
+.dock{position:absolute;z-index:4;left:6px;right:6px;bottom:6px;max-height:calc(100% - 12px);overflow:auto;margin:0 auto;max-width:520px;display:flex;flex-direction:column;gap:8px;border-radius:14px}
+.dock .card{padding:8px 12px;gap:4px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.dock .asked{font-size:19px}
+.dock .big{font-size:14px;line-height:1.3}
+.dock .hint{font-size:13px;line-height:1.25}
+.dock .label{font-size:10px}
+.dock .pick{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px}
+.dock .pick .btn{flex:1;min-width:0;min-height:42px;padding:0 8px}
+.gbar{display:flex;align-items:center;justify-content:center;gap:6px;position:relative;min-width:0}
+.gbar>*{min-width:0}
+.gbar .btn{min-height:32px;padding:0 10px;font-size:11px;box-shadow:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pop>summary{list-style:none;cursor:pointer;font:700 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border:2px solid var(--line);border-radius:999px;background:var(--surface);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop>summary::-webkit-details-marker{display:none}
+.pop[open]>summary{background:var(--fg);color:var(--surface)}
+.pop>.popin{position:absolute;z-index:6;left:0;right:0;bottom:calc(100% + 6px);max-height:min(60vh,480px);overflow:auto;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:12px 12px 12px 30px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.pop>div.popin{padding:12px}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none !important;transition:none !important}.confetti{display:none}}
 
 /* the start screen's tabs: a bar fixed at the bottom, like an app's, within reach of the thumb (D11) */
@@ -393,7 +446,7 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .now b{color:var(--fg)}
 .entries,.list{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
 .entry,.item{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px;text-align:left;width:100%}
-.entry+.entry,.item+.item,.list .charrow+.charrow{border-top:1px solid var(--cardline)}
+.entry+.entry,.item+.item{border-top:1px solid var(--cardline)}
 .etext{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
 .etext b{font:700 17px/1.2 var(--display)}
 .etext small{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -405,14 +458,4 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .sw{flex:none;width:10px;align-self:stretch;min-height:28px;border-radius:999px;background:linear-gradient(var(--a) 0 55%,var(--b) 55%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
 .sw.none{background:var(--cardline)}
 .slot .sw{width:100%;min-height:6px;height:6px}
-.list .charrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:7px 10px}
-.charrow .sw{align-self:center;min-height:0;height:16px;width:8px}
-.charrow>span:not(.sw){flex:1;min-width:0;font:700 13px/1.2 var(--display);color:var(--muted)}
-.chars{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%;min-width:0}
-.chip-btn{min-height:34px;padding:0 9px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font:600 13px/1 var(--font)}
-.chip-btn.on{background:var(--fg);color:var(--surface)}
-/* the teams of the open universe as small chips: only the open one's three characters show (keeps the 20 clubs short) */
-.teamchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
-.chip-btn.team{display:inline-flex;align-items:center;gap:6px;min-height:32px;font-size:12px}
-.chip-btn.team .sw{height:14px;width:6px;min-height:0}
 .linkbtn{text-decoration:underline;font-weight:700;color:var(--fg);padding:0 2px}

@@ -122,61 +122,23 @@ function suggested(i: number): void {
   const r = Core.suggestRivals(S.team)[i];
   if (r) { S.rival = r.id; S.rivalAuto = true; } else { delete S.rival; delete S.rivalAuto; }
 }
-/** The theme: a ready team, rivals, or the table seat by seat; the names of the players; the tabs of the pickers. */
-function club(a: string, v: string, d: DOMStringMap): void {
-  const s = S.seats;
-  // choosing a team or a rival is the main way (team against team): it takes the place of a table put together
+/** The theme: a ready team or rivals; the names of the players. */
+function club(a: string, v: string): void {
   if (a === 'team') {
     if (v) S.team = v; else delete S.team;
     // the first suggested rival comes in (D16), unless the person chose one by hand (and it is not the team itself)
     if (!v) { delete S.rival; delete S.rivalAuto; }
     else if (!S.rival || S.rivalAuto || S.rival === v) suggested(0);
-    delete S.seats; delete S.hv; ui.editing = false; ui.otherRival = false;
+    ui.editing = false; ui.otherRival = false;
   }
   else if (a === 'suggest') {
     // each tap: the next suggested rival, back to the first after the last
     const list = Core.suggestRivals(S.team), i = list.findIndex(r => r.id === S.rival);
-    suggested(i + 1 < list.length ? i + 1 : 0); delete S.seats; delete S.hv;
+    suggested(i + 1 < list.length ? i + 1 : 0);
   }
   else if (a === 'otherrival') ui.otherRival = true;
-  else if (a === 'mode') {
-    if (v === 'hv') { S.hv = {}; S.seats = Core.drawSided(rand, null, 'heroi'); ui.slot = 0; }
-    else if (v === 'seats') {
-      delete S.hv;
-      if (!s) {
-        const t = S.team || Core.TEAMS[0].id, r = S.rival;
-        S.seats = { partner: `${t}/0`, opp: r ? [`${r}/0`, `${r}/1`] : [`${t}/1`, `${t}/2`] };
-      }
-      ui.slot = 0;
-    } else {
-      delete S.seats; delete S.hv;
-      if (v === 'own') { delete S.rival; delete S.rivalAuto; }
-      else { if (!S.team) S.team = Core.TEAMS[0].id; if (!S.rival) suggested(0); }
-    }
-  }
-  else if (a === 'rival') { S.rival = v; delete S.rivalAuto; delete S.seats; delete S.hv; ui.otherRival = false; }
-  else if (a === 'kind' && d.k) {
-    // another kind or universe opens on its own team; the team chip opens that team
-    const k: Record<string, string> = { ...ui.kind, [d.k]: v };
-    if (d.k === 'seat' || d.k === 'seatpack') { delete k.seatteam; if (d.k === 'seat') delete k.seatpack; }
-    ui.kind = k;
-  }
-  else if (a === 'slot') { ui.slot = (Number(v) % 3) as 0 | 1 | 2; const k = { ...ui.kind }; delete k.seatteam; ui.kind = k; }      // the seat tapped shows its own team
-  else if (a === 'seat' && s) {
-    // the character goes to the seat being filled; if it sat elsewhere, the two swap
-    const all = [s.partner, ...s.opp], was = all.findIndex((c, k) => k !== ui.slot && Core.samePerson(c, v));
-    if (was >= 0) all[was] = all[ui.slot];
-    all[ui.slot] = v;
-    S.seats = { partner: all[0], opp: [all[1], all[2]] };
-    ui.slot = ((ui.slot + 1) % 3) as 0 | 1 | 2;
-  }
-  else if (a === 'swapopp' && s) S.seats = { partner: s.partner, opp: [s.opp[1], s.opp[0]] };
-  else if (a === 'drawseats') { S.seats = S.hv ? Core.drawSided(rand, S.hv.pack || null, S.hv.side || 'heroi') : Core.drawSeats(rand); ui.slot = 0; }
-  else if ((a === 'hvpack' || a === 'hvside') && S.hv) {
-    const h = { ...S.hv };
-    if (a === 'hvpack') { if (v) h.pack = v; else delete h.pack; } else if (v === 'vilao') h.side = 'vilao'; else delete h.side;
-    S.hv = h; S.seats = Core.drawSided(rand, h.pack || null, h.side || 'heroi'); ui.slot = 0;
-  }
+  else if (a === 'mode') { delete S.rival; delete S.rivalAuto; }      // "Sem equipe adversária": team against itself
+  else if (a === 'rival') { S.rival = v; delete S.rivalAuto; ui.otherRival = false; }
   else if (a === 'colorby') { if (v === 'pack' || v === 'char') S.colorBy = v; else delete S.colorBy; }
   else if (a === 'editplayers') ui.editing = true;
   else if (a === 'saveplayers' && S.team) {
@@ -292,8 +254,8 @@ export function initEvents(): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
     if (['level', 'hints', 'speed', 'theme', 'fx', 'auto'].includes(a)) setting(a, d.v || '');
-    else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || '', d); backTo(1); }
-    else if (['team', 'mode', 'rival', 'suggest', 'otherrival', 'kind', 'slot', 'seat', 'swapopp', 'drawseats', 'hvpack', 'hvside', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '', d);
+    else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || ''); backTo(1); }
+    else if (['team', 'mode', 'rival', 'suggest', 'otherrival', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '');
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
