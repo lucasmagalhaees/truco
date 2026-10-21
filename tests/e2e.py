@@ -327,6 +327,23 @@ with sync_playwright() as p:
     assert txt('#answerer') == 'Responde: você, pela sua dupla.' and pg.locator('#seat1.asking .asktag').count() == 1 and 'PEDIU TRUCO' in txt('#seat1 .asktag').upper(), 'the chair of who asked stands out'
     assert txt('#stamp small') == 'Biu pediu TRUCO!', txt('#stamp')
     assert overflow() == 0; shot(f'e8-pedido-nome-{THEME}.png')
+    # the whole game fits the window with no scrolling (D19): with the raise open, the vira, the whole hand and the buttons
+    # to answer are inside the window, and the page does not scroll; also with the "versão nova" strip showing
+    FIT = """() => { const H = innerHeight, W = innerWidth, out = [];
+      const sel = ['#vira', '#hand', ...[...document.querySelectorAll('#hand .hc, [data-act=answer]')].map((e, i) => (e.dataset.fit = i, `[data-fit="${i}"]`))];
+      for (const q of sel) { const e = document.querySelector(q); if (!e) { out.push(q + ' missing'); continue; } const r = e.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > H + 0.5 || r.left < 0 || r.right > W + 0.5 || r.height === 0) out.push(`${q} ${Math.round(r.top)}..${Math.round(r.bottom)} of ${H}`); }
+      const se = document.scrollingElement; if (se.scrollHeight > H) out.push(`page scrolls: ${se.scrollHeight} > ${H}`);
+      if (document.querySelectorAll('[data-act=answer]').length !== 3) out.push('answer buttons');
+      return out; }"""
+    for w, h in ((393, 852), (360, 640), (1920, 1080)):
+        pg.set_viewport_size({'width': w, 'height': h}); pg.wait_for_timeout(50)
+        assert G()['phase'] == 'truco' and pg.evaluate(FIT) == [], (w, h, pg.evaluate(FIT))
+        assert overflow() == 0, (w, h); shot(f'e10-cabe-{w}x{h}-{THEME}.png')
+        pg.evaluate("""() => { const u = document.getElementById('update'); u.hidden = false; u.innerHTML = '<div class="wrap"><span>Saiu uma versão nova do app.</span><button class="btn">Atualizar agora</button></div>'; }""")
+        assert pg.evaluate(FIT) == [], ('with the new-version strip', w, h, pg.evaluate(FIT))
+        pg.evaluate("() => { const u = document.getElementById('update'); u.hidden = true; u.innerHTML = ''; }")
+    pg.set_viewport_size({'width': 393, 'height': 852})
     pg.evaluate('Math.random = window.__realRandom')
     pg.click('[data-act=answer][data-v=run]')
     assert txt('#stamp').startswith('Era blefe!') and txt('#stamp small') == 'Você correu', txt('#stamp')
@@ -438,4 +455,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, cores do tema, da equipe e da dupla, sem Mais jeitos de montar a mesa), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, cores do tema, da equipe e da dupla, sem Mais jeitos de montar a mesa), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, a partida inteira na janela sem rolar (393×852, 360×640, 1920×1080, com e sem o aviso de versão nova), sem estouro de largura e sem erro de script')

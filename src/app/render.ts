@@ -28,7 +28,7 @@ export function render(): void {
     ? g.score.map((p, t) => `<span class="chip ${TEAM_CLS[t]}${bump ? ' bump' : ''}" id="chip${t}"><span class="nm">${t === 0 ? 'Nós' : esc(pairName(g, t as Team))}</span> ${p}</span>`).join('')
     : (() => { const [a, b] = sideNames(g); return `<span class="chip nos${bump ? ' bump' : ''}" id="chip0"><span class="nm">Nós${a ? `: ${esc(a)}` : ''}</span> ${g.score[0]}</span><span class="chip eles${bump ? ' bump' : ''}" id="chip1"><span class="nm">Eles${b ? `: ${esc(b)}` : ''}</span> ${g.score[1]}</span>`; })();
   const atHome = !online && !g && !ui.drill && !ui.real, tabs = part('tabs');
-  tabs.hidden = !atHome; tabs.innerHTML = atHome ? vTabs() : ''; document.body.classList.toggle('tabbed', atHome);
+  tabs.hidden = !atHome; tabs.innerHTML = atHome ? vTabs() : ''; document.body.classList.toggle('tabbed', atHome); document.body.classList.toggle('ingame', !!g);
   view.innerHTML = online ? (g ? vNet() + vGame(g) : vLobby()) : g ? vGame(g) : ui.drill ? vDrill(ui.drill) : ui.real ? vReal(S.real) : vHome();
 }
 
@@ -372,11 +372,17 @@ function vGame(g: Game): string {
   const fresh = !deal && g.played.length > seenPlayed; seenPlayed = g.played.length;
   const lastKey = g.last ? `${g.n}:${g.rounds.length}` : '';
   const glow = lastKey !== '' && lastKey !== seenLast; seenLast = lastKey;
-  return vMatchup(g) + vStatus(g) + vTable(g, fresh, glow) + vHand(g, deal) + vSaid(g) + vAction(g) + (g.phase === 'over' ? vSummary(g) : '')
-    + (hints() ? `<details class="card" id="rank"><summary class="label">Ranking com esta vira</summary>${vRanking(g.vira, 'gamerank')}</details>` : '')
-    + vLog(g) + (g.phase === 'over' ? '' : inRoom()
-      ? `<section class="card"><button class="btn ghost block" data-act="leaveroom">${ui.confirmEnd ? 'Toque de novo para sair da sala' : 'Sair da sala'}</button></section>`
-      : `<section class="card"><button class="btn ghost block" data-act="end">${ui.confirmEnd ? 'Toque de novo para encerrar a partida' : 'Encerrar partida'}</button></section>`);
+  // the whole game fits the window with no scrolling (D19): a thin line of facts, the table taking what is left, the
+  // card that asks something of the person docked over the bottom of the table, the hand always under it, and the extras
+  // (ranking, log, end) as a short bar whose panels open over the table
+  const act = vAction(g), docked = act.startsWith('<section');
+  const end = inRoom()
+    ? `<button class="btn ghost" data-act="leaveroom">${ui.confirmEnd ? 'Toque de novo' : 'Sair da sala'}</button>`
+    : `<button class="btn ghost" data-act="end">${ui.confirmEnd ? 'Toque de novo' : 'Encerrar'}</button>`;
+  return `<div class="gtop">${vMatchup(g)}${vStatus(g)}</div>`
+    + `<div class="tablebox">${vTable(g, fresh, glow)}${docked ? `<div class="dock" id="dock">${act}${g.phase === 'over' ? vSummary(g) : ''}</div>` : ''}</div>`
+    + (hints() ? vExplain(g) : '') + vSaid(g) + (docked ? '' : act) + vHand(g, deal)
+    + `<div class="gbar">${hints() ? `<details class="pop" id="rank"><summary>Ranking</summary><div class="popin">${vRanking(g.vira, 'gamerank')}</div></details>` : ''}${vLog(g)}${g.phase === 'over' ? '' : end}</div>`;
 }
 /** The two teams, by name, over the table: "Nós: Time 7 × Eles: Akatsuki" (only when the table has teams). */
 function vMatchup(g: Game): string {
@@ -391,7 +397,7 @@ function vSaid(g: Game): string {
 }
 function vStatus(g: Game): string {
   const dots = [0, 1, 2].map(i => { const r = g.rounds[i]; return `<i class="${r === undefined ? '' : r === -1 ? 'tie' : TEAM_CLS[r]}" title="${i + 1}ª rodada"></i>`; }).join('');
-  return `<div class="status" id="status"><span><small>Vale</small><b id="value">${g.value}</b></span><span><small>Mão</small><b>${g.n}</b></span><span><small>Rodadas</small><b class="dots">${dots}</b></span><span><small>Nível</small><b>${LEVEL[g.level][0]}</b></span></div>`;
+  return `<div class="status" id="status"><span><small>Vale</small> <b id="value">${g.value}</b></span><span><small>Mão</small> <b>${g.n}</b></span><span><small>Rodadas</small> <b class="dots">${dots}</b></span><span><small>Nível</small> <b>${LEVEL[g.level][0]}</b></span></div>`;
 }
 const POS = ['p-bottom', 'p-right', 'p-top', 'p-left'];
 /** With three pairs: you at the bottom, your partner at the top, the others two on each side, in the order of play. */
@@ -416,7 +422,7 @@ function vTable(g: Game, fresh: boolean, glow: boolean): string {
   return `<section class="felt${T === 3 ? ' six' : ''}" id="table">${(T === 3 ? [3, 4, 2, 5, 1] : [2, 3, 1]).map(s => vSeat(g, s)).join('')}
     <div class="center" id="center">${slots}</div>
     <div class="vira" id="vira"><small>Vira</small>${face(g.vira)}${hints() ? `<small>manilha: <b>${Core.manilhaRank(g.vira)}</b></small>` : ''}</div>
-    ${vSeat(g, 0)}</section>${hints() ? vExplain(g) : ''}`;
+    ${vSeat(g, 0)}</section>`;
 }
 /** With rodinhas: who is taking the round being played, or why the last round went the way it did. */
 function vExplain(g: Game): string {
@@ -486,7 +492,7 @@ function vSummary(g: Game): string {
   return `<section class="card" id="summary"><span class="label">Resumo da partida</span><ol class="timeline">${items}</ol></section>`;
 }
 function vLog(g: Game): string {
-  return `<details class="card" id="log"><summary class="label">O que aconteceu</summary><ol class="log">${[...g.log].reverse().slice(0, 60).map(l => `<li>${esc(l)}</li>`).join('')}</ol></details>`;
+  return `<details class="pop" id="log"><summary>Histórico</summary><ol class="log popin">${[...g.log].reverse().slice(0, 60).map(l => `<li>${esc(l)}</li>`).join('')}</ol></details>`;
 }
 
 /* ---------- settings ---------- */
