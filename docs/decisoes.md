@@ -238,6 +238,12 @@ Modelo de uma decisão:
 - **Testes que saíram:** os do e2e e do núcleo que só conferiam montar a mesa e Heróis x Vilões (a ordem trocada, o sorteio, a mesma pessoa em dois lugares, os sorteios por lado); a escolha de cores passou a ser conferida com equipe contra equipe.
 - **Não sei:** como fica num iPhone de verdade (a barra do Safari muda o `dvh` enquanto aparece e some); medido só no Chromium do Playwright.
 
+## D20. Mais temas: Avatar, Def Jam, Nintendo, Sonic e Piratas do Caribe
+
+- **Contexto (21/10/2026, pedido do Lucas):** Avatar: A Lenda de Aang em Animes; Def Jam: Fight for NY, Nintendo (Mario, Zelda, Donkey Kong) e Sonic em Jogos; Piratas do Caribe numa categoria nova, Filmes.
+- **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
+- **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
+
 ## Pendências
 
 | Pendência | Quem resolve |
