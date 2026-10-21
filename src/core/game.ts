@@ -142,6 +142,8 @@ const responder = (g: Game, a: Ask): Seat => {
   const t = waiting(g, a)[0];
   let s = nextSeat(a.by, seatsOf(g));
   while (tm(g, s) !== t) s = nextSeat(s, seatsOf(g));
+  // a raise back is answered by whoever made the raise before, person or computer
+  if (a.to !== undefined && tm(g, a.to) === t) return a.to;
   return speaker(g, t, s);
 };
 /** Whether `seat` is played by a person. */
@@ -255,7 +257,7 @@ export function answer(g: Game, a: Answer, bluff = false): Game {
   }
   if (a === 'raise' && ask.value < WIN_POINTS) {
     const value = nextValue(ask.value), word = WORD[value];
-    return { ...g, reads, watch: watching(g, seat, value), value: ask.value, raisedBy: teamOf(ask.by), ask: bluff ? { by: seat, value, bluff: true } : { by: seat, value }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
+    return { ...g, reads, watch: watching(g, seat, value), value: ask.value, raisedBy: teamOf(ask.by), ask: bluff ? { by: seat, value, bluff: true, to: ask.by } : { by: seat, value, to: ask.by }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
   }
   return g;
 }
@@ -269,7 +271,7 @@ function answer3(h: Game, a: Answer, bluff: boolean): Game {
   if (a === 'raise' && ask.value < WIN_POINTS) {
     const value = nextValue(ask.value), word = WORD[value];
     const back = { ...g, value: ask.value, raisedBy: asker };
-    return { ...back, watch: watching(back, seat, value), ask: askOf(back, seat, value, bluff), shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
+    return { ...back, watch: watching(back, seat, value), ask: { ...askOf(back, seat, value, bluff), to: ask.by }, shout: { seat, word }, log: [...g.log, `${say(g, seat)} aceitou e pediu ${word}!`] };
   }
   if (a === 'accept') {
     const said: Game = { ...g, shout: { seat, word: 'aceito' }, log: [...g.log, `${say(g, seat)} aceitou.`] };
@@ -309,7 +311,9 @@ export const RAISE_NEED: Record<number, number> = { 3: 6.5, 6: 8, 9: 9.5, 12: 11
 export const WEAK_BY = 2;
 /** How many raises (or answers) a first guess is worth before what a seat has shown counts more: little for the hard
  *  player, who learns fast, more for the medium one. */
-export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4, extremo: 4 };
+export const READ_PRIOR: Record<Level, number> = { facil: 50, medio: 12, dificil: 4, extremo: 8 };
+/** A nove or a doze is a bluff less often than a truco: the bluff rate read from a seat counts this much on them (D18). */
+export const BIG_RAISE_BLUFF = 0.5;
 /** The first guess before anything is seen: how often a raise is a bluff, and how often a seat runs from a raise. */
 export const BLUFF_GUESS = 0.2, RUN_GUESS = 0.35;
 const unread = (n: number): Read[] => Array.from({ length: n }, () => ({ shown: 0, weak: 0, answers: 0, runs: 0 }));
@@ -483,20 +487,24 @@ export function handOdds(g: Game, seat: Seat, rand: () => number, samples = SAMP
     let k = 0;
     const hands = Array.from({ length: seatsOf(g) }, (_, s) => (s === seat ? [...mine] : d.slice(k, (k += holding(g, s)))));
     const w = playOut(g, hands, 'medio');
-    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, tm(g, ask.by)) >= DESERVE;
+    const deserved = !!ask && strength(hands[ask.by], g.vira) + standing(g, tm(g, ask.by)) >= deserve(ask.value);
     for (const o of deserved ? [all, fair] : [all]) { o.n++; if (w === t) o.win++; else if (w !== null) o.lose++; }
   }
   const odds = (o: { win: number; lose: number; n: number }) => ({ win: o.win / o.n, lose: o.lose / o.n });
   if (!ask || tm(g, ask.by) === t) return odds(all);
   // Bayes: a deal where the asker's hand deserves the raise explains it fully; a deal where it does not, only as a
   // bluff, which happens with chance `beta` per weak hand: the rate that makes the seat's bluff rate come out right
-  const b = bluffRate(g, ask.by), q0 = FAIR_BASE, beta = Math.min(1, (b * q0) / ((1 - b) * (1 - q0)));
+  const b = bluffRate(g, ask.by) * (ask.value >= 9 ? BIG_RAISE_BLUFF : 1), q0 = FAIR_BASE, beta = Math.min(1, (b * q0) / ((1 - b) * (1 - q0)));
   const n = fair.n + beta * (all.n - fair.n);
   return { win: (fair.win + beta * (all.win - fair.win)) / n, lose: (fair.lose + beta * (all.lose - fair.lose)) / n };
 }
 /** What a hand that deserves a raise looks like, whatever is asked: strength plus how the rounds stand. A seis or a
  *  doze comes from a hand that was worth raising and from the stakes already up, not from an ever stronger hand. */
 export const DESERVE = 5.5;
+/** How much more a nove and a doze ask for (D18): someone who raises that high at those stakes rarely does it with a
+ *  hand that only deserved a truco, so the extreme player stops paying them like a truco. */
+export const DESERVE_STEP = 0.75;
+const deserve = (value: number): number => DESERVE + (value >= 9 ? 2 * DESERVE_STEP : value >= 6 ? DESERVE_STEP : 0);
 /** How often a hand dealt at random is that good (measured with 20000 deals, 18/10/2026): the base rate that turns a
  *  seat's bluff rate into how often it raises on a weak hand. */
 export const FAIR_BASE = 0.26;
@@ -575,7 +583,7 @@ export function imagine(g: Game, seat: Seat, rand: () => number, n = EXTREME_SAM
       if (x.by === seat) continue;
       // what it held when it asked: the cards it played since, and what it would still hold in this deal
       const held = [...x.seen, ...hands[x.by]].slice(0, x.held);
-      if (strength(held, g.vira) + x.stand < DESERVE) w *= bluffWeight(g, x.by);
+      if (strength(held, g.vira) + x.stand < deserve(x.value)) w *= bluffWeight(g, x.by);
     }
     out.push({ hands, w });
   }

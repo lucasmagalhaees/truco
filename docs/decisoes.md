@@ -224,6 +224,13 @@ Modelo de uma decisão:
   - O botão, com a adversária escolhida à mão, começa pelo 1º sugerido.
 - **Não sei:** se os pares e os nomes dos clássicos estão certos (memória, não conferido); se o 2º e 3º fazem sentido para quem conhece cada história.
 
+## D18. Quem responde o aumento, e o extremo pagando nove e doze
+
+- **Contexto (21/10/2026, Lucas jogando):** "quando a IA aliada pede truco e a IA rival aumenta, o pedido vem pra mim"; "no extremo a IA tá comendo bait direto, aceita 9 e 12".
+- **Decisão (escolhida pelo Lucas):** o aumento de volta é respondido por quem fez o pedido anterior, pessoa ou IA (`Ask.to`). A pessoa continua respondendo o que pedem direto para a dupla dela.
+- **Extremo:** um nove ou um doze passa a pedir uma mão melhor para contar como merecido (`DESERVE_STEP` a mais no seis, o dobro no nove e no doze), e o blefe lido de quem pede conta pela metade nesses pedidos (`BIG_RAISE_BLUFF`); o extremo aprende o blefe mais devagar (`READ_PRIOR` 8). Medido (60 partidas por linha, 21/10/2026): contra quem só pede com mão, o extremo paga o doze com mão fraca 26% (antes 36%) e com mão média 67% (antes 85%); contra quem já foi pego blefando continua pagando quase sempre. O extremo segue vencendo o difícil (63% em 200 partidas).
+- **Não verificado:** contra uma pessoa de verdade.
+
 ## Pendências
 
 | Pendência | Quem resolve |
