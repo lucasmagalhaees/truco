@@ -106,7 +106,7 @@ export function viewFor(g: Game, seat: Seat): Game {
     table: g.table.map(p => ({ seat: r(p.seat), card: p.card })),
     last: g.last ? { plays: g.last.plays.map(p => ({ seat: r(p.seat), card: p.card })), winner: g.last.winner === -1 ? -1 : r(g.last.winner) } : null,
     rounds: g.rounds.map(x => (x === -1 ? -1 : tm(x))), raisedBy: tm(g.raisedBy),
-    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value, ...(g.ask.wait ? { wait: g.ask.wait.map(tm) } : {}) } : null, eleven,
+    ask: g.ask ? { by: r(g.ask.by), value: g.ask.value, ...(g.ask.wait ? { wait: g.ask.wait.map(tm) } : {}), ...(g.ask.to !== undefined ? { to: r(g.ask.to) } : {}) } : null, eleven,
     shout: g.shout ? { seat: r(g.shout.seat), word: g.shout.word } : null,
     result: g.result ? { team: tm(g.result.team), points: g.result.points, why: say(g.result.why), ...(g.result.shown ? { shown: { ...g.result.shown, seat: r(g.result.shown.seat) } } : {}) } : null,
     winner: tm(g.winner), hist: g.hist.map(h => ({ ...h, team: tm(h.team), how: say(h.how) })), log: g.log.map(say)

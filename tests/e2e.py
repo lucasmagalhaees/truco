@@ -353,7 +353,7 @@ with sync_playwright() as p:
     # ---------- raises back and forth: you truco, Biu (a monster) asks seis, you nove, he doze; you run, they take 9 ----------
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['3o', '2e', 'Ac'], ['5p', '5c', '3e'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
     pg.click('[data-act=truco]'); settle(); g = G()
-    assert g['phase'] == 'truco' and g['ask'] == {'by': 1, 'value': 6} and g['value'] == 3, g['ask']
+    assert g['phase'] == 'truco' and g['ask'] == {'by': 1, 'value': 6, 'to': 0} and g['value'] == 3, g['ask']
     assert txt('#asked') == 'Biu pediu SEIS de volta!' and pg.locator('#seat1.asking').count() == 1 and pg.locator('#seat0.asking').count() == 0, txt('#asked')
     assert 'Nove!' in txt('[data-act=answer][data-v=raise]')
     pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=answer][data-v=raise]')       # Biu waits: the stamp on screen is yours

@@ -32,7 +32,7 @@ export function readGame(x: unknown): Game | null {
   if (!isPlays(g.table) || !(g.last === null || (g.last && isPlays(g.last.plays) && (g.last.winner === -1 || isSeat(g.last.winner))))) return null;
   if (!Array.isArray(g.rounds) || g.rounds.length > 3 || !g.rounds.every(r => r === -1 || isTeam(r)) || !isSeat(g.starter) || !isSeat(g.turn)) return null;
   if (!VALUES.includes(g.value) || !(g.raisedBy === null || isTeam(g.raisedBy)) || !(g.eleven === null || isTeam(g.eleven)) || !PHASES.includes(g.phase)) return null;
-  if (!(g.ask === null || (g.ask && isSeat(g.ask.by) && VALUES.includes(g.ask.value) && (g.ask.wait === undefined || (T === 3 && Array.isArray(g.ask.wait) && g.ask.wait.length && g.ask.wait.every(isTeam)))))) return null;
+  if (!(g.ask === null || (g.ask && isSeat(g.ask.by) && VALUES.includes(g.ask.value) && (g.ask.to === undefined || isSeat(g.ask.to)) && (g.ask.wait === undefined || (T === 3 && Array.isArray(g.ask.wait) && g.ask.wait.length && g.ask.wait.every(isTeam)))))) return null;
   if (g.phase === 'truco' && !g.ask) return null;
   if (g.phase === 'eleven' && g.eleven === null) return null;
   if (!(g.shout === null || (g.shout && isSeat(g.shout.seat) && typeof g.shout.word === 'string'))) return null;

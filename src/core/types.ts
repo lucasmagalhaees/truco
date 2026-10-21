@@ -32,7 +32,8 @@ export type Phase =
 
 /** A raise waiting for an answer: who asked, and what the hand would be worth. With three pairs, `wait`: the pairs that
  *  still have to answer, the next one first. */
-export interface Ask { by: Seat; value: number; bluff?: true; wait?: Team[] }
+/** `to`: on a raise back, the seat that made the raise before; it answers for its pair (the one who asked answers the raise back). */
+export interface Ask { by: Seat; value: number; bluff?: true; wait?: Team[]; to?: Seat }
 
 /** Something said out loud at the table, shown as a speech bubble: a raise, an answer, a decision on a hand of eleven. */
 export type Word = 'truco' | 'seis' | 'nove' | 'doze' | 'aceito' | 'corro' | 'jogo' | 'fujo';
