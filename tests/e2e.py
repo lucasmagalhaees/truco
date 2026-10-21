@@ -106,7 +106,7 @@ with sync_playwright() as p:
     def colorby(v):
         tab('ajustes'); pg.click(f'[data-act=colorby][data-v={v}]')
 
-    # ---------- the theme: a team, names, colours, rivals across themes, a table seat by seat ----------
+    # ---------- the theme: a team, names, colours, rivals across themes ----------
     top_bg = lambda: pg.evaluate('getComputedStyle(document.querySelector(".top")).backgroundColor')
     eles_bg = lambda: pg.evaluate('getComputedStyle(document.documentElement).getPropertyValue("--rival").trim()')
     plain_top = top_bg()
@@ -150,10 +150,9 @@ with sync_playwright() as p:
     assert pg.locator('#teams [data-act=rival][data-v="futebol/flamengo"]').count() == 0, 'your own team is not a rival'
     pg.click('#teams [data-act=rival][data-v="futebol/palmeiras"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
     assert 'você e Pedro contra Vitor Roque e Flaco López' in lineup()
-    # team against team (D15): your team, then the other team whole, then the sentence; the other ways one screen down
+    # team against team (D15): your team, then the other team whole, then the sentence
     assert 'Você e Pedro (Flamengo) contra Vitor Roque e Flaco López (Palmeiras)' in full_lineup(), full_lineup()
     assert pg.locator('#steps .entry').count() == 2 and 'Palmeiras' in txt('#steps') and 'Pedro é a sua dupla' in txt('#steps')
-    assert pg.locator('#modes [data-act=go][data-v="equipe/mais"]').count() == 1 and pg.locator('[data-v="equipe/mais/montar"], [data-v="equipe/mais/hv"]').count() == 0, 'putting a table together is not on the main way'
     assert overflow() == 0; shot(f'e1-time-{THEME}.png'); shot(f'e8-equipe-x-equipe-{THEME}.png')
     into('equipe/rivais'); assert 'Adversária agora: Palmeiras' in txt('#panel') and pg.locator('#panel [data-act=mode][data-v=own]').count() == 1; back('equipe')
     reload(); assert S()['team'] == 'futebol/flamengo' and S()['rival'] == 'futebol/palmeiras' and top_bg() == 'rgb(200, 16, 46)', 'the team stays on the device'
@@ -189,59 +188,19 @@ with sync_playwright() as p:
     assert 'você e Naruto contra Neymar e Gabigol' in lineup() and 'Você e Naruto (Time 7) contra Neymar e Gabigol (Santos)' in full_lineup(), full_lineup()
     assert eles_bg() == '#f2f2f2', eles_bg()
     shot(f'e1-anime-{THEME}.png')
-    # a table seat by seat: Ryu with you, against Scorpion and Sub-Zero; then the order swapped
-    def sit(cid):
-        """A character into the seat being filled: its team's chip first (only the open team's characters show), then the character."""
-        pg.click(f'#seatteams [data-act=kind][data-v="{cid.rsplit("/", 1)[0]}"]'); pg.click(f'[data-act=seat][data-v="{cid}"]')
-    def montar():
-        into('equipe/mais'); into('equipe/mais/montar')
-    montar(); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'seats' in S() and pg.locator('#slots .slot').count() == 3
-    pg.click('#picker [data-act=kind][data-k=seat][data-v=jogos]')
-    assert pg.locator('#seatpacks [role=tab]').count() == 2, 'the universes of the kind, as tabs: never one list of everything'
-    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=street-fighter]'); sit('street-fighter/shotokan/0')
-    assert pg.locator('[data-act=seat][data-v^="mortal-kombat/"]').count() == 0
-    pg.click('#picker [data-act=kind][data-k=seatpack][data-v=mortal-kombat]')
-    sit('mortal-kombat/shirai-ryu/0'); sit('mortal-kombat/lin-kuei/0')
-    assert S()['seats'] == {'partner': 'street-fighter/shotokan/0', 'opp': ['mortal-kombat/shirai-ryu/0', 'mortal-kombat/lin-kuei/0']}, S()['seats']
-    assert 'você e Ryu contra Scorpion e Sub-Zero' in lineup(), lineup()
-    assert top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#facc15', (top_bg(), eles_bg())     # the teams' colours: Shotokan, Shirai Ryu
-    pg.click('[data-act=swapopp]'); assert 'você e Ryu contra Sub-Zero e Scorpion' in lineup()
-    colorby('char')                                                                         # colours of the partner himself, and of the first opponent
-    assert S()['colorBy'] == 'char' and top_bg() == 'rgb(245, 245, 244)' and eles_bg() == '#1d4ed8', (top_bg(), eles_bg())
-    tab('equipe'); montar()
-    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=dragon-ball]'); sit('dragon-ball/guerreiros-z/0')
-    assert 'você e Goku contra Sub-Zero e Scorpion' in lineup() and top_bg() == 'rgb(249, 115, 22)', top_bg()
-    colorby('pack'); assert S()['colorBy'] == 'pack' and top_bg() == 'rgb(234, 88, 12)' and eles_bg() == '#111111', (top_bg(), eles_bg())
-    tab('equipe'); montar()
-    assert overflow() == 0; shot(f'e1-montar-{THEME}.png')
-    reload(); assert route() == 'equipe/mais/montar' and 'você e Goku contra Sub-Zero e Scorpion' in lineup(), 'the table seat by seat stays on the device, and the screen in the address'
-    tab('jogar'); pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
-    assert g['names'] == ['Você', 'Sub-Zero', 'Goku', 'Scorpion'] and g['sides'] == ['dragon-ball', 'mortal-kombat'], g['sides']
+    # the colours follow the choice: the pack's, the team's, or the star's own ("Eles" by the rival's first the same way)
+    rgb_of = lambda h: 'rgb(%d, %d, %d)' % tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+    want = lambda k: pg.evaluate(f'window.__APP.Core.colorsOf("{k}")[0]')
+    for by, mine, theirs in (('char', 'naruto/time-7/0', 'futebol/santos/0'), ('pack', 'naruto', 'futebol'), ('team', 'naruto/time-7', 'futebol/santos')):
+        colorby(by); assert top_bg() == rgb_of(want(mine)) and eles_bg() == want(theirs), (by, top_bg(), eles_bg())
+    colorby('pack'); tab('jogar'); pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=new]'); g = G()
+    assert g['names'] == ['Você', 'Neymar', 'Naruto', 'Gabigol'] and g['sides'] == ['naruto', 'futebol'], g['sides']
     pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
-    tab('equipe'); montar()
-    pg.click('[data-act=drawseats]'); assert 'seats' in S() and len({S()['seats']['partner'], *S()['seats']['opp']}) == 3
     colorby('team'); assert 'colorBy' not in S()
-    # the same person never sits twice: Nagi of Time V, then Nagi of Manshine City in the next seat moves the first one out
-    tab('equipe'); montar()
-    pg.click('[data-act=slot][data-v="0"]'); pg.click('#picker [data-act=kind][data-k=seat][data-v=anime]'); pg.click('#picker [data-act=kind][data-k=seatpack][data-v=blue-lock]')
-    sit('blue-lock/time-v/0'); sit('blue-lock/manshine-city/1')
-    names = pg.evaluate('window.__APP.Core.lineup(null, null, window.__APP.S.custom, window.__APP.S.seats).names')
-    assert len(set(names)) == 4 and names.count('Nagi') == 1, names
-    # heroes against villains: drawn by side, in one universe or mixed, and you may be the villain
-    side = lambda c: pg.evaluate(f'window.__APP.Core.sideOf("{c}")')
-    back('equipe/mais'); into('equipe/mais/hv'); pg.click('#panel [data-act=mode][data-v=hv]'); st = S()
-    assert st['hv'] == {} and side(st['seats']['partner']) == 'heroi' and all(side(o) == 'vilao' for o in st['seats']['opp']), st['seats']
-    pg.click('#hvpack [data-act=hvpack][data-v=naruto]'); st = S()
-    assert st['hv'] == {'pack': 'naruto'} and all(c.startswith('naruto/') for c in [st['seats']['partner'], *st['seats']['opp']]), st['seats']
-    pg.click('#hvside [data-act=hvside][data-v=vilao]'); st = S()
-    assert side(st['seats']['partner']) == 'vilao' and all(side(o) == 'heroi' for o in st['seats']['opp']), st['seats']
-    first = pg.evaluate('window.__APP.Core.colorsOf(window.__APP.Core.charById(window.__APP.S.seats.opp[0]).team.id)[0]')
-    assert eles_bg() == first, (eles_bg(), first)                                           # "Eles" in the opponents' colours
-    pg.click('[data-act=drawseats]'); assert 'Sortear de novo' in txt('#club') and pg.evaluate('!!window.__APP.Core.readSeats(window.__APP.S.seats)')
-    assert overflow() == 0; shot(f'e1-herois-{THEME}.png')
-    back('equipe/mais'); into('equipe/mais/montar'); pg.click('#panel [data-act=mode][data-v=seats]'); assert 'hv' not in S() and 'seats' in S()
-    pg.click('#panel [data-act=mode][data-v=own]'); assert 'rival' not in S() and 'seats' not in S()
-    back('equipe/mais'); back('equipe'); pg.click('#club [data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in lineup()
+    # "Mais jeitos de montar a mesa" is gone (D19): not on the Equipe tab, and its old addresses fall back to a known screen
+    tab('equipe'); assert pg.locator('[data-v^="equipe/mais"], #modes').count() == 0 and 'Mais jeitos' not in txt('#panel')
+    pg.evaluate('location.hash = "#equipe/mais/montar"'); pg.wait_for_selector('#panel[data-route="equipe"]'); assert pg.locator('#slots, #picker').count() == 0
+    pg.click('#club [data-act=team][data-v=""]'); assert 'team' not in S() and top_bg() == plain_top and 'Biu' in lineup()
 
     # ---------- ranking and glossary ----------
     tab('treinar'); into('treinar/ranking')
@@ -441,20 +400,12 @@ with sync_playwright() as p:
     # ---------- every screen of the tree: by its address, no screen absurdly tall, a capture of each ----------
     tall = {}
     for r in ('jogar', 'jogar/online', 'treinar', 'treinar/ranking', 'treinar/glossario', 'treinar/regras', 'real', 'equipe', 'equipe/time',
-              'equipe/time/futebol', 'equipe/time/anime', 'equipe/time/anime/naruto', 'equipe/time/jogos', 'equipe/rivais', 'equipe/mais', 'equipe/mais/montar', 'equipe/mais/hv', 'ajustes'):
+              'equipe/time/futebol', 'equipe/time/anime', 'equipe/time/anime/naruto', 'equipe/time/jogos', 'equipe/rivais', 'ajustes'):
         pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]')
         assert (r.count('/') > 0) == (pg.locator('#panel [data-act=back]').count() == 1), f'a way back below the root of a tab: {r}'
         h = pg.evaluate('document.documentElement.scrollHeight'); tall[r] = round(h / 852, 1)
         assert h <= 3 * 852 and overflow() == 0, (r, h)
         shot(f'e0-{r.replace("/", "-")}-{THEME}.png')
-    # the table seat by seat and heroes against villains in use: the picker, a kind and a universe at a time, stays short
-    for r, mode in (('equipe/mais/montar', 'seats'), ('equipe/mais/hv', 'hv')):
-        pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]'); pg.click(f'#panel [data-act=mode][data-v={mode}]')
-        assert pg.locator('#picker').count() == 1, r
-        h = pg.evaluate('document.documentElement.scrollHeight'); tall[r + ' (em uso)'] = round(h / 852, 1)
-        assert h <= 3 * 852 and overflow() == 0, (r, h)
-        shot(f'e0-{r.replace("/", "-")}-em-uso-{THEME}.png')
-    pg.click('#panel [data-act=mode][data-v=own]'); assert 'seats' not in S()
     # the team lists keep the app's colours: a team's colours only in the small strip of each line
     pg.evaluate('location.hash = "#equipe/time/futebol"'); pg.wait_for_selector('#panel[data-route="equipe/time/futebol"]')
     bgs = pg.evaluate('[...new Set([...document.querySelectorAll("#teams .item")].map(e => getComputedStyle(e).backgroundColor))]')
@@ -487,4 +438,4 @@ with sync_playwright() as p:
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, montar a mesa com SF e MK, trocar a ordem, sortear, a mesma pessoa nunca em dois lugares, heróis x vilões por universo e lado, cores do tema, da equipe e da dupla), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa, mais jeitos fora do caminho), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, cores do tema, da equipe e da dupla, sem Mais jeitos de montar a mesa), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, sem estouro de largura e sem erro de script')
