@@ -4,6 +4,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). Versões: 
 
 ## [Não lançado]
 
+### Corrigido
+- A partida cabe inteira na janela, sem rolar, do celular pequeno ao desktop (D19): a vira e a mão sempre à vista, e o pedido de truco, a mão de onze e o fim da mão por cima da mesa, logo acima da mão.
+
+### Removido
+- "Mais jeitos de montar a mesa": Montar a mesa e Heróis x Vilões (D19). Estado salvo com eles abre no modo equipe.
+
 ### Adicionado
 - Quem pediu fica claro (D15): "Biu pediu TRUCO!" no cartão, a cadeira de quem pediu destacada, o carimbo com o nome embaixo, "Responde: <nome>", "<nome> aceitou", "<nome> correu", "pediu SEIS de volta". Também online e nas 3 duplas.
 - Avançar sozinho (Ajustes, ligado por padrão): a próxima mão sai sozinha depois de uma pausa pela velocidade; o fim da partida espera. Online, o servidor dá a próxima mão.
