@@ -122,6 +122,7 @@ function vsLine(): string {
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
 }
 function tableNow(): string {
+  if (S.trio) return '<p class="now" id="tablenow">Sua mesa agora: 3 duplas na mesa de bar — você e uma IA contra duas duplas de IA.</p>';
   return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.</p>`;
 }
 function vHome(): string {
@@ -137,7 +138,11 @@ function screenOf(r: string[]): Screen {
   if (tab === 'jogar') {
     if (r[1] === 'online') return { title: 'Jogar online', body: vOnline(), depth: 2 };
     const lvBtn = (v: string): string => `<button class="${lv === v ? 'on' : ''}" data-act="level" data-v="${v}" aria-pressed="${lv === v}">${LEVEL[v][0]}</button>`;
+    const trio = !!S.trio;
     return { title: 'Jogar', depth: 1, body: `${tableNow()}<section class="card" id="start">
+    <p id="formattext">Como vai jogar:</p>
+    <div class="segm" role="group" aria-label="Formato da mesa" id="format4or6"><button class="${trio ? '' : 'on'}" data-act="trio" data-v="duplas" aria-pressed="${!trio}">Mesa de 4</button><button class="${trio ? 'on' : ''}" data-act="trio" data-v="tres" aria-pressed="${trio}">3 duplas (6 na mesa)</button></div>
+    <p class="hint" id="formathint">${trio ? 'Seis na mesa: você e uma IA contra duas duplas de IA, cada dupla contra as outras duas.' : 'Mesa de quatro: você e sua dupla contra a outra dupla.'}</p>
     <p id="lineup">Quem fizer ${Core.WIN_POINTS} pontos primeiro leva. Nível da IA:</p>
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>

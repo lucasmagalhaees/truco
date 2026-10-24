@@ -135,6 +135,9 @@ export interface AppState {
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };
+  /** `trio` true: on this phone, deal a game of three pairs (six seats; you with one computer player, against two
+   *  computer pairs). Absent: the game of four (D27). A saved state without it opens as the game of four. */
+  trio?: true;
 }
 
 /** An entry as the source describes it, once read by `normEntry`. */
