@@ -292,6 +292,11 @@ Modelo de uma decisão:
 
 - **Não verificado:** os elencos continuam mudando a cada janela; os nomes dos animes/jogos/filmes (fora o Def Jam) seguem da memória. Reconferir antes de depender.
 
+## D27. Correção: o Hulk está no Fluminense, não no Atlético-MG
+
+- **Contexto (24/10/2026, Lucas):** a D25 corrigiu o Hulk PARA o Atlético-MG, achando que o "Hulk no Fluminense" era invenção. Estava errado: o Lucas apontou e a busca confirmou — o Hulk rescindiu no Atlético-MG e acertou com o Fluminense em agosto de 2026 ([Portal de Prefeitura](https://portaldeprefeitura.com.br/esportes/hulk-acerta-com-fluminense-apos-rescisao-no-atletico-mg-veja-detalhes/620293/); [Correio da Manhã](https://www.correiodamanha.com.br/esporte/esportes/2026/04/amp/280615-crise-no-galo-aproxima-hulk-do-fluminense.html)).
+- **Decisão:** Fluminense volta com o Hulk como craque (Hulk, Germán Cano, Ganso); Atlético-MG fica sem o Hulk (Gustavo Scarpa, Rony, Bernard). Lição: nem toda "correção da web" acerta — o dado do Lucas vale.
+
 ## Pendências
 
 | Pendência | Quem resolve |
