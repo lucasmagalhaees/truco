@@ -3,7 +3,7 @@ import type { Pack } from '../teams';
 /* Dragon Ball (the classic and Z), by the groups of the series, with the names of the Brazilian dub. Set down from the
    agent's memory on 18/10/2026, not checked on the web. Only names and colours: no image or drawing. */
 export const dragonBall: Pack = {
-  id: 'dragon-ball', kind: 'anime', kindName: 'Animes', name: 'Dragon Ball', lead: 'líder',
+  id: 'dragon-ball', kind: 'anime', kindName: 'Animes', name: 'Dragon Ball', lead: 'líder', fx: 'fogo',
   colors: ['#ea580c', '#1d4ed8', '#111111'],
   groups: [
     { id: 'guerreiros-z', rivals: ['dragon-ball/freeza', 'dragon-ball/saiyajins', 'dragon-ball/androides'], why: ['Goku × Freeza em Namekusei', 'Goku × Vegeta', 'a saga Cell'], side: 'heroi', name: 'Guerreiros Z', colors: ['#f28c28', '#1f4fa0', '#111111'], players: [{ name: 'Goku', colors: ['#f97316', '#1d4ed8', '#111111'] }, { name: 'Gohan', colors: ['#6d28d9', '#fde68a', '#ffffff'] }, 'Kuririn'] },

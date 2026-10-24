@@ -244,6 +244,23 @@ Modelo de uma decisão:
 - **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
 - **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
 
+## D21. Animações por tema (confete, carimbo, carta e placar)
+
+- **Contexto (24/10/2026, pedido do Lucas):** animações customizadas por tema, mas abstratas — nada de escudo, logo, imagem ou desenho de personagem; só formas, cores e movimento (a mesma regra dos nomes e cores). Uma camada de "efeitos por categoria/pack" nas cores do lado de quem joga.
+- **Decisão:**
+  - Um `Flavor` por tema (`flavorOf` em `src/core/teams.ts`, função pura): `fogo | velocidade | agua | luta | moedas | futebol | tinta | neutro`. O pack pode declarar o seu (`fx` no `Pack`); sem isso, a categoria decide (`KIND_FLAVOR`: jogos→luta, animes e filmes→tinta, futebol→futebol); id desconhecido ou sem tema (mesa de bar), neutro. Resolve por id de pack, equipe ou personagem (personagem → equipe → pack). Flavors dos packs atuais: Dragon Ball `fogo`, Avatar e Piratas do Caribe `agua`, Sonic `velocidade`, Nintendo `moedas`; os demais pela categoria (futebol futebol; Naruto, Blue Lock tinta; Street Fighter, Mortal Kombat, Def Jam luta).
+  - **Confete** (`confetti` em `render.ts`): ganha a classe `fx-<flavor>` e as cores do lado de quem venceu (vars `--cc1/2/3` tiradas de `--club/--club2/--rival/...`, com reserva para a mesa de bar). Cada flavor muda só a forma da peça (CSS clip-path/border-radius): bandeirinhas (futebol), chamas (fogo), gotas (água), riscos finos e estrelas (velocidade), faíscas (luta), moedas douradas com borda na cor do lado (moedas), respingo de tinta (tinta), retângulo (neutro).
+  - **Carimbo** (`stamp`): classe `fx-<flavor>`; sotaque por categoria, na cor do lado: tremor nos jogos (`luta`, keyframe próprio), risca que cruza no Sonic (`velocidade`, `::before`), respingo de tinta nos animes e filmes (`tinta`, `::before`). Os outros flavors usam o carimbo de sempre.
+  - **Carta e leque:** a carta jogada (`.slot.fly`) e o leque inicial (`.hc.deal`) ganham um brilho curto (`::after`, `cardGlow`) na cor do lado de quem jogou (a `.slot` recebe `t0/t1/t2`, de onde sai `--sg`; o leque usa `--club`).
+  - **Placar:** o chip pulsa um anel (`chipRing`) na cor do lado quando o ponto muda, junto com o `bump` de sempre.
+  - Tudo em CSS/SVG embutido, nada baixado, nenhuma imagem externa. Com `prefers-reduced-motion` a regra global já zera as animações e esconde o confete, então nenhum efeito novo anima (o estado final fica estático).
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - Qual flavor cai em cada pack (fogo/água/velocidade/moedas e os defaults por categoria).
+  - Piratas do Caribe ficou `agua` (o mar) em vez do default `tinta` de Filmes.
+  - O carimbo segue o flavor do lado de quem falou; nas 3 duplas (sem `sides`), neutro.
+  - O confete só dispara quando você vence (como já era), nas suas cores.
+- **Não verificado:** se os efeitos ficam bons num aparelho de verdade (medido só no Chromium do Playwright, claro e escuro).
+
 ## Pendências
 
 | Pendência | Quem resolve |

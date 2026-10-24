@@ -3,7 +3,7 @@ import { DESERVE, FAIR_BASE, bluffOdds, extremeBluff, EXTREME_BLUFF, bluffRate, 
 import { advise, emptyTable, hear, nextRound, tableSay, tell, untell } from './assist';
 import { aiDelay, aiStep, allow, CLOSE_BIG, CLOSE_FAST, CODE_LEN, CONN_MAX, MSG_MAX, newBucket, RATE_BURST, RATE_PER_S, roomFull, tooBig, handle, isCode, newRoom, readMsg, readRoom, FORMATS, SUPPORTS_THREE, ROOM_GONE, ROOM_HAND_PAUSE, ROOM_ROUND_PAUSE, ROOM_THINK, roomCode, SEAT_GONE, roomView, swapSides, viewFor } from './online';
 import { readGame, readReal, readState } from './save';
-import { accentOn, charById, COLOR_BY, colorsOf, contrast, DEFAULT_NAMES, kinds, lineup, packById, PACKS, playersOf, qualify, teamById, packTeams, TEAMS, TEAMS_CHECKED, suggestRivals, RIVALS_MAX } from './teams';
+import { accentOn, charById, COLOR_BY, colorsOf, contrast, DEFAULT_NAMES, flavorOf, kinds, lineup, packById, PACKS, playersOf, qualify, teamById, packTeams, TEAMS, TEAMS_CHECKED, suggestRivals, RIVALS_MAX } from './teams';
 import { normEntries, normEntry } from './source';
 
 export const Core = {
@@ -14,7 +14,7 @@ export const Core = {
   weight, strength, unseen, sure, aiCard, aiRaise, aiAnswer, aiEleven, aiAct, drill, drillOk,
   DESERVE, FAIR_BASE, handOdds, gameChance, bluffRate, runRate, bluffOdds, extremeBluff, EXTREME_BLUFF, RAISE_NEED, WEAK_BY, READ_PRIOR, BLUFF_GUESS, RUN_GUESS, BLUFF_MAX, SAMPLES, RAISE_FOR, RAISE_BACK,
   emptyTable, tell, untell, nextRound, advise, tableSay, hear,
-  TEAMS, TEAMS_CHECKED, DEFAULT_NAMES, teamById, playersOf, lineup, PACKS, kinds, packById, packTeams, charById, qualify, colorsOf, contrast, accentOn, COLOR_BY, suggestRivals, RIVALS_MAX,
+  TEAMS, TEAMS_CHECKED, DEFAULT_NAMES, teamById, playersOf, lineup, PACKS, kinds, packById, packTeams, charById, qualify, colorsOf, contrast, accentOn, COLOR_BY, flavorOf, suggestRivals, RIVALS_MAX,
   viewFor, swapSides, newRoom, roomCode, isCode, CODE_LEN, handle, roomView, aiDelay, aiStep, readMsg, readRoom, ROOM_THINK, ROOM_ROUND_PAUSE, ROOM_HAND_PAUSE, ROOM_GONE, SEAT_GONE, FORMATS, SUPPORTS_THREE,
   MSG_MAX, RATE_BURST, RATE_PER_S, CONN_MAX, CLOSE_BIG, CLOSE_FAST, newBucket, allow, tooBig, roomFull,
   readGame, readReal, readState, normEntry, normEntries
@@ -22,5 +22,5 @@ export const Core = {
 export type * from './types';
 export type { Answer, Drill, DrillKind } from './game';
 export type { CardAdvice, Target } from './assist';
-export type { Character, Colors, ColorBy, Group, Pack, RivalPick, Side, Team as Club } from './teams';
+export type { Character, Colors, ColorBy, Flavor, Group, Pack, RivalPick, Side, Team as Club } from './teams';
 export type { Action, Bucket, ClientMsg, Format, Member, Room, RoomView } from './online';

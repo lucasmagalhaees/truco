@@ -291,6 +291,7 @@ with sync_playwright() as p:
     pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=truco]')
     assert txt('#asked') == 'Você pediu TRUCO!' and txt('#answerer') == 'Responde: Biu' and pg.locator('#seat0.asking .asktag').count() == 1 and pg.locator('#seat1.answering').count() == 1, (txt('#action'))
     assert txt('#stamp').startswith('TRUCO!') and txt('#stamp small') == 'Você pediu TRUCO!', txt('#stamp')
+    assert pg.evaluate('getComputedStyle(document.getElementById("stamp")).animationName') == 'none', 'movimento reduzido: o carimbo não anima'
     shot(f'e8-pedido-voce-{THEME}.png')
     reload(); pg.evaluate('Math.random = () => 0.99')         # the test's long wait is gone after a reload: Biu answers now, same chance as above
     settle()
@@ -403,6 +404,8 @@ with sync_playwright() as p:
     g = G(); assert g['winner'] == 0 and g['score'] == [12, 3]
     pg.wait_for_timeout(300); assert G()['phase'] == 'over' and pg.locator('[data-act=again]').count() == 1, 'with "Avançar sozinho" on, the end of a game still waits'
     assert 'Vocês venceram' in txt('#action') and pg.locator('#summary li').count() == 2 and pg.evaluate('document.getElementById("confetti").children.length') > 0
+    # the confetti carries the theme's flavour (D21; no theme here, so neutral) and, under reduced motion, does not animate
+    assert 'fx-neutro' in (pg.get_attribute('#confetti', 'class') or '') and pg.evaluate('getComputedStyle(document.getElementById("confetti")).display') == 'none', 'confete: flavor e sem animação com movimento reduzido'
     assert S()['tally'] == {'w': 1, 'l': 0}
     assert overflow() == 0; shot(f'e7-fim-{THEME}.png')
     pg.click('[data-act=home]'); assert 'Neste aparelho: 1 vitória e 0 derrotas' in txt('#tally')
@@ -452,7 +455,41 @@ with sync_playwright() as p:
     mp.click('#hand [data-act=play][data-k="1"]'); assert 'out' in (mp.get_attribute('#hand [data-k="1"]', 'class') or ''), 'the card lifts off the hand'
     mp.wait_for_function('window.__APP.S.game.played.length >= 1')
     mp.wait_for_selector('#center .slot.fly')
+    # the card just played glows in its side's colour, and so does the hand dealt in a fan (D21)
+    assert mp.evaluate('getComputedStyle(document.querySelector("#center .slot.fly"), "::after").animationName') == 'cardGlow', 'o brilho na carta jogada'
+
+    # ---------- per-theme win effects (D21): the confetti wears each category's flavour, no error, no overflow ----------
+    def win_with(team_id):
+        """Reloads a game one card from 12 with the given team, then plays the winning card: you take the hand and win,
+        so the confetti fires in that theme's flavour."""
+        mp.evaluate('''(team) => {
+          const a = window.__APP;
+          if (team) a.S.team = team; else delete a.S.team;
+          delete a.S.rival; delete a.S.rivalAuto;
+          const lu = a.Core.lineup(a.S.team, null, a.S.custom, a.S.colorBy || 'team');
+          const base = a.Core.newGame(a.Core.seeded(1), 'medio', lu);
+          a.S.game = { ...base, log: [], vira: '7c', score: [11, 3], value: 1, dealer: 3, starter: 0, turn: 0, rounds: [0],
+            hist: [{ team: 1, points: 3, how: 'Eles levaram a mão.', value: 3 }], hands: [['Qp'], ['4e'], ['5e'], ['6e']] };
+          localStorage.setItem('truco.v1', JSON.stringify(a.S));
+        }''', team_id)
+        cov.reload(mp); mp.wait_for_function('window.__APP && window.__APP.S')
+        mp.evaluate('window.__APP.ui.wait = 20; Math.random = () => 0.99')
+        mp.click('#hand [data-act=play][data-k="0"]'); mp.wait_for_function('window.__APP.S.game.phase === "over"', timeout=10000)
+        return mp.get_attribute('#confetti', 'class') or ''
+    # one theme per category, plus the bar table; a capture of four visually distinct flavours
+    cases = [('futebol/flamengo', 'futebol', True), ('dragon-ball/guerreiros-z', 'fogo', True),
+             ('sonic/sonic', 'velocidade', True), ('nintendo/mario', 'moedas', True),
+             ('street-fighter/shotokan', 'luta', False), ('avatar/time-avatar', 'agua', False),
+             ('naruto/time-7', 'tinta', False), (None, 'neutro', False)]
+    for team_id, fx, snap in cases:
+        cls = win_with(team_id)
+        assert f'fx-{fx}' in cls, (team_id, fx, cls)
+        mp.wait_for_selector(f'.confetti.fx-{fx} i')
+        assert mp.evaluate('document.getElementById("confetti").children.length') > 0, fx
+        assert mp.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth') == 0, (fx, 'o confete não estoura a largura')
+        if snap:
+            mp.wait_for_timeout(650); mp.screenshot(path=str(SHOTS / f'e11-confete-{fx}-{THEME}.png'))
     cov.stop(mp, f'e2e-motion-{THEME}')
     assert not merrs, merrs
     b.close()
-print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, cores do tema, da equipe e da dupla, sem Mais jeitos de montar a mesa), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, a partida inteira na janela sem rolar (393×852, 360×640, 1920×1080, com e sem o aviso de versão nova), sem estouro de largura e sem erro de script')
+print(f'e2e ok ({THEME}): quem pediu pelo nome (cartão, cadeira, carimbo, quem responde, de volta, aceitou, correu), avançar sozinho ligado e desligado (o fim da partida espera), equipe contra equipe (resumo, nomes no placar e na mesa), abas embaixo e telas em árvore (ir, voltar, voltar do navegador, teclado, endereço, o voltar do navegador fechando o treino e o assistente, a altura de cada tela, as listas sem a cor das equipes no fundo), ícone, início, sua equipe (abas do catálogo, nomes, cores, nomes trocados, rivais entre temas, anime contra clube, cores do tema, da equipe e da dupla, sem Mais jeitos de montar a mesa), níveis, tema e ajustes, ranking e glossário, treino (certo e errado), mesa real pela grade e pela voz, partida pela tela, rodada ganha no naipe, cangada, truco aceito, blefe com cartas mostradas, seis e doze, mão de onze dos dois lados, mão de ferro às cegas, fim de jogo com confete e resumo, efeitos por tema (confete por categoria: futebol, fogo, velocidade, moedas, luta, água, tinta e neutro; brilho na carta jogada e no leque; sem animar com movimento reduzido), sem rodinhas, encerrar no meio, guardado no aparelho, animações com movimento, a partida inteira na janela sem rolar (393×852, 360×640, 1920×1080, com e sem o aviso de versão nova), sem estouro de largura e sem erro de script')
