@@ -232,6 +232,21 @@ with sync_playwright() as p:
     pg.click('[data-act=brand]'); assert pg.locator('#train').count() == 1, 'the name at the top goes home from training'
     assert 'Acertos: 2 de 3' in txt('#trainstats') and 'Melhor sequência: 1' in txt('#trainstats')
 
+    # ---------- which card to play ----------
+    pg.click('[data-act=drill][data-k=play]'); assert pg.locator('#drill').count() == 1 and pg.is_hidden('#tabs')
+    d = pg.evaluate('window.__APP.ui.drill')
+    assert d['kind'] == 'play' and d['seat'] == 0 and pg.locator('#drill .dp').count() == 3 + len(d['options'])
+    before = S()['train']['total']
+    pg.click(f'#drill [data-act=guess][data-v="{d["answer"]}"]')
+    assert 'Isso!' in txt('#verdict') and pg.locator('#drillrank li').count() == 13 and S()['train']['total'] == before + 1
+    assert pg.locator('#drill [data-act=guess]:not([disabled])').count() == 0, 'one answer per card drill'
+    pg.click('#drill [data-act=drill]'); d = pg.evaluate('window.__APP.ui.drill')
+    wrong = next(o for o in d['options'] if o != d['answer'])
+    pg.click(f'#drill [data-act=guess][data-v="{wrong}"]'); assert 'Não foi dessa vez' in txt('#verdict')
+    assert pg.locator('#drill .is-right').count() == 1 and pg.locator('#drill .is-wrong').count() == 1
+    assert overflow() == 0; shot(f'e2-treino-carta-{THEME}.png')
+    pg.click('[data-act=home]'); assert route() == 'treinar', 'out of the card drill, back on Treinar'
+
     # ---------- the real table ----------
     tab('real'); pg.click('[data-act=real]'); assert 'Diga primeiro a vira' in txt('#realsay')
     def pick(target, card):
