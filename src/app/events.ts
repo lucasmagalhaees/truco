@@ -1,5 +1,5 @@
 import { Core } from '../core';
-import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } from '../core';
+import type { Answer, DrillKind, Flavor, Game, Level, RealTable, Speed, Target, Team, Theme } from '../core';
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, shoutLine, stamp, toast } from './render';
 import { $, valOf } from './format';
@@ -46,16 +46,19 @@ function moment(before: Game | null, g: Game): void {
   if (!before || before.n !== g.n) { sound('shuffle'); return; }
   if (g.played.length > before.played.length) sound('card');
   if (g.shout && shoutKey(g) !== shoutKey(before)) {
-    // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!"
+    // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!". The theme's flavour (D21)
+    // follows the side the stamp is for; with three pairs (no sides) it is neutral.
+    const three = Core.teamsOf(g) === 3;
+    const flav = (t: Team | null): Flavor => (three || t === null ? 'neutro' : Core.flavorOf((g.sides as (string | null)[])[t]));
     const team = Core.teamOf(g.shout.seat, Core.teamsOf(g)), line = shoutLine(g);
     if (LOUD.includes(g.shout.word)) {
-      stamp(`${g.shout.word.toUpperCase()}!`, team, line); sound('truco');
+      stamp(`${g.shout.word.toUpperCase()}!`, team, line, flav(team)); sound('truco');
       if (Core.teamOf(g.shout.seat) === 1) buzz([50, 40, 50]);
-    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? team, line);
-    else if (g.shout.word === 'aceito') stamp('Aceito!', team, line);
+    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') { const rt = g.result?.team ?? team; stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', rt, line, flav(rt)); }
+    else if (g.shout.word === 'aceito') stamp('Aceito!', team, line, flav(team));
   }
   if (g.phase === 'over' && before.phase !== 'over' && g.winner !== null) {
-    if (g.winner === 0) confetti(0);
+    if (g.winner === 0) confetti(0, Core.teamsOf(g) === 3 ? 'neutro' : Core.flavorOf(g.sides[0]));
     sound(g.winner === 0 ? 'win' : 'lose'); buzz([60, 80, 60, 80, 200]);
   } else if (g.phase === 'handEnd' && before.phase !== 'handEnd' && g.result?.team !== null) sound('point');
 }
@@ -92,7 +95,7 @@ function playMine(g: Game, k: number): void {
   ui.busy = true; lift(k);
   later(() => { ui.busy = false; play(Core.playCard(g, 0, k)); }, 180);
 }
-function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
+function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = kind === 'play' ? Core.playDrill(rand) : Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
 function guess(v: string): void {
   if (!ui.drill || ui.picked !== null) return;
   ui.picked = v;
