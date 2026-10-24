@@ -113,7 +113,7 @@ with sync_playwright() as p:
     tab('equipe'); assert 'você e Cida contra Biu e Toinho' in lineup()
     into('equipe/time')
     kinds = pg.locator('#kinds .entry b').all_inner_texts()
-    assert [t.strip().lower() for t in kinds] == ['futebol', 'animes', 'jogos', 'filmes'], kinds     # the kinds come from the catalogue
+    assert [t.strip().lower() for t in kinds] == ['futebol', 'animes', 'jogos', 'filmes', 'séries', 'mitologia'], kinds     # the kinds come from the catalogue
     into('equipe/time/futebol')                                  # one universe in the kind: straight to the teams
     assert pg.locator('#teams .item').count() == 20 and txt('#screentitle') == 'Série A 2026'
     pg.click('#teams [data-act=team][data-v="futebol/flamengo"]'); pg.wait_for_selector('#panel[data-route="equipe"]')
@@ -168,7 +168,7 @@ with sync_playwright() as p:
     # an anime team against a football club: kind, then universe, then team; then a rival from another theme
     tab('equipe'); into('equipe/time'); into('equipe/time/anime')
     packs = [x.strip().lower() for x in pg.locator('#packs .entry b').all_inner_texts()]
-    assert packs == ['blue lock', 'naruto clássico', 'dragon ball', 'avatar: a lenda de aang'], packs
+    assert packs == ['blue lock', 'naruto clássico', 'dragon ball', 'avatar: a lenda de aang', 'os cavaleiros do zodíaco'], packs
     into('equipe/time/anime/naruto'); assert txt('#screentitle') == 'Naruto Clássico'
     # the browser's back goes one screen back, and forward again
     pg.go_back(); pg.wait_for_selector('#panel[data-route="equipe/time/anime"]')
