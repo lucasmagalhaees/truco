@@ -3,7 +3,7 @@ import type { Pack } from '../teams';
 /* Avatar: A Lenda de Aang, by nations and sides of the story, with the names used in Brazil. Set down from the agent's
    memory on 21/10/2026, not checked on the web. Only names and colours: no image, logo or drawing. */
 export const avatar: Pack = {
-  id: 'avatar', kind: 'anime', kindName: 'Animes', name: 'Avatar: A Lenda de Aang', lead: 'líder',
+  id: 'avatar', kind: 'anime', kindName: 'Animes', name: 'Avatar: A Lenda de Aang', lead: 'líder', fx: 'agua',
   colors: ['#0e5a8a', '#fbbf24', '#ffffff'],
   groups: [
     { id: 'time-avatar', rivals: ['avatar/familia-real', 'avatar/azula', 'avatar/zuko'], why: ['Aang × Senhor do Fogo Ozai', 'Aang × Azula', 'Aang × Zuko, no começo'], name: 'Time Avatar', colors: ['#0e5a8a', '#fbbf24', '#ffffff'], players: [{ name: 'Aang', colors: ['#c2410c', '#fde68a', '#ffffff'] }, { name: 'Katara', colors: ['#1e40af', '#bfdbfe', '#ffffff'] }, 'Sokka'] },

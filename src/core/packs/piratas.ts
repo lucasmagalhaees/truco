@@ -3,7 +3,7 @@ import type { Pack } from '../teams';
 /* Piratas do Caribe, by crews and sides of the films, with the names used in Brazil. Set down from the agent's memory on
    21/10/2026, not checked on the web. Only names and colours: no image, logo or drawing. */
 export const piratas: Pack = {
-  id: 'piratas', kind: 'filmes', kindName: 'Filmes', name: 'Piratas do Caribe', lead: 'capitão',
+  id: 'piratas', kind: 'filmes', kindName: 'Filmes', name: 'Piratas do Caribe', lead: 'capitão', fx: 'agua',
   colors: ['#1c1917', '#d4a017', '#ffffff'],
   groups: [
     { id: 'perola', rivals: ['piratas/holandes', 'piratas/companhia', 'piratas/barba-negra'], why: ['Jack Sparrow × Davy Jones', 'Jack Sparrow × Beckett', 'Jack Sparrow × Barba Negra'], name: 'Tripulação do Pérola Negra', colors: ['#1c1917', '#d4a017', '#ffffff'], players: ['Jack Sparrow', 'Will Turner', 'Elizabeth Swann'] },
