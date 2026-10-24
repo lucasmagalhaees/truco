@@ -3,7 +3,7 @@ import type { Pack } from '../teams';
 /* Nintendo: the worlds of Mario, Zelda and Donkey Kong, with the names used in Brazil. Set down from the agent's memory
    on 21/10/2026, not checked on the web. Only names and colours: no image, logo or drawing. */
 export const nintendo: Pack = {
-  id: 'nintendo', kind: 'jogos', kindName: 'Jogos', name: 'Nintendo', lead: 'líder',
+  id: 'nintendo', kind: 'jogos', kindName: 'Jogos', name: 'Nintendo', lead: 'líder', fx: 'moedas',
   colors: ['#b91c1c', '#ffffff', '#ffffff'],
   groups: [
     { id: 'mario', rivals: ['nintendo/bowser', 'nintendo/wario', 'nintendo/kongs'], why: ['Mario × Bowser', 'Mario × Wario', 'Mario × Donkey Kong, o primeiro jogo'], name: 'Irmãos Mario', colors: ['#b91c1c', '#bfdbfe', '#ffffff'], players: [{ name: 'Mario', colors: ['#b91c1c', '#bfdbfe', '#ffffff'] }, { name: 'Luigi', colors: ['#15803d', '#bfdbfe', '#ffffff'] }, { name: 'Peach', colors: ['#f9a8d4', '#9d174d', '#111111'] }] },

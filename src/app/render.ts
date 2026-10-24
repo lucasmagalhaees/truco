@@ -1,5 +1,5 @@
 import { Core } from '../core';
-import type { Card, Drill, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
+import type { Card, Drill, Flavor, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
 import { S, applyClub, table, TABS, ui } from './state';
 import type { Tab } from './state';
@@ -177,7 +177,7 @@ function screenOf(r: string[]): Screen {
     if (r[1] === 'regras') return { title: 'Como joga', body: vRules(), depth: 2 };
     return { title: 'Treinar', depth: 1, body: `<section class="card" id="train">
     <p>Exercícios rápidos pra ver na hora o que manda na mesa.</p>
-    <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button></div>
+    <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button><button class="btn ghost" data-act="drill" data-k="play">Qual carta jogar?</button></div>
     <p class="hint" id="trainstats">${tr.total ? `Acertos: ${tr.ok} de ${tr.total} (${Math.round(100 * tr.ok / tr.total)}%). Melhor sequência: ${tr.best}.` : 'Nenhum exercício feito ainda.'}</p></section>
     <nav class="entries">${entry('treinar/ranking', 'Ranking da vira', 'Escolha a vira e veja da mais forte pra mais fraca')}${entry('treinar/glossario', 'Glossário', 'Zap, espadilha, cangar, mão de ferro…')}${entry('treinar/regras', 'Como joga', 'As regras do truco paulista')}</nav>` };
   }
@@ -382,15 +382,24 @@ function vDrill(d: Drill): string {
   if (d.kind === 'manilha') {
     body = `<p class="big">Vira na mesa. Qual valor é a manilha?</p><div class="vira-big">${face(d.vira)}</div>
       <div class="pick four">${d.options.map(o => `<button class="btn ghost opt${cls(o)}" data-act="guess" data-v="${o}"${done ? ' disabled' : ''}>${o}</button>`).join('')}</div>`;
-  } else {
+  } else if (d.kind === 'round') {
     body = `<p class="big">Quem ganha esta rodada?</p><div class="drill-row"><span class="vira-mini">Vira ${face(d.vira)}</span></div>
       <div class="drill-plays">${d.plays.map(p => `<button class="dp t${Core.teamOf(p.seat)}${cls(p.card)}" data-act="guess" data-v="${p.card}"${done ? ' disabled' : ''}><small>${name(p.seat)}</small>${face(p.card)}</button>`).join('')}</div>
       <button class="btn ghost block opt${cls('empate')}" data-act="guess" data-v="empate"${done ? ' disabled' : ''}>Empate (cangou)</button>`;
+  } else {
+    // which card to play: the three cards on the table (the learner is the pé, last to play), then their own hand to pick from
+    const stand = d.rounds && d.rounds.length ? '<span class="vira-mini">Perdendo 0 a 1</span>' : '';
+    body = `<p class="big">Sua vez (você é o pé). Qual carta jogar?</p>
+      <div class="drill-row"><span class="vira-mini">Vira ${face(d.vira)}</span>${stand}</div>
+      <div class="drill-plays">${d.plays.map(p => `<span class="dp t${Core.teamOf(p.seat)}"><small>${name(p.seat)}</small>${face(p.card, d.vira, true)}</span>`).join('')}</div>
+      <p class="hint" style="text-align:center">Sua mão:</p>
+      <div class="drill-plays">${d.options.map(c => `<button class="dp t0${cls(c)}" data-act="guess" data-v="${c}"${done ? ' disabled' : ''}><small>Você</small>${face(c, d.vira, true)}</button>`).join('')}</div>`;
   }
   const verdict = done ? `<div class="verdict ${ui.picked === d.answer ? 'ok' : 'no'}" id="verdict"><b>${ui.picked === d.answer ? 'Isso!' : 'Não foi dessa vez.'}</b> ${esc(d.why)}</div>` : '';
-  return `<section class="card${ui.picked === null ? ' enter' : ''}" id="drill"><span class="label">Treino · ${d.kind === 'manilha' ? 'manilha' : 'rodada'} · sequência de ${ui.streak}</span>${body}${verdict}
+  const kindLabel = d.kind === 'manilha' ? 'manilha' : d.kind === 'round' ? 'rodada' : 'carta';
+  return `<section class="card${ui.picked === null ? ' enter' : ''}" id="drill"><span class="label">Treino · ${kindLabel} · sequência de ${ui.streak}</span>${body}${verdict}
     <div class="pick">${done ? `<button class="btn" data-act="drill" data-k="${d.kind}">Próxima</button>` : ''}<button class="btn ghost" data-act="home">Voltar</button></div></section>
-    ${d.kind === 'round' && done ? `<section class="card"><span class="label">Ranking com esta vira</span>${vRanking(d.vira, 'drillrank')}</section>` : ''}`;
+    ${(d.kind === 'round' || d.kind === 'play') && done ? `<section class="card"><span class="label">Ranking com esta vira</span>${vRanking(d.vira, 'drillrank')}</section>` : ''}`;
 }
 
 /* ---------- the game ---------- */
@@ -444,7 +453,7 @@ function vTable(g: Game, fresh: boolean, glow: boolean): string {
   const T = Core.teamsOf(g), lead = g.table.length ? Core.roundWinner(g.table, g.vira, T) : -2;
   const slots = showing.map((p, i) => {
     const isNew = fresh && i === showing.length - 1;
-    return `<div class="slot ${posOf(g, p.seat)}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
+    return `<div class="slot t${Core.teamOf(p.seat, T)} ${posOf(g, p.seat)}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
   }).join('');
   return `<section class="felt${T === 3 ? ' six' : ''}" id="table">${(T === 3 ? [3, 4, 2, 5, 1] : [2, 3, 1]).map(s => vSeat(g, s)).join('')}
     <div class="center" id="center">${slots}</div>
@@ -558,19 +567,23 @@ function vSettings(): string {
 
 /* ---------- moments ---------- */
 let stampTimer: ReturnType<typeof setTimeout> | undefined;
-/** A word stamped over the screen for a moment: a raise, a run, a bluff caught. */
-export function stamp(text: string, team: Team | null, sub = ''): void {
+/** A word stamped over the screen for a moment: a raise, a run, a bluff caught. The theme's flavour (D21) adds a small
+ *  accent on some categories (a fighting-game tremor, a Sonic streak, an ink splat for anime/film); abstract, in the
+ *  side's own colour, and off under reduced motion like every other animation. */
+export function stamp(text: string, team: Team | null, sub = '', flavor: Flavor = 'neutro'): void {
   const s = part('stamp');
-  s.textContent = text; s.className = `stamp t${team ?? 'x'}`; s.hidden = false;
+  s.textContent = text; s.className = `stamp t${team ?? 'x'} fx-${flavor}`; s.hidden = false;
   if (sub) { const who = document.createElement('small'); who.textContent = sub; s.append(who); }       // who said it, under the word
   void s.offsetWidth; s.classList.add('go');            // restart the animation even when it is the same word again
   clearTimeout(stampTimer); stampTimer = setTimeout(() => { s.hidden = true; }, 1100);
 }
-/** Confetti in the colours of the pair that won. */
-export function confetti(winner: Team): void {
+/** Confetti in the colours of the pair that won, with the theme's flavour (D21): football bunting, flames, speed
+ *  streaks, water drops, impact sparks, gold coins or ink splats — abstract shapes only, no logo or image. */
+export function confetti(winner: Team, flavor: Flavor = 'neutro'): void {
   const c = part('confetti');
-  c.innerHTML = Array.from({ length: 48 }, (_, i) => `<i class="t${winner}" style="left:${(i * 37) % 100}%;animation-delay:${(i % 12) * 0.08}s;animation-duration:${1.6 + (i % 5) * 0.25}s;--r:${(i * 53) % 360}deg"></i>`).join('');
-  setTimeout(() => { c.innerHTML = ''; }, 4200);
+  c.className = `confetti fx-${flavor} t${winner}`;
+  c.innerHTML = Array.from({ length: 48 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 12) * 0.08}s;animation-duration:${1.6 + (i % 5) * 0.25}s;--r:${(i * 53) % 360}deg"></i>`).join('');
+  setTimeout(() => { c.innerHTML = ''; c.className = 'confetti'; }, 4200);
 }
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 /** A short message at the bottom of the screen. */
