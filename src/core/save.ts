@@ -2,7 +2,8 @@
    never breaks the page: the tally, the level and the settings still come back. */
 import { LEVELS, VALUES, WIN_POINTS } from './game';
 import { colorsOf, qualify } from './teams';
-import type { AppState, Game, Level, Phase, RealTable, Speed } from './types';
+import { H2H_MAX, h2hKey } from './stats';
+import type { AppState, Game, H2H, Level, Phase, RealTable, Speed, Stats, WL } from './types';
 
 const PHASES: Phase[] = ['eleven', 'play', 'truco', 'handEnd', 'over'];
 const SPEEDS: Speed[] = ['calma', 'normal', 'rapida'];
@@ -73,9 +74,43 @@ function readTeams(team: unknown, rival: unknown, by: unknown, auto: unknown): P
   return { ...(t ? { team: t } : {}), ...(r && r !== t ? { rival: r, ...(auto === true ? { rivalAuto: true as const } : {}) } : {}), ...(by === 'pack' || by === 'char' ? { colorBy: by } : {}) };
 }
 
+const nn = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
+function isWL(x: unknown): x is WL { const w = x as { w?: unknown; l?: unknown }; return !!x && typeof x === 'object' && nn(w.w) && nn(w.l); }
+
+/** The head-to-head of each matchup (D22). Only well-formed keys (two known groups, in canonical order) with a sound
+ *  record survive, and only the last H2H_MAX of them; anything else is dropped, so a damaged field never breaks the page. */
+function readH2h(x: unknown): { h2h?: H2H } {
+  if (!x || typeof x !== 'object') return {};
+  const out: H2H = {};
+  for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
+    const parts = k.split('|');
+    if (parts.length !== 2 || !isWL(v)) continue;
+    const a = qualify(parts[0]), b = qualify(parts[1]);
+    if (!a || !b || a === b || a.split('/').length !== 2 || b.split('/').length !== 2 || h2hKey(a, b) !== k) continue;
+    out[k] = { w: v.w, l: v.l };
+  }
+  const keys = Object.keys(out);
+  for (const k of keys.slice(0, Math.max(0, keys.length - H2H_MAX))) delete out[k];
+  return Object.keys(out).length ? { h2h: out } : {};
+}
+
+/** The game statistics (D22): the level records of known levels, the counts, and the streaks; a damaged field is dropped. */
+function readStats(x: unknown): { stats?: Stats } {
+  if (!x || typeof x !== 'object') return {};
+  const o = x as { level?: unknown; paid?: unknown; ran?: unknown; streak?: unknown; best?: unknown };
+  const level: Partial<Record<Level, WL>> = {};
+  if (o.level && typeof o.level === 'object') for (const [k, v] of Object.entries(o.level as Record<string, unknown>)) {
+    if (LEVELS.includes(k as Level) && isWL(v)) level[k as Level] = { w: v.w, l: v.l };
+  }
+  const num = (v: unknown): number => (nn(v) ? (v as number) : 0);
+  const best = num(o.best), streak = Math.min(num(o.streak), best);               // the streak can never exceed the best
+  if (!Object.keys(level).length && !num(o.paid) && !num(o.ran) && !best) return {};
+  return { stats: { level, paid: num(o.paid), ran: num(o.ran), streak, best } };
+}
+
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; rivalAuto?: unknown; colorBy?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; rivalAuto?: unknown; colorBy?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; train?: unknown; h2h?: unknown; stats?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -89,6 +124,8 @@ export function readState(x: unknown): AppState {
     ...(o.auto === false ? { auto: false as const } : {}),
     ...readTeams(o.team, o.rival, o.colorBy, o.rivalAuto),
     ...readCustom(o.custom),
+    ...readH2h(o.h2h),
+    ...readStats(o.stats),
     ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),
     ...(o.online && typeof o.online === 'object' && /^[A-Z0-9]{5}$/.test(String((o.online as { code?: unknown }).code)) && /^[A-Za-z0-9-]{8,64}$/.test(String((o.online as { token?: unknown }).token))
       ? { online: { code: String((o.online as { code: string }).code), token: String((o.online as { token: string }).token), ...((o.online as { played?: unknown }).played === true ? { played: true as const } : {}) } } : {})

@@ -432,9 +432,45 @@ with sync_playwright() as p:
     tab('ajustes'); pg.click('[data-act=hints][data-v=on]'); tab('jogar')
     saved = json.loads(pg.evaluate(f'localStorage.getItem("{KEY}")')); assert saved['game'] is None and saved['tally']['w'] == 1
 
+    # ---------- head-to-head, revanche and the Números screen (D22) ----------
+    pg.evaluate('(() => { const a = window.__APP; a.S.team = "futebol/flamengo"; a.S.rival = "futebol/fluminense"; a.S.rivalAuto = true; })()')
+    stack({'vira': '7c', 'score': [11, 3], 'value': 1, 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0],
+           'hist': [{'team': 1, 'points': 3, 'how': 'x', 'value': 3}], 'hands': [['Qp'], ['4e'], ['5e'], ['6e']]})
+    assert S()['team'] == 'futebol/flamengo' and S()['rival'] == 'futebol/fluminense', 'the matchup survives the reload'
+    pg.click('#hand [data-act=play][data-k="0"]'); settle(); pg.wait_for_function('window.__APP.S.game.phase === "over"')
+    assert G()['winner'] == 0 and S()['h2h']['futebol/flamengo|futebol/fluminense'] == {'w': 1, 'l': 0}, S().get('h2h')
+    assert 'Agora 1 a 0 no clássico contra Fluminense' in txt('#h2hend'), txt('#action')
+    assert pg.locator('[data-act=again]').count() == 1 and pg.locator('[data-act=nextrival]').count() == 1, 'Revanche and Próximo rival on the end-of-game card'
+    assert overflow() == 0; shot(f'e11-fim-revanche-{THEME}.png')
+    # Revanche: the same teams and level, straight into a new game
+    pg.click('[data-act=again]'); g = G()
+    assert g['n'] == 1 and g['phase'] in ('play', 'eleven') and g['sides'] == ['futebol/flamengo', 'futebol/fluminense'], ('revanche keeps the matchup', g['sides'])
+    pg.click('[data-act=end]'); pg.click('[data-act=end]'); assert G() is None
+    # the summary of Jogar shows the matchup, and it survives a reload
+    assert 'Flamengo x Fluminense: 1 a 0 pra você' in txt('#tablenow'), txt('#tablenow')
+    reload(); assert 'Flamengo x Fluminense: 1 a 0 pra você' in txt('#tablenow') and S()['h2h']['futebol/flamengo|futebol/fluminense'] == {'w': 1, 'l': 0}, 'the history stays after a reload'
+    tab('equipe'); assert 'Flamengo x Fluminense: 1 a 0 pra você' in txt('#vs')
+    # a neutral pill next to a team already faced, in the list of rivals
+    into('equipe/rivais'); pg.click('#otherrival'); into('equipe/rivais/futebol')
+    assert pg.locator('#teams [data-act=rival][data-v="futebol/fluminense"] .pastilha').inner_text() == '1–0'
+    # Próximo rival from the end of a game: the next suggested rival (Vasco) takes over
+    tab('jogar'); pg.evaluate('window.__APP.ui.wait = 1e6')
+    stack({'vira': '7c', 'score': [11, 3], 'value': 1, 'dealer': 3, 'starter': 0, 'turn': 0, 'rounds': [0],
+           'hist': [{'team': 1, 'points': 3, 'how': 'x', 'value': 3}], 'hands': [['Qp'], ['4e'], ['5e'], ['6e']]})
+    pg.click('#hand [data-act=play][data-k="0"]'); settle(); pg.wait_for_function('window.__APP.S.game.phase === "over"')
+    pg.click('[data-act=nextrival]'); assert S()['rival'] == 'futebol/vasco' and G()['sides'] == ['futebol/flamengo', 'futebol/vasco'], ('próximo rival advances the rival', S().get('rival'))
+    pg.click('[data-act=end]'); pg.click('[data-act=end]'); pg.evaluate('window.__APP.ui.wait = 20')
+    # the Números screen: wins by level, bluff paid and run, best streak, the matchups
+    into('jogar/numeros')
+    assert pg.locator('#statslevels li').count() == 4 and 'vitória' in txt('#statstotal') and 'Melhor sequência' in txt('#statstotal')
+    assert 'Blefe pago' in txt('#statsbluff') and pg.locator('#statsh2h').count() == 1 and 'Fluminense' in txt('#statsh2h')
+    assert overflow() == 0; shot(f'e11-numeros-{THEME}.png')
+    # back to a plain table for the screens-of-the-tree sweep below
+    pg.evaluate('(() => { const a = window.__APP; delete a.S.team; delete a.S.rival; delete a.S.rivalAuto; localStorage.setItem("truco.v1", JSON.stringify(a.S)); })()'); reload()
+
     # ---------- every screen of the tree: by its address, no screen absurdly tall, a capture of each ----------
     tall = {}
-    for r in ('jogar', 'jogar/online', 'treinar', 'treinar/ranking', 'treinar/glossario', 'treinar/regras', 'real', 'equipe', 'equipe/time',
+    for r in ('jogar', 'jogar/online', 'jogar/numeros', 'treinar', 'treinar/ranking', 'treinar/glossario', 'treinar/regras', 'real', 'equipe', 'equipe/time',
               'equipe/time/futebol', 'equipe/time/anime', 'equipe/time/anime/naruto', 'equipe/time/jogos', 'equipe/rivais', 'ajustes'):
         pg.evaluate(f'location.hash = "#{r}"'); pg.wait_for_selector(f'#panel[data-route="{r}"]')
         assert (r.count('/') > 0) == (pg.locator('#panel [data-act=back]').count() == 1), f'a way back below the root of a tab: {r}'

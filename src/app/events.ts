@@ -32,7 +32,10 @@ function play(next: Game): void {
   if (next === before) return;
   setS({ ...S, game: next });
   if (next.phase === 'over' && before && before.phase !== 'over' && next.winner !== null) {
-    S.tally = { w: S.tally.w + (next.winner === 0 ? 1 : 0), l: S.tally.l + (next.winner === 1 ? 1 : 0) };
+    const youWon = next.winner === 0;
+    S.tally = { w: S.tally.w + (youWon ? 1 : 0), l: S.tally.l + (youWon ? 0 : 1) };
+    S.stats = Core.afterGame(S.stats || Core.emptyStats(), next.level, youWon);   // by level, and the winning streak
+    if (S.team && S.rival) S.h2h = Core.bumpH2h(S.h2h, S.team, S.rival, youWon);   // head-to-head, only with both teams set
   }
   saveS(); ui.confirmEnd = false;
   render();
@@ -82,6 +85,22 @@ export function schedule(): void {
 }
 
 function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
+/** A rematch against the next suggested rival (D22): your team against the one after the current rival, then a new game.
+ *  Only offered with a team that has a suggestion; without one it is just a rematch. */
+function nextRival(): void {
+  const list = Core.suggestRivals(S.team);
+  if (list.length) { const i = list.findIndex(r => r.id === S.rival); suggested(i + 1 < list.length ? i + 1 : 0); saveS(); }
+  newGame();
+}
+/** The person answers a raise (D22, off a phone only): a run is counted, and accepting a raise a computer player made as
+ *  a bluff counts as a bluff paid. Only an opponent's raise in the standard game of four. */
+function countAnswer(g: Game, v: Answer): void {
+  if (Core.teamsOf(g) !== 2 || !g.ask || Core.teamOf(g.ask.by) === Core.teamOf(0)) return;
+  if (v === 'run') S.stats = { ...(S.stats || Core.emptyStats()), ran: (S.stats?.ran ?? 0) + 1 };
+  else if (v === 'accept' && g.ask.bluff) S.stats = { ...(S.stats || Core.emptyStats()), paid: (S.stats?.paid ?? 0) + 1 };
+  else return;
+  saveS();
+}
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
  *  on the tab they were opened from. */
 function home(): void {
@@ -263,6 +282,7 @@ export function initEvents(): void {
     else if (a === 'drill') drill(d.k as DrillKind);
     else if (a === 'guess') guess(d.v || '');
     else if (a === 'new' || a === 'again') newGame();
+    else if (a === 'nextrival') nextRival();
     else if (a === 'home') home();
     else if (a === 'real') { openOver('assistente'); ui.real = true; render(); window.scrollTo(0, 0); }
     else if (a === 'sheet') { ui.sheet = d.v as Target; render(); }
@@ -283,7 +303,7 @@ export function initEvents(): void {
     else if (!g) return;
     else if (a === 'play') playMine(g, Number(d.k));
     else if (a === 'truco') play(Core.raise(g, 0));
-    else if (a === 'answer') play(Core.answer(g, d.v as Answer));
+    else if (a === 'answer') { countAnswer(g, d.v as Answer); play(Core.answer(g, d.v as Answer)); }
     else if (a === 'eleven') play(Core.decideEleven(g, d.v === '1'));
     else if (a === 'next') play(Core.nextHand(g, rand));
     else if (a === 'end' && ui.confirmEnd) home();

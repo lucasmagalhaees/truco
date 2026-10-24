@@ -113,6 +113,15 @@ export interface Game {
 /** Games won and lost on this device. */
 export interface Tally { w: number; l: number }
 
+/** A won/lost record (a matchup, or a level in the statistics), from the person's side. */
+export interface WL { w: number; l: number }
+/** The head-to-head of each matchup (D22): the person's record against another team, keyed by the two team ids ordered
+ *  (`pack/group|pack/group`); only the most recent H2H_MAX are kept. */
+export type H2H = Record<string, WL>;
+/** The game statistics (D22): wins and losses by level, how many times the person paid a bluff (accepted a raise a
+ *  computer player made as a bluff) and ran from a raise, and the best winning streak. */
+export interface Stats { level: Partial<Record<Level, WL>>; paid: number; ran: number; streak: number; best: number }
+
 /** The real table the assistant is following (see src/core/assist.ts). */
 export interface RealTable { vira: Card | null; hand: Card[]; table: Card[]; gone: Card[]; target: 'vira' | 'hand' | 'table' }
 
@@ -135,6 +144,9 @@ export interface AppState {
   /** The name the person plays under online, and the room they are in (code and the token that keeps their seat; played:
    *  a game in it has started, so coming back to an empty room means the room is gone). */
   myName?: string; online?: { code: string; token: string; played?: true };
+  /** The head-to-head of each matchup (D22) and the game statistics; both absent until a game with a team and a rival
+   *  ends, and read back loosely, so an old state without them opens fine. */
+  h2h?: H2H; stats?: Stats;
 }
 
 /** An entry as the source describes it, once read by `normEntry`. */

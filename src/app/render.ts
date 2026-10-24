@@ -122,7 +122,33 @@ function vsLine(): string {
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
 }
 function tableNow(): string {
-  return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.</p>`;
+  return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.${h2hNote()}</p>`;
+}
+/** A record "3 a 1" told from the person's side: "pra você", "pra eles" or "empatado". */
+function h2hScore(rec: { w: number; l: number }): string {
+  return rec.w === rec.l ? `${rec.w} a ${rec.l}, empatado` : rec.w > rec.l ? `${rec.w} a ${rec.l} pra você` : `${rec.l} a ${rec.w} pra eles`;
+}
+/** The head-to-head of the matchup set now (D22), when a team and a rival are chosen and they have met: " Flamengo x
+ *  Fluminense: 3 a 1 pra você." Empty otherwise. */
+function h2hNote(): string {
+  const t = Core.teamById(S.team), rv = Core.teamById(S.rival);
+  const rec = t && rv ? Core.h2hOf(S.h2h, t.id, rv.id) : null;
+  if (!t || !rv || !rec || (!rec.w && !rec.l)) return '';
+  return ` <span class="h2h" id="h2h">${esc(t.name)} x ${esc(rv.name)}: ${h2hScore(rec)}.</span>`;
+}
+/** At the end of a game (D22), the updated head-to-head: "Agora 4 a 1 no clássico contra Fluminense." Only off a phone,
+ *  with a team and a rival. "no clássico" when the rival is a direct one, else "no retrospecto". */
+function h2hEndLine(): string {
+  const t = Core.teamById(S.team), rv = Core.teamById(S.rival);
+  const rec = t && rv ? Core.h2hOf(S.h2h, t.id, rv.id) : null;
+  if (inRoom() || !t || !rv || !rec) return '';
+  const direct = Core.suggestRivals(t.id).some(x => x.id === rv.id);
+  return `<p class="hint" id="h2hend">Agora ${rec.w} a ${rec.l} ${direct ? 'no clássico' : 'no retrospecto'} contra ${esc(rv.name)}.</p>`;
+}
+/** A small neutral pill with the record against a team, in the list of possible rivals; empty if they have not met. */
+function h2hPill(a: string, b: string): string {
+  const rec = Core.h2hOf(S.h2h, a, b);
+  return rec && (rec.w || rec.l) ? `<span class="pastilha" aria-label="Seu retrospecto contra: ${rec.w} a ${rec.l}">${rec.w}–${rec.l}</span>` : '';
 }
 function vHome(): string {
   const sc = screenOf(ui.route), tab = ui.route[0] as Tab;
@@ -136,13 +162,14 @@ function screenOf(r: string[]): Screen {
   const tab = r[0] as Tab, lv = S.level, t = S.tally, tr = S.train;
   if (tab === 'jogar') {
     if (r[1] === 'online') return { title: 'Jogar online', body: vOnline(), depth: 2 };
+    if (r[1] === 'numeros') return { title: 'Números', body: vStats(), depth: 2 };
     const lvBtn = (v: string): string => `<button class="${lv === v ? 'on' : ''}" data-act="level" data-v="${v}" aria-pressed="${lv === v}">${LEVEL[v][0]}</button>`;
     return { title: 'Jogar', depth: 1, body: `${tableNow()}<section class="card" id="start">
     <p id="lineup">Quem fizer ${Core.WIN_POINTS} pontos primeiro leva. Nível da IA:</p>
     <div class="segm" role="group" aria-label="Dificuldade">${Core.LEVELS.map(lvBtn).join('')}</div><p class="hint" id="leveltext">${LEVEL[lv][1]}</p>
     <button class="btn block" data-act="new">Dar as cartas</button>
     <p class="hint" id="tally">${t.w + t.l ? `Neste aparelho: ${t.w} ${t.w === 1 ? 'vitória' : 'vitórias'} e ${t.l} ${t.l === 1 ? 'derrota' : 'derrotas'}.` : 'Nenhuma partida terminada ainda.'}</p></section>
-    <nav class="entries">${entry('jogar/online', 'Jogar online', 'Com amigos, cada um no seu celular')}${entry('equipe', 'Trocar quem senta na mesa', 'Sua equipe contra a equipe adversária')}</nav>` };
+    <nav class="entries">${entry('jogar/online', 'Jogar online', 'Com amigos, cada um no seu celular')}${entry('jogar/numeros', 'Números', 'Vitórias por nível, blefe pago, sua sequência')}${entry('equipe', 'Trocar quem senta na mesa', 'Sua equipe contra a equipe adversária')}</nav>` };
   }
   if (tab === 'treinar') {
     if (r[1] === 'ranking') return { title: 'Ranking da vira', body: vGloss('rank'), depth: 2 };
@@ -192,7 +219,7 @@ function equipeScreen(r: string[]): Screen {
     const pack = kind.packs.length === 1 ? kind.packs[0] : kind.packs.find(x => x.id === r[3]);
     if (!pack) return { title: esc(kind.name), depth: 3, body: `<nav class="entries" id="packs">${kind.packs.map(x => entry(`equipe/${base}/${kind.id}/${x.id}`, esc(x.name), `${Core.packTeams(x).length} equipes`, swatch(x.colors))).join('')}</nav>` };
     const depth = kind.packs.length === 1 ? 3 : 4, list = Core.packTeams(pack).filter(x => base === 'time' || x.id !== S.team);
-    return { title: esc(pack.name), depth, body: `<div class="list" id="teams">${list.map(x => `<button class="item${cur === x.id ? ' on' : ''}" data-act="${act}" data-v="${esc(x.id)}" data-back="1" aria-pressed="${cur === x.id}">${swatch(x.colors)}<span class="etext"><b>${esc(x.name)}</b><small>${esc(Core.playersOf(x.id, S.custom).join(', '))}</small></span>${cur === x.id ? '<span class="tick" aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>` };
+    return { title: esc(pack.name), depth, body: `<div class="list" id="teams">${list.map(x => `<button class="item${cur === x.id ? ' on' : ''}" data-act="${act}" data-v="${esc(x.id)}" data-back="1" aria-pressed="${cur === x.id}">${swatch(x.colors)}<span class="etext"><b>${esc(x.name)}</b><small>${esc(Core.playersOf(x.id, S.custom).join(', '))}</small></span>${base === 'rivais' && S.team ? h2hPill(S.team, x.id) : ''}${cur === x.id ? '<span class="tick" aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>` };
   };
   if (r[1] === 'time' || r[1] === 'rivais') return pickTeam(r[1]);
   const current = t && p ? `<section class="card" id="club"><p id="squad">${swatch(t.colors)} <b>${esc(t.name)}</b> (${esc(t.pack.name)}): <b>${esc(p[0])}</b> (${esc(t.pack.lead)}), ${esc(p[1])} e ${esc(p[2])}.</p>
@@ -202,7 +229,7 @@ function equipeScreen(r: string[]): Screen {
     : '';
   const theirs = rv ? Core.playersOf(rv.id, S.custom) : null;
   const cap = (x: string): string => x.charAt(0).toUpperCase() + x.slice(1);
-  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">Equipe contra equipe</span><p class="now" id="tablenow">${cap(vsLine())}.</p></section>
+  return { title: 'Equipe', depth: 1, body: `<section class="card" id="vs"><span class="label">Equipe contra equipe</span><p class="now" id="tablenow">${cap(vsLine())}.${h2hNote()}</p></section>
     <nav class="entries" id="steps">
     ${entry('equipe/time', '1. Sua equipe', t && p ? `${esc(t.name)}: ${esc(p[0])} é a sua dupla` : 'Futebol, animes, jogos')}
     ${entry('equipe/rivais', '2. Equipe adversária', rv && theirs ? `${esc(rv.name)}${t && Core.suggestRivals(t.id).some(x => x.id === rv.id) ? ' (rival direto)' : ''}: ${esc(theirs[0])} e ${esc(theirs[1])} contra você` : t ? 'Nenhuma: os outros dois da sua equipe' : 'Depois de escolher a sua')}</nav>
@@ -486,9 +513,10 @@ function vAction(g: Game): string {
     const next = auto ? `<p class="autonext" id="autonext"><span>A próxima mão sai sozinha…</span><i style="--t:${ms}ms" aria-hidden="true"></i></p>` : '<button class="btn block" data-act="next">Próxima mão</button>';
     return `<section class="card result t${r.team ?? 'x'}" id="action"><span class="label">Fim da mão</span><p class="big"><b>${head}</b></p><p>${esc(r.why)}</p>${shown}${next}</section>`;
   }
-  return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : `${pairSay(g, g.winner)} venceram.`}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score.join(' a ')}.</p>${shown}
+  const nextRival = !inRoom() && !!S.team && Core.suggestRivals(S.team).length > 0;
+  return `<section class="card result win t${g.winner}" id="action"><span class="label">Fim de jogo</span><p class="big"><b>${g.winner === 0 ? 'Vocês venceram!' : `${pairSay(g, g.winner)} venceram.`}</b></p><p>${head}. ${esc(r.why)} Placar final: ${g.score.join(' a ')}.</p>${h2hEndLine()}${shown}
     ${inRoom() ? (net.view?.host ? '<button class="btn block" data-act="againroom">Jogar de novo com a mesma sala</button>' : `<p class="hint">Quem criou a sala pode começar outra.</p>`) + '<button class="btn ghost block" data-act="leaveroom">Sair da sala</button>'
-      : '<button class="btn block" data-act="again">Jogar de novo</button><button class="btn ghost block" data-act="home">Início</button>'}</section>`;
+      : `<button class="btn block" data-act="again">Revanche</button>${nextRival ? '<button class="btn ghost block" data-act="nextrival">Próximo rival</button>' : ''}<button class="btn ghost block" data-act="home">Início</button>`}</section>`;
 }
 /** With three pairs, on a raise: which pairs still have to answer, and which ran and are out of the hand. */
 function vWho(g: Game): string {
@@ -502,6 +530,24 @@ function vSummary(g: Game): string {
 }
 function vLog(g: Game): string {
   return `<details class="pop" id="log"><summary>Histórico</summary><ol class="log popin">${[...g.log].reverse().slice(0, 60).map(l => `<li>${esc(l)}</li>`).join('')}</ol></details>`;
+}
+
+/** The Números screen (D22): wins and losses by level, bluffs paid and raises run from, the best winning streak, and
+ *  the head-to-head of the matchups played, most recent first. Only what the app actually counted. */
+function vStats(): string {
+  const st = S.stats || Core.emptyStats(), tot = Core.statsTotal(st);
+  const wl = (r: { w: number; l: number }): string => `${r.w} ${r.w === 1 ? 'vitória' : 'vitórias'}, ${r.l} ${r.l === 1 ? 'derrota' : 'derrotas'}`;
+  const levels = Core.LEVELS.map(l => `<li><b>${LEVEL[l][0]}</b> <span>${wl(st.level[l] || { w: 0, l: 0 })}</span></li>`).join('');
+  const h2h = S.h2h || {};
+  // most recent first; w/l are always from the person's side, so no flip is needed
+  const matches = Object.keys(h2h).reverse().map(k => { const [a, b] = k.split('|'), ta = Core.teamById(a), tb = Core.teamById(b), r = h2h[k];
+    return ta && tb ? `<li><b>${esc(ta.name)} × ${esc(tb.name)}</b> <span>${r.w}–${r.l}</span></li>` : ''; }).join('');
+  return `<section class="card" id="stats">
+    <p class="now" id="statstotal">No total: <b>${wl(tot)}</b>. Melhor sequência de vitórias: <b>${st.best}</b>.</p>
+    <span class="label">Por nível</span><ul class="statlist" id="statslevels">${levels}</ul>
+    <span class="label">Resposta a truco</span><p id="statsbluff">Blefe pago (você aceitou e era blefe): <b>${st.paid}</b>. Vezes que você correu: <b>${st.ran}</b>.</p>
+    ${matches ? `<span class="label">Confrontos (só com equipe e adversária)</span><ul class="statlist" id="statsh2h">${matches}</ul>` : ''}
+    <p class="hint">Partidas online não entram nestes números; os confrontos contam só com a sua equipe e a adversária definidas.</p></section>`;
 }
 
 /* ---------- settings ---------- */
