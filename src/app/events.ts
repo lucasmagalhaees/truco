@@ -81,7 +81,13 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
+/** A new game on this phone: the game of four with the chosen table, or, with S.trio, three pairs (six seats): you and
+ *  one computer player against two computer pairs, with the bar table's names and colours (D27). */
+function newGame(): void {
+  ui.drill = null; ui.editing = false;
+  play(S.trio ? Core.newGame(rand, S.level, { teams: 3, humans: [0], names: [], sides: [null, null] }) : Core.newGame(rand, S.level, table()));
+  toast(`Partida nova, ${S.trio ? '3 duplas, ' : ''}nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`);
+}
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
  *  on the tab they were opened from. */
 function home(): void {
@@ -239,6 +245,7 @@ function setting(a: string, v: string): void {
   else if (a === 'theme') { if (v === 'auto') delete S.theme; else S.theme = v as Theme; applyTheme(); }
   else if (a === 'auto') { if (v === 'off') S.auto = false; else delete S.auto; }
   else if (a === 'fx') { if (v === 'off') S.quiet = true; else { delete S.quiet; buzz(30); sound('card'); } }
+  else if (a === 'trio') { if (v === 'tres') S.trio = true; else delete S.trio; }
   saveS(); render(); schedule();
 }
 
@@ -256,7 +263,7 @@ export function initEvents(): void {
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
-    if (['level', 'hints', 'speed', 'theme', 'fx', 'auto'].includes(a)) setting(a, d.v || '');
+    if (['level', 'hints', 'speed', 'theme', 'fx', 'auto', 'trio'].includes(a)) setting(a, d.v || '');
     else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || ''); backTo(1); }
     else if (['team', 'mode', 'rival', 'suggest', 'otherrival', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '');
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
