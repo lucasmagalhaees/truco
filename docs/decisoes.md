@@ -244,6 +244,19 @@ Modelo de uma decisão:
 - **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
 - **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
 
+## D26. Mais temas: Cavaleiros do Zodíaco, Senhor dos Anéis, Game of Thrones e mitologias
+
+- **Contexto (24/10/2026, pedido do Lucas):** cinco packs novos — Os Cavaleiros do Zodíaco em Animes; O Senhor dos Anéis em Filmes (junto com Piratas do Caribe); Game of Thrones numa categoria nova, Séries; e Mitologia Grega e Mitologia Egípcia numa categoria nova, Mitologia.
+- **Decisão:** um arquivo de dados por pack (D11), equipes de três com o líder primeiro, com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Ordem das categorias nas abas: Futebol, Animes, Jogos, Filmes, Séries, Mitologia (a ordem em que os packs entram no `PACKS` de `src/core/packs/index.ts`). Os packs têm `side` (herói/vilão) onde a história tem lados, só para a sugestão de rival; Heróis x Vilões continua fora (D19).
+- **Equipes (escolha do agente, a partir do pedido do Lucas):**
+  - Cavaleiros do Zodíaco: Cavaleiros de Bronze (Seiya, Shiryu, Hyoga), Cavaleiros de Ouro (Aiolia, Mu, Milo de Escorpião), Espectros de Hades (Hades, Radamanthys, Minos), Guerreiros Deuses de Asgard (Siegfried, Hagen, Fenrir), Generais de Poseidon (Kanon, Sorento, Isaak).
+  - O Senhor dos Anéis: Sociedade do Anel (Frodo, Aragorn, Gandalf), Rohan (Théoden, Éomer, Éowyn), Gondor (Boromir, Faramir, Denethor), Mordor (Sauron, Saruman, Boca de Sauron), Elfos (Legolas, Elrond, Galadriel), Anões (Gimli, Thorin, Balin).
+  - Game of Thrones: Casa Stark (Ned, Jon Snow, Arya), Casa Lannister (Tywin, Jaime, Cersei), Casa Targaryen (Daenerys, Viserys, Rhaegar), Casa Baratheon (Robert, Stannis, Renly), Patrulha da Noite (Jeor Mormont, Samwell, Benjen), Caminhantes Brancos (Rei da Noite, Caminhante Branco, Viserion).
+  - Mitologia Grega: Deuses do Olimpo (Zeus, Poseidon, Hades), Heróis (Héracles, Perseu, Aquiles), Titãs (Cronos, Atlas, Prometeu), Monstros (Medusa, Minotauro, Hidra).
+  - Mitologia Egípcia: Deuses de Heliópolis (Rá, Osíris, Ísis), Deuses do Submundo (Anúbis, Set, Néftis), Protetores (Hórus, Thoth, Bastet), Criaturas (Ammit, Apep, Esfinge).
+- **Interpretações que precisaram ser feitas (decididas pelo agente):** a terceira equipe dos Caminhantes Brancos ficou o dragão morto Viserion (não há um trio nomeado na série); os rivais declarados giram em torno do vilão central de cada pack (Hades, Mordor, Lannister/Caminhantes, Titãs/Monstros, Submundo/Criaturas) para fechar os clássicos herói × vilão; as cores vêm das armaduras, dos reinos e dos brasões das histórias, só nomes e cores, nenhuma imagem.
+- **Não verificado:** equipes, nomes e rivais vieram da memória do agente (24/10/2026), sem conferir na web.
+
 ## Pendências
 
 | Pendência | Quem resolve |
