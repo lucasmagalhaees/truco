@@ -120,7 +120,7 @@ with sync_playwright() as p:
     assert S()['team'] == 'futebol/flamengo' and top_bg() == 'rgb(200, 16, 46)', top_bg()
     # the direct rival comes in with the team (D16): Flamengo brings Fluminense, and the sentence says it
     assert S()['rival'] == 'futebol/fluminense' and S()['rivalAuto'] is True, S().get('rival')
-    assert 'Pedro' in txt('#squad') and 'Você e Pedro (Flamengo) contra Germán Cano e Ganso (Fluminense, rival direto)' in full_lineup(), full_lineup()
+    assert 'Pedro' in txt('#squad') and 'Você e Pedro (Flamengo) contra Hulk e Germán Cano (Fluminense, rival direto)' in full_lineup(), full_lineup()
     assert 'Fluminense (rival direto)' in txt('#steps'), txt('#steps')
     pg.go_back(); pg.wait_for_selector('#panel[data-route="ajustes"]')          # choosing took the screens on the way off the history: back is the tab before
     pg.go_forward(); pg.wait_for_selector('#panel[data-route="equipe"]')
