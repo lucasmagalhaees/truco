@@ -92,7 +92,7 @@ function playMine(g: Game, k: number): void {
   ui.busy = true; lift(k);
   later(() => { ui.busy = false; play(Core.playCard(g, 0, k)); }, 180);
 }
-function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
+function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = kind === 'play' ? Core.playDrill(rand) : Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
 function guess(v: string): void {
   if (!ui.drill || ui.picked !== null) return;
   ui.picked = v;

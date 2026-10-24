@@ -183,6 +183,24 @@ export default function cases(Core) {
     if (w === -1) ties++;
   }
   eq('drill round: 200 drills, each answer right, with many suit duels and some ties', [ok, duels > 60, ties > 20], [true, true, true]);
+  // "which card to play": the learner is seat 0 and last to play, so the round is settled by their card. The best card
+  // is rule-decidable: the cheapest card that takes the round for their pair, or the weakest when none can. Checked
+  // here independently of what playDrill claims, over 200 drills, with both outcomes well represented.
+  let pOk = true, canWin = 0, cannot = 0;
+  for (let s = 1; s <= 200; s++) {
+    const d = Core.playDrill(Core.seeded(s * 13 + 1)), me = d.seat, table = d.plays, hand = d.options, vira = d.vira;
+    const cards = [...table.map(p => p.card), ...hand, vira], distinct = new Set(cards).size === cards.length;
+    const outcome = c => Core.roundWinner([...table, { seat: me, card: c }], vira);
+    const mine = Core.teamOf(me), pw = c => Core.power(c, vira);
+    const wins = c => { const w = outcome(c); return w !== -1 && Core.teamOf(w) === mine; };
+    const winners = hand.filter(wins);
+    let best;                                                        // the rule, computed from scratch
+    if (winners.length) { const lo = Math.min(...winners.map(pw)), cheap = winners.filter(c => pw(c) === lo); best = cheap.length === 1 ? cheap[0] : null; }
+    else { const lo = Math.min(...hand.map(pw)), weak = hand.filter(c => pw(c) === lo); const noTie = d.rounds.length > 0 || !hand.some(c => outcome(c) === -1); best = weak.length === 1 && noTie ? weak[0] : null; }
+    pOk = pOk && me === 0 && distinct && hand.length === 3 - d.rounds.length && hand.includes(d.answer) && d.why.length > 10 && best !== null && d.answer === best && Core.drillOk(d, d.answer) && !Core.drillOk(d, 'x');
+    if (winners.length) canWin++; else cannot++;
+  }
+  eq('drill play: 200 drills, the marked card is the best by rule (cheapest winner, or the weakest when none wins)', [pOk, canWin > 40, cannot > 30], [true, true, true]);
 
   /* the real table */
   let rt = Core.emptyTable();

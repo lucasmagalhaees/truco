@@ -150,7 +150,7 @@ function screenOf(r: string[]): Screen {
     if (r[1] === 'regras') return { title: 'Como joga', body: vRules(), depth: 2 };
     return { title: 'Treinar', depth: 1, body: `<section class="card" id="train">
     <p>Exercícios rápidos pra ver na hora o que manda na mesa.</p>
-    <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button></div>
+    <div class="pick"><button class="btn ghost" data-act="drill" data-k="manilha">Qual é a manilha?</button><button class="btn ghost" data-act="drill" data-k="round">Quem ganha a rodada?</button><button class="btn ghost" data-act="drill" data-k="play">Qual carta jogar?</button></div>
     <p class="hint" id="trainstats">${tr.total ? `Acertos: ${tr.ok} de ${tr.total} (${Math.round(100 * tr.ok / tr.total)}%). Melhor sequência: ${tr.best}.` : 'Nenhum exercício feito ainda.'}</p></section>
     <nav class="entries">${entry('treinar/ranking', 'Ranking da vira', 'Escolha a vira e veja da mais forte pra mais fraca')}${entry('treinar/glossario', 'Glossário', 'Zap, espadilha, cangar, mão de ferro…')}${entry('treinar/regras', 'Como joga', 'As regras do truco paulista')}</nav>` };
   }
@@ -355,15 +355,24 @@ function vDrill(d: Drill): string {
   if (d.kind === 'manilha') {
     body = `<p class="big">Vira na mesa. Qual valor é a manilha?</p><div class="vira-big">${face(d.vira)}</div>
       <div class="pick four">${d.options.map(o => `<button class="btn ghost opt${cls(o)}" data-act="guess" data-v="${o}"${done ? ' disabled' : ''}>${o}</button>`).join('')}</div>`;
-  } else {
+  } else if (d.kind === 'round') {
     body = `<p class="big">Quem ganha esta rodada?</p><div class="drill-row"><span class="vira-mini">Vira ${face(d.vira)}</span></div>
       <div class="drill-plays">${d.plays.map(p => `<button class="dp t${Core.teamOf(p.seat)}${cls(p.card)}" data-act="guess" data-v="${p.card}"${done ? ' disabled' : ''}><small>${name(p.seat)}</small>${face(p.card)}</button>`).join('')}</div>
       <button class="btn ghost block opt${cls('empate')}" data-act="guess" data-v="empate"${done ? ' disabled' : ''}>Empate (cangou)</button>`;
+  } else {
+    // which card to play: the three cards on the table (the learner is the pé, last to play), then their own hand to pick from
+    const stand = d.rounds && d.rounds.length ? '<span class="vira-mini">Perdendo 0 a 1</span>' : '';
+    body = `<p class="big">Sua vez (você é o pé). Qual carta jogar?</p>
+      <div class="drill-row"><span class="vira-mini">Vira ${face(d.vira)}</span>${stand}</div>
+      <div class="drill-plays">${d.plays.map(p => `<span class="dp t${Core.teamOf(p.seat)}"><small>${name(p.seat)}</small>${face(p.card, d.vira, true)}</span>`).join('')}</div>
+      <p class="hint" style="text-align:center">Sua mão:</p>
+      <div class="drill-plays">${d.options.map(c => `<button class="dp t0${cls(c)}" data-act="guess" data-v="${c}"${done ? ' disabled' : ''}><small>Você</small>${face(c, d.vira, true)}</button>`).join('')}</div>`;
   }
   const verdict = done ? `<div class="verdict ${ui.picked === d.answer ? 'ok' : 'no'}" id="verdict"><b>${ui.picked === d.answer ? 'Isso!' : 'Não foi dessa vez.'}</b> ${esc(d.why)}</div>` : '';
-  return `<section class="card${ui.picked === null ? ' enter' : ''}" id="drill"><span class="label">Treino · ${d.kind === 'manilha' ? 'manilha' : 'rodada'} · sequência de ${ui.streak}</span>${body}${verdict}
+  const kindLabel = d.kind === 'manilha' ? 'manilha' : d.kind === 'round' ? 'rodada' : 'carta';
+  return `<section class="card${ui.picked === null ? ' enter' : ''}" id="drill"><span class="label">Treino · ${kindLabel} · sequência de ${ui.streak}</span>${body}${verdict}
     <div class="pick">${done ? `<button class="btn" data-act="drill" data-k="${d.kind}">Próxima</button>` : ''}<button class="btn ghost" data-act="home">Voltar</button></div></section>
-    ${d.kind === 'round' && done ? `<section class="card"><span class="label">Ranking com esta vira</span>${vRanking(d.vira, 'drillrank')}</section>` : ''}`;
+    ${(d.kind === 'round' || d.kind === 'play') && done ? `<section class="card"><span class="label">Ranking com esta vira</span>${vRanking(d.vira, 'drillrank')}</section>` : ''}`;
 }
 
 /* ---------- the game ---------- */
