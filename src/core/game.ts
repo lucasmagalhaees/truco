@@ -631,8 +631,8 @@ export function aiAct(g: Game, rand: () => number): Game {
    Short drills for what a player has to see at once: which rank is the manilha with this vira (the sequence), and who
    takes a round (manilhas met: the suit decides; equal ranks of the two pairs: it ties). Each drill knows its answer and
    explains it. */
-export type DrillKind = 'manilha' | 'round';
-export interface Drill { kind: DrillKind; vira: Card; plays: Play[]; options: string[]; answer: string; why: string }
+export type DrillKind = 'manilha' | 'round' | 'play';
+export interface Drill { kind: DrillKind; vira: Card; plays: Play[]; options: string[]; answer: string; why: string; seat?: Seat; rounds?: RoundResult[] }
 /** Whether an answer to a drill is right. */
 export const drillOk = (d: Drill, a: string): boolean => d.answer === a;
 /** A drill. 'manilha': the options are ranks. 'round': the options are the four cards played, and "empate". */
@@ -666,4 +666,47 @@ export function drill(kind: DrillKind, rand: () => number): Drill {
     : isManilha(plays[w].card, vira) ? `${cardSay(plays[w].card, vira)} é a única manilha: ganha de qualquer outra carta.`
     : `Sem manilha na mesa, vale a sequência 4 5 6 7 Q J K A 2 3: ${cardName(plays[w].card)} é a mais alta.`;
   return { kind, vira, plays, options, answer, why };
+}
+
+/** A "which card to play" drill. The learner is seat 0 and the last to play in the round (the pé), so the card they
+ *  choose settles the round on its own: the best move is rule-decidable, not a matter of opinion. Either the round is
+ *  the first one (three cards in hand) or the pair lost the first and must win this one to stay in the hand (two cards).
+ *  The best card is the cheapest card that makes the pair take the round (when any does: killing an opponent's card
+ *  without overpaying, or dumping the weakest when the partner already leads), and the weakest card when none can (the
+ *  round is lost either way). Only situations with a single clearly-best card are generated; it is kept in `answer`. */
+export function playDrill(rand: () => number): Drill {
+  const me: Seat = 0, t = teamOf(me);
+  const d = shuffle(deck(), rand), vira = d[0], rest = d.slice(1);
+  const round2 = rand() < 0.4;                                      // round 2, a round down (0-1): must win this one
+  const rounds: RoundResult[] = round2 ? [other(t)] : [];
+  const hs = HAND_SIZE - rounds.length;                            // three cards in round 1, two in round 2
+  const plays: Play[] = [1, 2, 3].map((seat, i) => ({ seat, card: rest[i] }));   // seats 1, 2, 3 already played; 2 is the partner
+  const hand = rest.slice(3, 3 + hs);
+  const pw = (c: Card): number => power(c, vira);
+  const outcome = (c: Card): Seat | -1 => roundWinner([...plays, { seat: me, card: c }], vira);
+  const wins = (c: Card): boolean => { const w = outcome(c); return w !== -1 && teamOf(w) === t; };
+  const winners = hand.filter(wins);
+  let answer: Card;
+  if (winners.length) {
+    const lo = Math.min(...winners.map(pw)), cheap = winners.filter(c => pw(c) === lo);
+    if (cheap.length !== 1) return playDrill(rand);                 // a single clearly-best card only
+    answer = cheap[0];
+  } else {
+    // no card wins: in round 1 a tie (0-0) would beat a loss (0-1), so skip those; in a round down a tie loses the hand too
+    if (!round2 && hand.some(c => outcome(c) === -1)) return playDrill(rand);
+    const lo = Math.min(...hand.map(pw)), weak = hand.filter(c => pw(c) === lo);
+    if (weak.length !== 1) return playDrill(rand);
+    answer = weak[0];
+  }
+  const topCard = plays.map(p => p.card).sort((a, b) => pw(b) - pw(a))[0], lead = roundWinner(plays, vira);
+  const partnerCard = (plays.find(p => p.seat === partnerOf({}, me)) as Play).card;
+  const down = rounds.length ? 'Vocês perderam a 1ª rodada, então precisam ganhar esta. ' : '';
+  const why = !winners.length
+    ? `${down}Nenhuma carta sua ganha esta rodada: a mais forte na mesa é ${cardSay(topCard, vira)}, da dupla deles, e você não bate. Jogue a mais fraca, ${cardSay(answer, vira)}, e guarde o resto.`
+    : lead !== -1 && teamOf(lead) === t
+    ? `${down}Sua dupla já está ganhando a rodada com ${cardSay(partnerCard, vira)}. Não gaste carta forte à toa: jogue a mais fraca, ${cardSay(answer, vira)}, e guarde as boas pra depois.`
+    : lead === -1
+    ? `${down}Na mesa as mais fortes empataram (${cardSay(topCard, vira)}). ${cardSay(answer, vira)} é a carta mais barata da sua mão que ganha das duas: leva a rodada sem gastar à toa.`
+    : `${down}A mais forte na mesa é ${cardSay(topCard, vira)}, da dupla deles. ${cardSay(answer, vira)} é a carta mais barata da sua mão que ganha dela: mata a carta e leva a rodada, sem gastar manilha à toa.`;
+  return { kind: 'play', vira, plays, options: hand, answer, why, seat: me, rounds };
 }
