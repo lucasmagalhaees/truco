@@ -1,5 +1,5 @@
 import { Core } from '../core';
-import type { Card, Drill, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
+import type { Card, Drill, Flavor, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
 import { S, applyClub, table, TABS, ui } from './state';
 import type { Tab } from './state';
@@ -417,7 +417,7 @@ function vTable(g: Game, fresh: boolean, glow: boolean): string {
   const T = Core.teamsOf(g), lead = g.table.length ? Core.roundWinner(g.table, g.vira, T) : -2;
   const slots = showing.map((p, i) => {
     const isNew = fresh && i === showing.length - 1;
-    return `<div class="slot ${posOf(g, p.seat)}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
+    return `<div class="slot t${Core.teamOf(p.seat, T)} ${posOf(g, p.seat)}${isNew ? ' fly' : ''}${old && !glow ? ' old' : ''}${p.seat === win ? ` won${glow ? ' glow' : ''}` : ''}${hints() && p.seat === lead ? ' lead' : ''}">${face(p.card, g.vira, hints())}</div>`;
   }).join('');
   return `<section class="felt${T === 3 ? ' six' : ''}" id="table">${(T === 3 ? [3, 4, 2, 5, 1] : [2, 3, 1]).map(s => vSeat(g, s)).join('')}
     <div class="center" id="center">${slots}</div>
@@ -512,19 +512,23 @@ function vSettings(): string {
 
 /* ---------- moments ---------- */
 let stampTimer: ReturnType<typeof setTimeout> | undefined;
-/** A word stamped over the screen for a moment: a raise, a run, a bluff caught. */
-export function stamp(text: string, team: Team | null, sub = ''): void {
+/** A word stamped over the screen for a moment: a raise, a run, a bluff caught. The theme's flavour (D21) adds a small
+ *  accent on some categories (a fighting-game tremor, a Sonic streak, an ink splat for anime/film); abstract, in the
+ *  side's own colour, and off under reduced motion like every other animation. */
+export function stamp(text: string, team: Team | null, sub = '', flavor: Flavor = 'neutro'): void {
   const s = part('stamp');
-  s.textContent = text; s.className = `stamp t${team ?? 'x'}`; s.hidden = false;
+  s.textContent = text; s.className = `stamp t${team ?? 'x'} fx-${flavor}`; s.hidden = false;
   if (sub) { const who = document.createElement('small'); who.textContent = sub; s.append(who); }       // who said it, under the word
   void s.offsetWidth; s.classList.add('go');            // restart the animation even when it is the same word again
   clearTimeout(stampTimer); stampTimer = setTimeout(() => { s.hidden = true; }, 1100);
 }
-/** Confetti in the colours of the pair that won. */
-export function confetti(winner: Team): void {
+/** Confetti in the colours of the pair that won, with the theme's flavour (D21): football bunting, flames, speed
+ *  streaks, water drops, impact sparks, gold coins or ink splats — abstract shapes only, no logo or image. */
+export function confetti(winner: Team, flavor: Flavor = 'neutro'): void {
   const c = part('confetti');
-  c.innerHTML = Array.from({ length: 48 }, (_, i) => `<i class="t${winner}" style="left:${(i * 37) % 100}%;animation-delay:${(i % 12) * 0.08}s;animation-duration:${1.6 + (i % 5) * 0.25}s;--r:${(i * 53) % 360}deg"></i>`).join('');
-  setTimeout(() => { c.innerHTML = ''; }, 4200);
+  c.className = `confetti fx-${flavor} t${winner}`;
+  c.innerHTML = Array.from({ length: 48 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 12) * 0.08}s;animation-duration:${1.6 + (i % 5) * 0.25}s;--r:${(i * 53) % 360}deg"></i>`).join('');
+  setTimeout(() => { c.innerHTML = ''; c.className = 'confetti'; }, 4200);
 }
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 /** A short message at the bottom of the screen. */
