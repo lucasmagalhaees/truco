@@ -3,6 +3,7 @@ import { DESERVE, FAIR_BASE, bluffOdds, extremeBluff, EXTREME_BLUFF, bluffRate, 
 import { advise, emptyTable, hear, nextRound, tableSay, tell, untell } from './assist';
 import { aiDelay, aiStep, allow, CLOSE_BIG, CLOSE_FAST, CODE_LEN, CONN_MAX, MSG_MAX, newBucket, RATE_BURST, RATE_PER_S, roomFull, tooBig, handle, isCode, newRoom, readMsg, readRoom, FORMATS, SUPPORTS_THREE, ROOM_GONE, ROOM_HAND_PAUSE, ROOM_ROUND_PAUSE, ROOM_THINK, roomCode, SEAT_GONE, roomView, swapSides, viewFor } from './online';
 import { readGame, readReal, readState } from './save';
+import { afterGame, bumpH2h, emptyStats, H2H_MAX, h2hKey, h2hOf, statsTotal } from './stats';
 import { accentOn, charById, COLOR_BY, colorsOf, contrast, DEFAULT_NAMES, kinds, lineup, packById, PACKS, playersOf, qualify, teamById, packTeams, TEAMS, TEAMS_CHECKED, suggestRivals, RIVALS_MAX } from './teams';
 import { normEntries, normEntry } from './source';
 
@@ -17,7 +18,8 @@ export const Core = {
   TEAMS, TEAMS_CHECKED, DEFAULT_NAMES, teamById, playersOf, lineup, PACKS, kinds, packById, packTeams, charById, qualify, colorsOf, contrast, accentOn, COLOR_BY, suggestRivals, RIVALS_MAX,
   viewFor, swapSides, newRoom, roomCode, isCode, CODE_LEN, handle, roomView, aiDelay, aiStep, readMsg, readRoom, ROOM_THINK, ROOM_ROUND_PAUSE, ROOM_HAND_PAUSE, ROOM_GONE, SEAT_GONE, FORMATS, SUPPORTS_THREE,
   MSG_MAX, RATE_BURST, RATE_PER_S, CONN_MAX, CLOSE_BIG, CLOSE_FAST, newBucket, allow, tooBig, roomFull,
-  readGame, readReal, readState, normEntry, normEntries
+  readGame, readReal, readState, normEntry, normEntries,
+  H2H_MAX, h2hKey, h2hOf, bumpH2h, emptyStats, afterGame, statsTotal
 };
 export type * from './types';
 export type { Answer, Drill, DrillKind } from './game';

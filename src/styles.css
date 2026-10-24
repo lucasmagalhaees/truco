@@ -453,6 +453,12 @@ body.tabbed .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
 .chev{flex:none;font-size:26px;line-height:1;color:var(--muted)}
 .item.on{background:var(--bg)}
 .tick{flex:none;font-weight:800;color:var(--accent)}
+/* a neutral record pill (D22): the matchup's head-to-head, never in a team's colours */
+.pastilha{flex:none;font:700 13px/1 var(--display);padding:4px 8px;border-radius:999px;background:var(--bg);color:var(--muted);border:1px solid var(--cardline)}
+.h2h{display:inline-block;margin-top:4px;color:var(--fg);font-weight:600}
+.statlist{list-style:none;display:flex;flex-direction:column;gap:6px;margin:4px 0;padding:0;font-size:15px}
+.statlist li{display:flex;justify-content:space-between;gap:12px}
+.statlist li span{color:var(--muted)}
 .entry:focus-visible,.item:focus-visible{outline:3px solid var(--accent-bg);outline-offset:-3px}
 /* a team's colours, small: the only place they show in the lists */
 .sw{flex:none;width:10px;align-self:stretch;min-height:28px;border-radius:999px;background:linear-gradient(var(--a) 0 55%,var(--b) 55%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}

@@ -502,6 +502,39 @@ export default function cases(Core) {
     eq('online: a room at the extreme level plays its game at that level on the server', [r.level, r.game.level, steps > 10], ['extremo', 'extremo', true]);
   }
   }
+  /* head-to-head and statistics (D22) */
+  eq('h2h: the key is the same whichever way round the two teams come', Core.h2hKey('futebol/flamengo', 'futebol/vasco') === Core.h2hKey('futebol/vasco', 'futebol/flamengo'), true);
+  {
+    let h = Core.bumpH2h(undefined, 'futebol/flamengo', 'futebol/vasco', true);
+    h = Core.bumpH2h(h, 'futebol/vasco', 'futebol/flamengo', false);        // same matchup, the other way round
+    h = Core.bumpH2h(h, 'futebol/flamengo', 'futebol/vasco', true);
+    eq('h2h: wins and losses add up on one symmetric record, from the person\'s side', [Core.h2hOf(h, 'futebol/flamengo', 'futebol/vasco'), Object.keys(h).length], [{ w: 2, l: 1 }, 1]);
+    eq('h2h: a matchup never met is null', Core.h2hOf(h, 'futebol/flamengo', 'futebol/santos'), null);
+    // the limit: more than H2H_MAX matchups keeps the most recent ones, the oldest dropped
+    let many = {};
+    const teams = Core.TEAMS;
+    for (let i = 1; i <= Core.H2H_MAX + 5; i++) many = Core.bumpH2h(many, teams[0].id, teams[i].id, true);
+    eq('h2h: never more than H2H_MAX matchups kept, the first ones dropped', [Object.keys(many).length, Core.h2hOf(many, teams[0].id, teams[1].id), !!Core.h2hOf(many, teams[0].id, teams[Core.H2H_MAX + 5].id)], [Core.H2H_MAX, null, true]);
+  }
+  {
+    let s = Core.emptyStats();
+    s = Core.afterGame(s, 'dificil', true);
+    s = Core.afterGame(s, 'dificil', true);
+    s = Core.afterGame(s, 'facil', false);                                  // a loss resets the streak but keeps the best
+    s = Core.afterGame(s, 'dificil', true);
+    eq('stats: wins and losses by level, the streak and the best', [s.level.dificil, s.level.facil, s.streak, s.best], [{ w: 3, l: 0 }, { w: 0, l: 1 }, 1, 2]);
+    eq('stats: the total adds the levels up', Core.statsTotal(s), { w: 3, l: 1 });
+  }
+  // the saved state reads h2h and stats back, dropping junk, and an old state without them still opens
+  {
+    const good = { v: 1, h2h: { 'futebol/flamengo|futebol/vasco': { w: 3, l: 1 }, 'lixo': { w: 1, l: 0 }, 'futebol/x|futebol/y': { w: 1, l: 1 } }, stats: { level: { dificil: { w: 2, l: 1 }, nope: { w: 9, l: 9 } }, paid: 4, ran: 7, streak: 5, best: 3 } };
+    const st = Core.readState(good);
+    eq('save: h2h keeps only well-formed matchups', [Object.keys(st.h2h), Core.h2hOf(st.h2h, 'futebol/flamengo', 'futebol/vasco')], [['futebol/flamengo|futebol/vasco'], { w: 3, l: 1 }]);
+    eq('save: stats keep known levels and clamp the streak to the best', [st.stats.level, st.stats.paid, st.stats.ran, st.stats.best, st.stats.streak], [{ dificil: { w: 2, l: 1 } }, 4, 7, 3, 3]);
+    const old = Core.readState({ v: 1, tally: { w: 2, l: 1 } });
+    eq('save: an old state without h2h or stats opens, with neither field', [old.h2h, old.stats, old.tally], [undefined, undefined, { w: 2, l: 1 }]);
+  }
+
   eq('source: an entry read', Core.normEntry({ id: 7, name: ' Um ', value: '2.5', extra: true }), { id: '7', name: 'Um', value: 2.5 });
   eq('source: what is not an entry reads as null', [null, 'x', {}, { id: 1 }, { id: 1, name: 'x', value: 'abc' }, { name: 'x', value: 1 }].map(Core.normEntry), [null, null, null, null, null, null]);
   eq('source: a list, leaving out what cannot be read', [Core.normEntries({ items: [{ id: 1, name: 'a', value: 1 }, { id: 2 }] }), Core.normEntries({}), Core.normEntries(null)], [[{ id: '1', name: 'a', value: 1 }], [], []]);

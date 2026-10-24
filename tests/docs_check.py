@@ -67,6 +67,7 @@ CONSTANTS = [
     (r'export const CLOSE_BIG = 1009, CLOSE_FAST = 1008;', 'passou disso fecha com 1008'),
     (r"export const ROOM_SERVER = 'wss://truco-salas.lucasbarbosa1738.workers.dev';", 'O endereço dele é `wss://truco-salas.lucasbarbosa1738.workers.dev` (`ROOM_SERVER` no `vite.config.js`)'),
     (r"export const SEATS = \['Você', 'Biu', 'Cida', 'Toinho'\];", 'Você e Cida contra Biu e Toinho (`SEATS`)'),
+    (r'export const H2H_MAX = 50;', 'só os N confrontos mais recentes, com N em `H2H_MAX`, 50'),
 ]
 for pattern, phrase in CONSTANTS:
     check(f'code has {pattern}', re.search(pattern, code + read('src/sw.js') + read('vite.config.js')) is not None)

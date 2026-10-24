@@ -244,6 +244,20 @@ Modelo de uma decisão:
 - **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
 - **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
 
+## D22. Histórico por confronto, revanche e estatísticas
+
+- **Contexto (24/10/2026, pedido do Lucas):** guardar o retrospecto de cada confronto equipe contra equipe e mostrá-lo nos resumos e no fim de jogo; botões de revanche e de próximo rival no fim da partida; uma tela de números (vitórias por nível, blefe pago, corridas, melhor sequência).
+- **Decisão:**
+  - **Histórico (h2h):** `S.h2h`, um mapa por chave simétrica dos dois ids `pack/equipe` (`h2hKey`, ordena os dois), com `{ w, l }` sempre do lado da pessoa (seat 0). Conta ao fim de cada partida só num aparelho e só com `S.team` e `S.rival` definidos (sem equipe, mesa de bar e online não contam). Guarda só os `H2H_MAX` (50) confrontos mais recentes (a ordem de inserção do objeto é a recência; o mais antigo sai). Mostrado no resumo da aba Jogar e da aba Equipe ("Flamengo x Fluminense: 3 a 1 pra você"), numa pastilha neutra "3–1" ao lado de cada equipe na escolha da adversária, e no fim de jogo ("Agora 4 a 1 no clássico contra Fluminense" — "no clássico" quando é rival sugerido, senão "no retrospecto").
+  - **Revanche:** o fim de jogo (num aparelho) tem "Revanche" (as mesmas equipes e o mesmo nível, começa na hora — é o `again` de antes, renomeado) e, só com equipe e rival sugerido, "Próximo rival" (passa `S.rival` para o próximo de `suggestRivals` e começa). "Avançar sozinho" segue valendo só para a mão; começar outra partida é sempre um toque.
+  - **Números:** `S.stats` com vitórias e derrotas por nível, `paid` (blefe pago: você aceitou um pedido que a IA fez blefando, `ask.bluff`), `ran` (vezes que você correu de um pedido), `streak` e `best` (a melhor sequência de vitórias). Contados de verdade: o nível e a sequência no fim da partida, o blefe pago e a corrida na hora em que você responde um pedido de um adversário (só num aparelho, mesa de 4). A tela fica em Jogar → Números.
+  - As funções puras (`h2hKey`, `h2hOf`, `bumpH2h`, `emptyStats`, `afterGame`, `statsTotal`) ficam em `src/core/stats.ts`, com os tipos em `src/core/types.ts` (`WL`, `H2H`, `Stats`). A leitura segura está em `readState` (`src/core/save.ts`): estado antigo sem os campos abre, e chave ou registro que não fecha é descartado.
+- **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
+  - "Blefe pago" lido como aceitar um pedido que a IA de fato marcou como blefe (`ask.bluff`), e não uma análise retroativa da mão; "correr" é qualquer corrida sua de um pedido do adversário.
+  - O limite de 50 confrontos e a chave simétrica (o retrospecto não distingue qual lado você jogou: `w` são sempre as suas vitórias).
+  - A tela ficou em Jogar (entrada "Números"), não nos Ajustes.
+- **Não verificado:** jogado por uma pessoa de verdade (só pela tela nos testes).
+
 ## Pendências
 
 | Pendência | Quem resolve |
