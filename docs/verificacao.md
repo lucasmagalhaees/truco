@@ -6,6 +6,7 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 
 | Afirmação | Como | Quando |
 |---|---|---|
+| D21, efeitos por tema: `flavorOf` resolve cada pack, equipe e personagem para um flavor conhecido, pelo `fx` ou pela categoria, e neutro para id desconhecido ou sem tema (casos puros). Pela tela, nos dois temas: o fim de jogo mostra o confete com a classe `fx-<flavor>` certa (um tema de cada categoria e a mesa de bar: futebol, fogo, velocidade, moedas, luta, água, tinta, neutro), com peças na tela, sem estouro de largura e sem erro de script; o brilho da carta jogada anima (`cardGlow`); com movimento reduzido o carimbo e o confete não animam (o confete fica escondido) | `node tests/core.mjs`, `python3 tests/unit.py`, `python3 tests/e2e.py dark` e `light`; capturas `e11-confete-*` | 24/10/2026 |
 | As regras (força das cartas, naipe, cangada, mão, pedidos, mão de onze e de ferro, fim de jogo), as IAs dos três níveis, o treino, o assistente da mesa real e o estado salvo passam nos casos sem página | `node tests/core.mjs` | 14/10/2026 |
 | Partidas IA contra IA terminam em todos os níveis, sem travar, e o estado de cada passo é lido de volta | simulação de 6.000 partidas com o núcleo (D3) | 14/10/2026 |
 | A página gerada passa nos mesmos casos | `python3 tests/unit.py` | 14/10/2026 |
@@ -40,6 +41,7 @@ O que foi verificado, como e quando; e o que não foi. Um item só entra em "Ver
 
 | Afirmação | Por que não | Como verificar |
 |---|---|---|
+| Se os efeitos por tema (D21) ficam bons num aparelho de verdade: o confete, o sotaque do carimbo, o brilho da carta e o pulso do placar, claro e escuro | Os testes conferem a classe, as peças, a largura e que não anima com movimento reduzido no Chromium; ninguém olhou num celular | Jogar uma partida de cada categoria (futebol, anime, jogo, filme) até vencer e ver o confete; pedir truco e ver o carimbo |
 | O reconhecimento de voz entendendo cartas faladas | Os testes leem texto; ninguém falou no microfone ainda | Abrir a mesa real no celular, tocar em "Falar a carta" e dizer "vira sete de copas" |
 | A partida inteira na janela sem rolar num iPhone de verdade (D19), com a barra do Safari aparecendo e sumindo | Os testes medem no Chromium do Playwright | Abrir a produção no iPhone (Safari e Tela de Início), começar uma partida e esperar um truco do Biu: a vira, a mão e os botões à vista sem rolar |
 | O service worker no Safari do iPhone e no app instalado na Tela de Início | Os testes rodam no Chromium | Abrir a produção no iPhone, ligar o modo avião e abrir de novo |
