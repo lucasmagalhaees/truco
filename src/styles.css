@@ -392,7 +392,11 @@ body.ingame .status .dots i{width:10px;height:10px;border-width:1.5px}
 body.ingame .matchup{font-size:12px}
 body.ingame main .wrap>.tablebox{flex:1 1 auto;min-height:0;max-height:640px;position:relative;display:flex}
 body.ingame .felt{flex:1;min-height:0;min-width:0;padding:6px 4px;gap:2px;border-width:6px;border-radius:22px}
-body.ingame .felt.six{min-height:0}
+/* three pairs (requisito 21): six seats cluster toward the middle so the two bottom ones clear the docked card, and the
+   whole table stays within the window as the four-seat one does (D24) */
+body.ingame .felt.six{min-height:0;grid-template-rows:auto auto auto auto;align-content:center;gap:1px}
+body.ingame .felt.six .seat .who{font-size:12px;padding:3px 7px}
+body.ingame .felt.six .backs .pc{--w:clamp(13px,2.4vh,22px);--w:clamp(13px,2.4dvh,22px)}
 body.ingame .center,body.ingame .felt.six .center{min-height:0;row-gap:0}
 body.ingame .seat{gap:2px}
 body.ingame .seat .who{font-size:13px;padding:4px 8px}
