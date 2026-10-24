@@ -350,6 +350,25 @@ with sync_playwright() as p:
     g = G(); assert g['phase'] == 'handEnd' and g['score'][1] == 1 and 'Era blefe!' in txt('#shown') and pg.locator('#shown .pc').count() == 3, g['result']
     assert overflow() == 0; shot(f'e5-blefe-{THEME}.png')
 
+    # ---------- three pairs (six seats): the table fits too, with a raise open (requisito 21, D24) ----------
+    # a game of three pairs, stacked so it starts with a truco asked of you; the vira, your whole hand and the three
+    # answer buttons must be inside the window, nothing scrolls, and the three-number score must not overflow the width
+    pg.evaluate('''(g) => { const a = window.__APP;
+      const base = a.Core.newGame(a.Core.seeded(1), "medio", { names: a.Core.SEATS6, sides: [null, null], humans: [0], teams: 3 });
+      a.S.game = { ...base, log: [], ...g };
+      localStorage.setItem("truco.v1", JSON.stringify(a.S)); }''', {
+        'vira': '4o', 'dealer': 5, 'starter': 0, 'turn': 0, 'phase': 'truco', 'value': 1,
+        'hands': [['5c', '4e', '6o'], ['5p', '4c', '6e'], ['Ke', '7o', 'Qe'], ['Jo', 'Jc', '6c'], ['Ap', 'Ao', '2c'], ['3o', '3e', '3c']],
+        'ask': {'by': 1, 'value': 3, 'wait': [0, 2]}})
+    reload(); pg.evaluate('window.__APP.ui.wait = 1e6'); pg.wait_for_selector('.felt.six')
+    g = G(); assert g['phase'] == 'truco' and pg.evaluate('window.__APP.Core.whoActs(window.__APP.S.game)') == 0, g['phase']
+    assert pg.locator('#score .chip').count() == 3, ('three numbers on the score', txt('#score'))
+    for w, h in ((393, 852), (360, 640)):
+        pg.set_viewport_size({'width': w, 'height': h}); pg.wait_for_timeout(50)
+        assert pg.evaluate(FIT) == [], ('six seats fit', w, h, pg.evaluate(FIT))
+        assert overflow() == 0, ('six seats width', w, h); shot(f'e11-seis-cabe-{w}x{h}-{THEME}.png')
+    pg.set_viewport_size({'width': 393, 'height': 852})
+
     # ---------- raises back and forth: you truco, Biu (a monster) asks seis, you nove, he doze; you run, they take 9 ----------
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['3o', '2e', 'Ac'], ['5p', '5c', '3e'], ['Ke', '7c', 'Jc'], ['Jo', '4c', '6c']]})
     pg.click('[data-act=truco]'); settle(); g = G()
@@ -439,7 +458,9 @@ with sync_playwright() as p:
     cov.start(mp)
     mp.goto((ROOT / 'dist' / 'index.html').as_uri()); mp.wait_for_function('window.__APP && window.__APP.S'); mp.evaluate('window.__APP.ui.wait = 1e6')
     mp.click('[data-act=new]'); assert mp.locator('#hand .hc.deal').count() == 3, 'a new hand is dealt in a fan'
-    mp.evaluate('''() => { const a = window.__APP; Object.assign(a.S.game, { vira: "4o", starter: 0, turn: 0, phase: "play", hands: [["5c", "4e", "6o"], ["5p", "4c", "6e"], ["Ke", "7o", "Qe"], ["Jo", "Jc", "6c"]] }); a.ui.wait = 20; }''')
+    # a themed table (a fighting game): the "TRUCO!" fires with its flavour (D24), with sound on, so the synth is
+    # exercised flavoured and must not throw (checked by merrs at the end)
+    mp.evaluate('''() => { const a = window.__APP; Object.assign(a.S.game, { vira: "4o", starter: 0, turn: 0, phase: "play", sides: ["street-fighter/shotokan", "street-fighter/shadaloo"], hands: [["5c", "4e", "6o"], ["5p", "4c", "6e"], ["Ke", "7o", "Qe"], ["Jo", "Jc", "6c"]] }); a.ui.wait = 20; }''')
     mp.evaluate('Math.random = () => 0.99')                      # the same chance every run: Biu (zap in hand) accepts the truco
     mp.click('[data-act=end]')                                    # a repaint with nothing new: the hand is not dealt again
     assert mp.locator('#hand .hc.deal').count() == 0

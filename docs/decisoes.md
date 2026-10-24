@@ -244,6 +244,14 @@ Modelo de uma decisão:
 - **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
 - **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
 
+## D24. Som por tema e a mesa de 6 cabendo na tela
+
+- **Contexto (24/10/2026, pedido do Lucas):** dar sabor ao som por tema — variar o "TRUCO!"/pedido, o ponto e a fanfarra do fim conforme o tema do lado de quem agiu (mais pesado nos jogos de luta, um blip rápido no Sonic) — e garantir que a partida de 3 duplas (6 lugares) também caiba na tela sem rolar com o pedido aberto, como a de 4 já cabia (D19).
+- **Decisão (som):** um `flavorOf(key)` em `src/core/teams.ts` devolve o flavor de um lado a partir da chave de cores que a partida guarda (`g.sides`: um pack, uma equipe ou um personagem), por `kind` do pack — jogos → `luta`, anime e filmes → `tinta`, futebol → `futebol`, sem tema ou kind desconhecido → `neutro` — com o Sonic como caso à parte (`veloz`, pela velocidade). O `sound` de `src/app/fx.ts` recebe o flavor e muda só a onda, a frequência e a duração do mesmo som sintetizado (luta mais grave e longo, veloz um blip agudo e curto, tinta mais suave, futebol um pouco mais brilhante); carta, embaralhar e os sons do treino não têm flavor. O `moment` de `events.ts` passa o flavor do lado de quem agiu (team 0 → `g.sides[0]`, team 1 → `g.sides[1]`; 3 duplas não guardam cores, então fica neutro). `S.quiet` continua desligando tudo (o `AudioContext` nem é criado). Independe do PR das animações: o mapeamento por kind foi criado do zero (não havia `flavorOf` nem campo `fx` no `Pack` na `main`).
+- **Decisão (mesa de 6):** no `body.ingame`, a `.felt.six` passa a agrupar as seis cadeiras no meio do feltro (`grid-template-rows:auto auto auto auto;align-content:center`, cadeiras e cartas viradas um pouco menores), para as duas de baixo saírem de trás do cartão de responder (`.dock`) e a mesa inteira caber na janela como a de 4, sem estourar a largura. A mesa de 4 não muda.
+- **Interpretações que precisaram ser feitas (decididas pelo agente):** o mapa de flavor por kind e o Sonic como `veloz`; o tamanho das variações de som (pequenas, para não cansar); agrupar as cadeiras no centro em vez de espalhá-las. Na mesa de 6 online o lado não guarda cores (D11), então lá o som é sempre neutro.
+- **Não verificado:** como o som fica num aparelho de verdade (os testes só conferem que não lança e que `S.quiet` cala tudo, no Chromium); se as variações agradam.
+
 ## Pendências
 
 | Pendência | Quem resolve |
