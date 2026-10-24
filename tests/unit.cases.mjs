@@ -183,6 +183,24 @@ export default function cases(Core) {
     if (w === -1) ties++;
   }
   eq('drill round: 200 drills, each answer right, with many suit duels and some ties', [ok, duels > 60, ties > 20], [true, true, true]);
+  // "which card to play": the learner is seat 0 and last to play, so the round is settled by their card. The best card
+  // is rule-decidable: the cheapest card that takes the round for their pair, or the weakest when none can. Checked
+  // here independently of what playDrill claims, over 200 drills, with both outcomes well represented.
+  let pOk = true, canWin = 0, cannot = 0;
+  for (let s = 1; s <= 200; s++) {
+    const d = Core.playDrill(Core.seeded(s * 13 + 1)), me = d.seat, table = d.plays, hand = d.options, vira = d.vira;
+    const cards = [...table.map(p => p.card), ...hand, vira], distinct = new Set(cards).size === cards.length;
+    const outcome = c => Core.roundWinner([...table, { seat: me, card: c }], vira);
+    const mine = Core.teamOf(me), pw = c => Core.power(c, vira);
+    const wins = c => { const w = outcome(c); return w !== -1 && Core.teamOf(w) === mine; };
+    const winners = hand.filter(wins);
+    let best;                                                        // the rule, computed from scratch
+    if (winners.length) { const lo = Math.min(...winners.map(pw)), cheap = winners.filter(c => pw(c) === lo); best = cheap.length === 1 ? cheap[0] : null; }
+    else { const lo = Math.min(...hand.map(pw)), weak = hand.filter(c => pw(c) === lo); const noTie = d.rounds.length > 0 || !hand.some(c => outcome(c) === -1); best = weak.length === 1 && noTie ? weak[0] : null; }
+    pOk = pOk && me === 0 && distinct && hand.length === 3 - d.rounds.length && hand.includes(d.answer) && d.why.length > 10 && best !== null && d.answer === best && Core.drillOk(d, d.answer) && !Core.drillOk(d, 'x');
+    if (winners.length) canWin++; else cannot++;
+  }
+  eq('drill play: 200 drills, the marked card is the best by rule (cheapest winner, or the weakest when none wins)', [pOk, canWin > 40, cannot > 30], [true, true, true]);
 
   /* the real table */
   let rt = Core.emptyTable();
@@ -209,17 +227,21 @@ export default function cases(Core) {
   /* the themes: packs of teams of three, the colours */
   const ids = Core.TEAMS.map(t => t.id), chars = Core.TEAMS.flatMap(t => [0, 1, 2].map(i => `${t.id}/${i}`));
   eq('every pack registered: a kind, a lead word, its colours, at least one team; every team three named players; ids unique', [Core.PACKS.every(p => p.kind && p.kindName && p.lead && p.colors && p.groups.length > 0), Core.TEAMS.every(t => t.colors.length === 3 && t.colors.every(c => /^#[0-9a-f]{6}$/.test(c)) && t.players.length === 3 && t.players.every(p => p && p.length <= 24)), new Set(ids).size === ids.length, new Set(Core.PACKS.map(p => p.id)).size === Core.PACKS.length], [true, true, true, true]);
-  eq('the packs asked for: the Série A with its 20 clubs, four animes, five games and a film', [Core.packById('futebol').groups.length, Core.kinds().map(k => [k.id, k.packs.map(p => p.id)])], [20, [['futebol', ['futebol']], ['anime', ['blue-lock', 'naruto', 'dragon-ball', 'avatar']], ['jogos', ['street-fighter', 'mortal-kombat', 'def-jam', 'nintendo', 'sonic']], ['filmes', ['piratas']]]]);
+  eq('the packs asked for: the Série A with its 20 clubs, five animes, five games, two films, a series and two mythologies', [Core.packById('futebol').groups.length, Core.kinds().map(k => [k.id, k.packs.map(p => p.id)])], [20, [['futebol', ['futebol']], ['anime', ['blue-lock', 'naruto', 'dragon-ball', 'avatar', 'cavaleiros']], ['jogos', ['street-fighter', 'mortal-kombat', 'def-jam', 'nintendo', 'sonic']], ['filmes', ['piratas', 'senhor-aneis']], ['series', ['got']], ['mitologia', ['mitologia-grega', 'mitologia-egipcia']]]]);
   eq('the clubs promoted for 2026 are in, the ones relegated are not', [['athletico', 'chapecoense', 'coritiba', 'remo'].every(c => Core.teamById(`futebol/${c}`)), ['fortaleza', 'ceara', 'juventude', 'sport'].some(c => Core.teamById(`futebol/${c}`))], [true, false]);
   const declared = [...Core.PACKS.map(p => p.colors), ...Core.PACKS.flatMap(p => p.groups.flatMap(g => [g.colors, ...g.players.map(c => typeof c === 'string' ? undefined : c.colors)])).filter(Boolean)];
   eq('every colour declared, of pack, team or character, has its text colour at 4.5:1 or more on the main one', declared.filter(c => Core.contrast(c[2], c[0]) < 4.5), []);
   eq('the words in the second colour fall back to the text colour when the second does not read', [Core.accentOn(['#c8102e', '#111111', '#ffffff']), Core.accentOn(['#6cabdd', '#ffffff', '#111111']), Math.round(Core.contrast('#ffffff', '#000000'))], ['#111111', '#111111', 21]);
   eq('a character takes its own colours, else its team\'s; a team without its own takes its pack\'s', [Core.colorsOf('street-fighter/shotokan/1'), Core.colorsOf('naruto/time-8/0'), Core.colorsOf('naruto/time-8'), Core.colorsOf('naruto'), Core.colorsOf('x/y/0')], [['#b91c1c', '#fde047', '#ffffff'], ['#6b4c9a', '#e7d9b0', '#ffffff'], ['#6b4c9a', '#e7d9b0', '#ffffff'], ['#c2410c', '#1b2a4a', '#ffffff'], null]);
+  eq('the celebration flavour (D21): a pack\'s own fx, else its kind\'s, by pack/team/character id; nothing is neutral',
+    [Core.flavorOf('dragon-ball'), Core.flavorOf('dragon-ball/guerreiros-z/0'), Core.flavorOf('futebol/flamengo'), Core.flavorOf('naruto'), Core.flavorOf('street-fighter'), Core.flavorOf('sonic'), Core.flavorOf('nintendo'), Core.flavorOf('avatar'), Core.flavorOf('piratas'), Core.flavorOf(null), Core.flavorOf('xyz')],
+    ['fogo', 'fogo', 'futebol', 'tinta', 'luta', 'velocidade', 'moedas', 'agua', 'agua', 'neutro', 'neutro']);
+  eq('every registered pack resolves to a flavour the effects know', [Core.PACKS.every(p => ['fogo', 'velocidade', 'agua', 'luta', 'moedas', 'futebol', 'tinta', 'neutro'].includes(Core.flavorOf(p.id)))], [true]);
   eq('ids saved before themes were bare club ids: they move to the football pack; known ids stay, others are none', [Core.qualify('flamengo'), Core.qualify('naruto/time-7'), Core.qualify('naruto/time-7/2'), Core.qualify('real-madrid'), Core.qualify(7)], ['futebol/flamengo', 'naruto/time-7', 'naruto/time-7/2', null, null]);
   // the sound flavour of a side (D24): by the pack kind, from a pack, team or character id, Sonic apart, nothing neutral
   eq('flavorOf: by the pack kind (jogos luta, anime and films tinta, football its own, Sonic a blip, nothing neutral)', ['futebol/flamengo', 'futebol/flamengo/0', 'futebol', 'naruto/time-7', 'piratas', 'street-fighter/shotokan', 'sonic/sonic', 'sonic/dark/0', 'x/y', null].map(k => Core.flavorOf(k)), ['futebol', 'futebol', 'futebol', 'tinta', 'tinta', 'luta', 'veloz', 'veloz', 'neutro', 'neutro']);
   eq('no team: the bar table', Core.lineup(), { names: ['Você', 'Biu', 'Cida', 'Toinho'], sides: [null, null] });
-  eq('a team: the star is the partner, the other two the opponents', Core.lineup('futebol/flamengo'), { names: ['Você', 'Lucas Paquetá', 'Pedro', 'Carrascal'], sides: ['futebol/flamengo', null] });
+  eq('a team: the star is the partner, the other two the opponents', Core.lineup('futebol/flamengo'), { names: ['Você', 'Arrascaeta', 'Pedro', 'Léo Ortiz'], sides: ['futebol/flamengo', null] });
   eq('rivals across themes: the star with you, the rival\'s first two against', [Core.lineup('futebol/flamengo', 'futebol/palmeiras'), Core.lineup('naruto/time-7', 'dragon-ball/saiyajins')], [{ names: ['Você', 'Vitor Roque', 'Pedro', 'Flaco López'], sides: ['futebol/flamengo', 'futebol/palmeiras'] }, { names: ['Você', 'Vegeta', 'Naruto', 'Nappa'], sides: ['naruto/time-7', 'dragon-ball/saiyajins'] }]);
   eq('a rival that is your own team, or unknown, is no rival', [Core.lineup('futebol/flamengo', 'futebol/flamengo').sides, Core.lineup('futebol/flamengo', 'xyz').sides, Core.lineup('xyz').names[1]], [['futebol/flamengo', null], ['futebol/flamengo', null], 'Biu']);
   eq('names the person changed win; blank ones fall back to the team\'s', [Core.playersOf('futebol/santos', { 'futebol/santos': ['Pelé', ' ', 'Zito'] }), Core.lineup('futebol/santos', null, { 'futebol/santos': ['Pelé', 'Coutinho', 'Zito'] }).names], [['Pelé', 'Gabigol', 'Zito'], ['Você', 'Coutinho', 'Pelé', 'Zito']]);

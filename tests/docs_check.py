@@ -57,7 +57,7 @@ CONSTANTS = [
     (r"export const HAND_PAUSE: Record<Speed, number> = \{ calma: 4500, normal: 3000, rapida: 2000 \};", 'calma 4,5 s, normal 3 s, rápida 2 s (`HAND_PAUSE`)'),
     (r'export const ROOM_HAND_PAUSE = 3000;', 'depois de 3 s (`ROOM_HAND_PAUSE`)'),
     (r'export const HOST_NEXT_AFTER = 4000;', 'depois de mais 4 s (`HOST_NEXT_AFTER`)'),
-    (r"export const TEAMS_CHECKED = '14/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
+    (r"export const TEAMS_CHECKED = '24/10/2026';", 'conferidos em `TEAMS_CHECKED`'),
     (r'export const ROOM_THINK = 900, ROOM_ROUND_PAUSE = 700;', 'depois de 0,9 s (`ROOM_THINK`), mais 0,7 s depois de uma rodada fechada (`ROOM_ROUND_PAUSE`)'),
     (r'export const NAME_MAX = 16, CODE_LEN = 5;', 'um código de 5 letras (`CODE_LEN`)'),
     (r'export const MSG_MAX = 1024;', 'mensagem acima de 1024 bytes (`MSG_MAX`) fecha a conexão com 1009'),

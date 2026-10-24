@@ -75,7 +75,7 @@ function readTeams(team: unknown, rival: unknown, by: unknown, auto: unknown): P
 
 /** Everything saved, as it was read from the device. */
 export function readState(x: unknown): AppState {
-  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; rivalAuto?: unknown; colorBy?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; train?: unknown };
+  const o = (x && typeof x === 'object' ? x : {}) as { myName?: unknown; online?: unknown; team?: unknown; rival?: unknown; rivalAuto?: unknown; colorBy?: unknown; custom?: unknown; real?: unknown; game?: unknown; tally?: { w?: unknown; l?: unknown }; level?: unknown; theme?: unknown; speed?: unknown; quiet?: unknown; hints?: unknown; auto?: unknown; trio?: unknown; train?: unknown };
   const n = (v: unknown): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   const t = o.train as { ok?: unknown; total?: unknown; best?: unknown } | undefined;
   return {
@@ -87,6 +87,7 @@ export function readState(x: unknown): AppState {
     ...(o.quiet === true ? { quiet: true as const } : {}),
     ...(o.hints === false ? { hints: false as const } : {}),
     ...(o.auto === false ? { auto: false as const } : {}),
+    ...(o.trio === true ? { trio: true as const } : {}),                          // a state without it opens as the game of four
     ...readTeams(o.team, o.rival, o.colorBy, o.rivalAuto),
     ...readCustom(o.custom),
     ...(typeof o.myName === 'string' && o.myName.trim() ? { myName: o.myName.trim().slice(0, 16) } : {}),

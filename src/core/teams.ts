@@ -18,6 +18,8 @@ export interface Pack {
   id: string; kind: string; kindName: string; name: string;
   /** What the first of a group is called: "craque", "líder". */
   lead: string;
+  /** The theme's celebration flavour (D21); without it, the kind decides. Abstract: shapes, colours and motion only. */
+  fx?: Flavor;
   colors: Colors;
   /** A line shown under the pack (where the names came from, when they were checked). */
   note?: string;
@@ -28,6 +30,10 @@ export interface Team { id: string; name: string; colors: Colors; players: [stri
 /** Which colours the app takes: the pack's, the team's, or the partner's own. */
 export type ColorBy = 'pack' | 'team' | 'char';
 export const COLOR_BY: ColorBy[] = ['pack', 'team', 'char'];
+/** The abstract celebration flavour of a theme (D21): shapes, colours and motion only, never a logo, image or drawing.
+ *  Used by the win confetti and by a small accent on the stamp. A pack may declare one (`fx`); without it the kind
+ *  decides; the bar table (no theme) is neutral. */
+export type Flavor = 'fogo' | 'velocidade' | 'agua' | 'luta' | 'moedas' | 'futebol' | 'tinta' | 'neutro';
 
 export { PACKS };
 export { TEAMS_CHECKED } from './packs';
@@ -69,6 +75,15 @@ export function colorsOf(id: string | null | undefined): Colors | null {
   const c = charById(id);
   if (c) return c.colors || c.team.colors;
   return teamById(id)?.colors || packById(id)?.colors || null;
+}
+/** The kind's flavour when a pack declares none (D21). */
+const KIND_FLAVOR: Record<string, Flavor> = { futebol: 'futebol', anime: 'tinta', jogos: 'luta', filmes: 'tinta' };
+/** The celebration flavour of the side with colour key `id` (a pack, a team or a character id, or null for the bar
+ *  table): the pack's own `fx`, or its kind's, or neutral. Shapes, colours and motion only — never a logo or image. */
+export function flavorOf(id: string | null | undefined): Flavor {
+  const c = charById(id), pack = c ? c.team.pack : teamById(id)?.pack || packById(id);
+  if (!pack) return 'neutro';
+  return pack.fx || KIND_FLAVOR[pack.kind] || 'neutro';
 }
 /** Contrast ratio between two #rrggbb colours (WCAG). */
 export function contrast(a: string, b: string): number {

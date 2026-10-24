@@ -49,18 +49,21 @@ function moment(before: Game | null, g: Game): void {
   if (!before || before.n !== g.n) { sound('shuffle'); return; }
   if (g.played.length > before.played.length) sound('card');
   if (g.shout && shoutKey(g) !== shoutKey(before)) {
-    // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!"
+    // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!". The theme's flavour (D21)
+    // follows the side the stamp is for; with three pairs (no sides) it is neutral.
+    const three = Core.teamsOf(g) === 3;
+    const flav = (t: Team | null): Flavor => (three || t === null ? 'neutro' : Core.flavorOf((g.sides as (string | null)[])[t]));
     const team = Core.teamOf(g.shout.seat, Core.teamsOf(g)), line = shoutLine(g);
     if (LOUD.includes(g.shout.word)) {
-      stamp(`${g.shout.word.toUpperCase()}!`, team, line); sound('truco', flavor(team));
+      stamp(`${g.shout.word.toUpperCase()}!`, team, line, flav(team)); sound('truco');
       if (Core.teamOf(g.shout.seat) === 1) buzz([50, 40, 50]);
-    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? team, line);
-    else if (g.shout.word === 'aceito') stamp('Aceito!', team, line);
+    } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') { const rt = g.result?.team ?? team; stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', rt, line, flav(rt)); }
+    else if (g.shout.word === 'aceito') stamp('Aceito!', team, line, flav(team));
   }
   if (g.phase === 'over' && before.phase !== 'over' && g.winner !== null) {
-    if (g.winner === 0) confetti(0);
-    sound(g.winner === 0 ? 'win' : 'lose', flavor(g.winner)); buzz([60, 80, 60, 80, 200]);
-  } else if (g.phase === 'handEnd' && before.phase !== 'handEnd' && g.result?.team !== null) sound('point', flavor(g.result?.team ?? null));
+    if (g.winner === 0) confetti(0, Core.teamsOf(g) === 3 ? 'neutro' : Core.flavorOf(g.sides[0]));
+    sound(g.winner === 0 ? 'win' : 'lose'); buzz([60, 80, 60, 80, 200]);
+  } else if (g.phase === 'handEnd' && before.phase !== 'handEnd' && g.result?.team !== null) sound('point');
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -81,7 +84,13 @@ export function schedule(): void {
   timer = setTimeout(() => { if (S.game === g) play(Core.aiAct(g, rand)); }, ms);
 }
 
-function newGame(): void { ui.drill = null; ui.editing = false; play(Core.newGame(rand, S.level, table())); toast(`Partida nova, nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`); }
+/** A new game on this phone: the game of four with the chosen table, or, with S.trio, three pairs (six seats): you and
+ *  one computer player against two computer pairs, with the bar table's names and colours (D27). */
+function newGame(): void {
+  ui.drill = null; ui.editing = false;
+  play(S.trio ? Core.newGame(rand, S.level, { teams: 3, humans: [0], names: [], sides: [null, null] }) : Core.newGame(rand, S.level, table()));
+  toast(`Partida nova, ${S.trio ? '3 duplas, ' : ''}nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`);
+}
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,
  *  on the tab they were opened from. */
 function home(): void {
@@ -95,7 +104,7 @@ function playMine(g: Game, k: number): void {
   ui.busy = true; lift(k);
   later(() => { ui.busy = false; play(Core.playCard(g, 0, k)); }, 180);
 }
-function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
+function drill(kind: DrillKind): void { if (!ui.drill) openOver('exercicio'); ui.drill = kind === 'play' ? Core.playDrill(rand) : Core.drill(kind, rand); ui.picked = null; render(); window.scrollTo(0, 0); }
 function guess(v: string): void {
   if (!ui.drill || ui.picked !== null) return;
   ui.picked = v;
@@ -239,6 +248,7 @@ function setting(a: string, v: string): void {
   else if (a === 'theme') { if (v === 'auto') delete S.theme; else S.theme = v as Theme; applyTheme(); }
   else if (a === 'auto') { if (v === 'off') S.auto = false; else delete S.auto; }
   else if (a === 'fx') { if (v === 'off') S.quiet = true; else { delete S.quiet; buzz(30); sound('card'); } }
+  else if (a === 'trio') { if (v === 'tres') S.trio = true; else delete S.trio; }
   saveS(); render(); schedule();
 }
 
@@ -256,7 +266,7 @@ export function initEvents(): void {
   document.addEventListener('click', e => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!b || ui.busy) return;
     const a = b.dataset.act as string, d = b.dataset, g = S.game;
-    if (['level', 'hints', 'speed', 'theme', 'fx', 'auto'].includes(a)) setting(a, d.v || '');
+    if (['level', 'hints', 'speed', 'theme', 'fx', 'auto', 'trio'].includes(a)) setting(a, d.v || '');
     else if ((a === 'team' || a === 'rival') && d.back) { club(a, d.v || ''); backTo(1); }
     else if (['team', 'mode', 'rival', 'suggest', 'otherrival', 'colorby', 'editplayers', 'saveplayers', 'resetplayers'].includes(a)) club(a, d.v || '');
     else if (a === 'vira') { ui.vira = (d.r || '7') + 'o'; render(); }
