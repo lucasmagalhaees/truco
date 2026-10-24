@@ -4,6 +4,7 @@
    The phone vibrates on a raise, when a raise is asked of the person and at the end; only Android lets a page do that.
    "Som e vibração" turns both off (`S.quiet`). */
 import { S } from './state';
+import type { Flavor } from '../core';
 
 /** The device asks for less motion: animations are off in the CSS, and nothing here waits for one to end. */
 export const calm = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,16 +45,24 @@ function hiss(a: AudioContext, at: number, dur: number, vol: number, freq: numbe
   s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = vol;
   s.connect(f).connect(g).connect(a.destination); s.start(at);
 }
-/** One of the few sounds of the game. */
-export function sound(name: Sound): void {
+/** One of the few sounds of the game. `flavor` (the pack of the side that acted, D24) nudges the "TRUCO!", the point and
+ *  the end fanfare: fighting games lower and heavier, Sonic a quick high blip, the rest their own small shade. It is the
+ *  same single sound each time, only the wave, the pitch and the length move a little; the card, shuffle and training
+ *  sounds carry no flavour. */
+export function sound(name: Sound, flavor: Flavor = 'neutro'): void {
   const a = audio(); if (!a) return;
   const t = a.currentTime + 0.01;
+  const low = flavor === 'luta', fast = flavor === 'veloz';
   if (name === 'card') { hiss(a, t, 0.06, 0.6, 2400); tone(a, 180, t, 0.05, 'sine', 0.25); }
   else if (name === 'shuffle') for (let i = 0; i < 6; i++) hiss(a, t + i * 0.05, 0.04, 0.3, 3000 + i * 200);
-  else if (name === 'truco') { tone(a, 90, t, 0.22, 'sine', 0.6); hiss(a, t, 0.1, 0.6, 700); tone(a, 220, t + 0.02, 0.18, 'square', 0.06); }
-  else if (name === 'point') { tone(a, 880, t, 0.08, 'triangle', 0.25); tone(a, 1320, t + 0.07, 0.12, 'triangle', 0.2); }
+  else if (name === 'truco') {
+    const f0 = low ? 70 : flavor === 'futebol' ? 110 : 90, dur = low ? 0.26 : fast ? 0.12 : 0.22;
+    tone(a, f0, t, dur, 'sine', 0.6); hiss(a, t, low ? 0.12 : 0.1, 0.6, low ? 520 : fast ? 1600 : 700);
+    tone(a, fast ? 1200 : 220, t + 0.02, fast ? 0.1 : 0.18, flavor === 'tinta' ? 'triangle' : 'square', fast ? 0.12 : 0.06);
+  }
+  else if (name === 'point') { const m = low ? 0.72 : fast ? 1.25 : 1; tone(a, 880 * m, t, 0.08, 'triangle', 0.25); tone(a, 1320 * m, t + 0.07, 0.12, 'triangle', 0.2); }
   else if (name === 'right') { tone(a, 660, t, 0.1, 'sine', 0.3); tone(a, 990, t + 0.09, 0.16, 'sine', 0.3); }
   else if (name === 'wrong') tone(a, 160, t, 0.25, 'sawtooth', 0.12);
-  else if (name === 'win') [523, 659, 784, 1047].forEach((f, i) => tone(a, f, t + i * 0.12, 0.3, 'square', 0.08));
-  else [392, 330, 262].forEach((f, i) => tone(a, f, t + i * 0.16, 0.35, 'sawtooth', 0.07));
+  else if (name === 'win') { const m = (low ? 0.75 : 1) * (fast ? 1.3 : 1), ty: OscillatorType = low ? 'sawtooth' : 'square', st = fast ? 0.09 : 0.12; [523, 659, 784, 1047].forEach((f, i) => tone(a, f * m, t + i * st, 0.3, ty, 0.08)); }
+  else { const m = low ? 0.8 : 1; [392, 330, 262].forEach((f, i) => tone(a, f * m, t + i * 0.16, 0.35, 'sawtooth', 0.07)); }
 }

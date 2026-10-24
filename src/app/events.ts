@@ -1,5 +1,5 @@
 import { Core } from '../core';
-import type { Answer, DrillKind, Game, Level, RealTable, Speed, Target, Theme } from '../core';
+import type { Answer, DrillKind, Flavor, Game, Level, RealTable, Speed, Target, Team, Theme } from '../core';
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, shoutLine, stamp, toast } from './render';
 import { $, valOf } from './format';
@@ -43,21 +43,24 @@ function play(next: Game): void {
 /** What was said, as a key: the same words seen again (a room sends the whole game on every change) are not news. */
 const shoutKey = (g: Game): string => (g.shout ? `${g.n}:${g.log.length}:${g.shout.seat}:${g.shout.word}` : '');
 function moment(before: Game | null, g: Game): void {
+  // the sound takes the flavour of the side that acted (D24): team 0 ("Nós") and team 1 ("Eles") keep a colour key in
+  // g.sides; three pairs keep none, so there it stays neutral
+  const flavor = (t: Team | null): Flavor => Core.flavorOf(t === 0 ? g.sides[0] : t === 1 ? g.sides[1] : null);
   if (!before || before.n !== g.n) { sound('shuffle'); return; }
   if (g.played.length > before.played.length) sound('card');
   if (g.shout && shoutKey(g) !== shoutKey(before)) {
     // the stamp says the word and, under it, who said it: "TRUCO!" / "Biu pediu TRUCO!"
     const team = Core.teamOf(g.shout.seat, Core.teamsOf(g)), line = shoutLine(g);
     if (LOUD.includes(g.shout.word)) {
-      stamp(`${g.shout.word.toUpperCase()}!`, team, line); sound('truco');
+      stamp(`${g.shout.word.toUpperCase()}!`, team, line); sound('truco', flavor(team));
       if (Core.teamOf(g.shout.seat) === 1) buzz([50, 40, 50]);
     } else if (g.shout.word === 'corro' || g.shout.word === 'fujo') stamp(g.result?.shown?.bluff ? 'Era blefe!' : 'Correu!', g.result?.team ?? team, line);
     else if (g.shout.word === 'aceito') stamp('Aceito!', team, line);
   }
   if (g.phase === 'over' && before.phase !== 'over' && g.winner !== null) {
     if (g.winner === 0) confetti(0);
-    sound(g.winner === 0 ? 'win' : 'lose'); buzz([60, 80, 60, 80, 200]);
-  } else if (g.phase === 'handEnd' && before.phase !== 'handEnd' && g.result?.team !== null) sound('point');
+    sound(g.winner === 0 ? 'win' : 'lose', flavor(g.winner)); buzz([60, 80, 60, 80, 200]);
+  } else if (g.phase === 'handEnd' && before.phase !== 'handEnd' && g.result?.team !== null) sound('point', flavor(g.result?.team ?? null));
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;

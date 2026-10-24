@@ -82,6 +82,18 @@ export function contrast(a: string, b: string): number {
 /** The second colour when it reads on the main one, else the text colour: for words drawn in the second colour. */
 export const accentOn = (c: Colors): string => (contrast(c[1], c[0]) >= 3 ? c[1] : c[2]);
 
+/** The sound flavour a side gives the effects (the "TRUCO!", the point, the final fanfare): fighting games hit heavier
+ *  and lower, Sonic gives a quick high blip, football and the ink-drawn themes (animes, films) each their own, and no
+ *  theme is neutral. Used only to colour the synthesised sound (src/app/fx.ts). */
+export type Flavor = 'luta' | 'tinta' | 'futebol' | 'veloz' | 'neutro';
+const KIND_FX: Record<string, Flavor> = { jogos: 'luta', anime: 'tinta', filmes: 'tinta', futebol: 'futebol' };
+/** The flavour of a side, from its colour key (a pack, team or character id): by the pack's kind, with Sonic given a
+ *  blip of its own; nothing, or an unknown kind, is neutral. */
+export function flavorOf(key: string | null | undefined): Flavor {
+  const pack = charById(key)?.team.pack || teamById(key)?.pack || packById(key);
+  return !pack ? 'neutro' : pack.id === 'sonic' ? 'veloz' : KIND_FX[pack.kind] || 'neutro';
+}
+
 /** The default table, with no theme chosen. */
 export const DEFAULT_NAMES = ['Você', 'Biu', 'Cida', 'Toinho'];
 /** The players of a group as the person sees them: the group's, with the names the person changed. */
