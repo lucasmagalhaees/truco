@@ -3,7 +3,7 @@ import type { Pack } from '../teams';
 /* Sonic, by the teams of the series (Sonic Heroes) and Eggman's side, with the names used in Brazil. Set down from the
    agent's memory on 21/10/2026, not checked on the web. Only names and colours: no image, logo or drawing. */
 export const sonic: Pack = {
-  id: 'sonic', kind: 'jogos', kindName: 'Jogos', name: 'Sonic', lead: 'líder',
+  id: 'sonic', kind: 'jogos', kindName: 'Jogos', name: 'Sonic', lead: 'líder', fx: 'velocidade',
   colors: ['#1d4ed8', '#fde047', '#ffffff'],
   groups: [
     { id: 'sonic', rivals: ['sonic/eggman', 'sonic/dark', 'sonic/chaotix'], why: ['Sonic × Dr. Eggman', 'Sonic × Shadow', 'Team Sonic × Team Chaotix'], name: 'Team Sonic', colors: ['#1d4ed8', '#fde047', '#ffffff'], players: [{ name: 'Sonic', colors: ['#1d4ed8', '#fde047', '#ffffff'] }, { name: 'Tails', colors: ['#c2410c', '#fef3c7', '#ffffff'] }, { name: 'Knuckles', colors: ['#b91c1c', '#fecaca', '#ffffff'] }] },

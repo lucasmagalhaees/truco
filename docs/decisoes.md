@@ -244,19 +244,22 @@ Modelo de uma decisão:
 - **Decisão:** um arquivo de dados por pack (D11), com até 3 rivais declarados por equipe, sempre do mesmo pack (D16). Def Jam usa os rappers que aparecem no jogo, só pelo nome, como os jogadores do futebol (escolha do Lucas). Sem `side`: esses packs não entram em Heróis x Vilões.
 - **Não verificado:** equipes, nomes e rivais vieram da memória do agente (21/10/2026), sem conferir na web; quem é de qual crew no Def Jam é o mais incerto.
 
-## D23. Treino "Qual carta jogar?"
+## D21. Animações por tema (confete, carimbo, carta e placar)
 
-- **Contexto (24/10/2026, pedido do Lucas):** um terceiro tipo de treino, além de "Qual é a manilha?" e "Quem ganha a rodada?": uma situação de mão com a jogada certa e a explicação, para treinar qual carta baixar. Cobrir matar a carta do adversário com a mais barata que ganha, não gastar manilha à toa quando o parceiro já está ganhando, jogar a mais fraca quando não dá pra ganhar, segurar a manilha para a próxima e o pé matando no limite. A resposta certa tem que ser decidível pelas regras do truco, não por opinião.
-- **Decisão:** `playDrill(rand)` no núcleo (`src/core/game.ts`, exportado no `Core`), puro, com o acaso entrando como função, igual aos outros drills. Reaproveita o tipo `Drill` (ganhou dois campos opcionais, `seat` e `rounds`, usados só por este) e os mesmos `drillOk`, botão, contador (`S.train`) e carimbo de certo/errado da tela (aba Treinar, botão "Qual carta jogar?").
-- **Como a carta certa é decidível (a escolha que fecha a regra):** o aprendiz é sempre o lugar 0 e o **pé** da rodada (último a jogar), então a carta que ele escolhe fecha a rodada sozinha — não há palpite sobre o que os outros fariam depois. Ou é a 1ª rodada (3 cartas na mão) ou a dupla perdeu a 1ª e precisa ganhar esta (2 cartas, rodada perdida 0 a 1). A melhor carta é regra pura:
-  - se alguma carta da mão faz a dupla levar a rodada, a **mais barata** entre essas (empate de menor força é descartado e sorteia-se outra situação). Isso cobre os três casos didáticos de uma vez: matar a carta deles com a mais barata que ganha; com o parceiro já ganhando, toda carta leva a rodada, então a mais barata é a mais fraca (não gasta manilha à toa / segura a manilha); o pé fechando a rodada no limite;
-  - se nenhuma ganha, a **mais fraca** (todas perdem; descarta e guarda o resto). Na 1ª rodada, uma situação em que daria pra empatar (cangar vale mais que perder) é descartada; na rodada perdida, empatar também entrega a mão, então a mais fraca vale.
+- **Contexto (24/10/2026, pedido do Lucas):** animações customizadas por tema, mas abstratas — nada de escudo, logo, imagem ou desenho de personagem; só formas, cores e movimento (a mesma regra dos nomes e cores). Uma camada de "efeitos por categoria/pack" nas cores do lado de quem joga.
+- **Decisão:**
+  - Um `Flavor` por tema (`flavorOf` em `src/core/teams.ts`, função pura): `fogo | velocidade | agua | luta | moedas | futebol | tinta | neutro`. O pack pode declarar o seu (`fx` no `Pack`); sem isso, a categoria decide (`KIND_FLAVOR`: jogos→luta, animes e filmes→tinta, futebol→futebol); id desconhecido ou sem tema (mesa de bar), neutro. Resolve por id de pack, equipe ou personagem (personagem → equipe → pack). Flavors dos packs atuais: Dragon Ball `fogo`, Avatar e Piratas do Caribe `agua`, Sonic `velocidade`, Nintendo `moedas`; os demais pela categoria (futebol futebol; Naruto, Blue Lock tinta; Street Fighter, Mortal Kombat, Def Jam luta).
+  - **Confete** (`confetti` em `render.ts`): ganha a classe `fx-<flavor>` e as cores do lado de quem venceu (vars `--cc1/2/3` tiradas de `--club/--club2/--rival/...`, com reserva para a mesa de bar). Cada flavor muda só a forma da peça (CSS clip-path/border-radius): bandeirinhas (futebol), chamas (fogo), gotas (água), riscos finos e estrelas (velocidade), faíscas (luta), moedas douradas com borda na cor do lado (moedas), respingo de tinta (tinta), retângulo (neutro).
+  - **Carimbo** (`stamp`): classe `fx-<flavor>`; sotaque por categoria, na cor do lado: tremor nos jogos (`luta`, keyframe próprio), risca que cruza no Sonic (`velocidade`, `::before`), respingo de tinta nos animes e filmes (`tinta`, `::before`). Os outros flavors usam o carimbo de sempre.
+  - **Carta e leque:** a carta jogada (`.slot.fly`) e o leque inicial (`.hc.deal`) ganham um brilho curto (`::after`, `cardGlow`) na cor do lado de quem jogou (a `.slot` recebe `t0/t1/t2`, de onde sai `--sg`; o leque usa `--club`).
+  - **Placar:** o chip pulsa um anel (`chipRing`) na cor do lado quando o ponto muda, junto com o `bump` de sempre.
+  - Tudo em CSS/SVG embutido, nada baixado, nenhuma imagem externa. Com `prefers-reduced-motion` a regra global já zera as animações e esconde o confete, então nenhum efeito novo anima (o estado final fica estático).
 - **Interpretações que precisaram ser feitas (decididas pelo agente, confirmar com o Lucas):**
-  - O aprendiz sempre como pé: é a única posição em que a rodada fica totalmente decidida pela carta escolhida, então a resposta é regra, não estratégia. Abrir a rodada ou jogar no meio depende do que vem depois e não é decidível pela regra.
-  - "Segurar a manilha para a próxima" entra pelo caso do parceiro já ganhando (a mais barata é a mais fraca, a manilha fica na mão), não como um cenário estratégico à parte.
-  - Só a 1ª rodada e a rodada perdida 0 a 1, para que "ganhar a rodada" seja sempre a jogada certa (sem o caso de rodada 3 em que empatar também leva a mão).
-- **Teste:** `tests/unit.cases.mjs` gera 200 drills e confere, do zero, que a carta marcada é a mais barata que ganha a rodada (quando alguma ganha) ou a mais fraca (quando nenhuma ganha), sem exceção, com os dois desfechos bem representados; `tests/e2e.py` faz o exercício na tela (um certo, um errado) e vê a explicação.
-- **Não verificado:** se os cenários cobrem bem o que o Lucas quer treinar na mesa (só conferido que a regra fecha); cenários estratégicos (abrir a rodada, blefe, segurar a manilha por leitura de jogo) ficaram de fora por não serem decidíveis pela regra.
+  - Qual flavor cai em cada pack (fogo/água/velocidade/moedas e os defaults por categoria).
+  - Piratas do Caribe ficou `agua` (o mar) em vez do default `tinta` de Filmes.
+  - O carimbo segue o flavor do lado de quem falou; nas 3 duplas (sem `sides`), neutro.
+  - O confete só dispara quando você vence (como já era), nas suas cores.
+- **Não verificado:** se os efeitos ficam bons num aparelho de verdade (medido só no Chromium do Playwright, claro e escuro).
 
 ## Pendências
 
