@@ -48,11 +48,10 @@ function pairName(g: Game, t: Team): string {
 /** Who a pair is, in a sentence: "nós", or (with three pairs) the pair's name; "eles" with two. */
 const pairSay = (g: Game, t: Team | null): string => (t === 0 ? 'Nós' : Core.teamsOf(g) === 3 && t !== null ? esc(pairName(g, t)) : 'Eles');
 /** Where a card stands with this vira: 1 for the zap, 2 for copas… down to the 4s. */
-const place = (c: Card, vira: Card): number => Core.ranking(vira).findIndex(r => r.cards.includes(c)) + 1;
 /** A card face. With `vira`, a manilha gets its nickname, and with rodinhas every card gets its place in the ranking. */
 export function face(c: Card, vira?: Card, help = false): string {
   const man = !!vira && Core.isManilha(c, vira);
-  return `<span class="pc${c[1] === 'o' || c[1] === 'c' ? ' red' : ''}${man ? ' man' : ''}" data-c="${c}" aria-label="${Core.cardName(c)}"><b>${c[0]}</b><i>${SUIT[c[1]]}</i>${man ? `<em>${Core.MANILHA_NAME[c[1]]}</em>` : ''}${help && vira ? `<small>${place(c, vira)}º</small>` : ''}</span>`;
+  return `<span class="pc${c[1] === 'o' || c[1] === 'c' ? ' red' : ''}${man ? ' man' : ''}" data-c="${c}" aria-label="${Core.cardName(c)}"><b>${c[0]}</b><i>${SUIT[c[1]]}</i>${man ? `<em>${Core.MANILHA_NAME[c[1]]}</em>` : ''}</span>`;
 }
 const back = (): string => '<span class="pc back" aria-hidden="true"></span>';
 const SAY: Record<Word, string[]> = {
