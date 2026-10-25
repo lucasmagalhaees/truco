@@ -1,7 +1,7 @@
 import { Core } from '../core';
 import type { Card, Drill, Flavor, Game, Play, RealTable, Seat, Target, Team, Word } from '../core';
 import { $, esc, part } from './format';
-import { S, applyClub, table, TABS, ui } from './state';
+import { S, applyClub, table, table6, TABS, ui } from './state';
 import type { Tab } from './state';
 import { builtFrom, canUpdate } from './update';
 import { canListen } from './voice';
@@ -122,7 +122,11 @@ function vsLine(): string {
   return `você e <b>${n[2]}</b> (${esc(t.name)}) contra <b>${n[1]}</b> e <b>${n[3]}</b>, os outros dois da equipe ${esc(t.name)}: nenhuma equipe adversária escolhida`;
 }
 function tableNow(): string {
-  if (S.trio) return '<p class="now" id="tablenow">Sua mesa agora: 3 duplas na mesa de bar — você e uma IA contra duas duplas de IA.</p>';
+  if (S.trio) {
+    const n6 = table6().names.map(esc), t = Core.teamById(S.team);
+    const desc = t ? `você e <b>${n6[3]}</b> (${esc(t.name)}) contra duas duplas de IA` : `mesa de bar: você e <b>${n6[3]}</b> contra duas duplas de IA`;
+    return `<p class="now" id="tablenow">Sua mesa agora: 3 duplas — ${desc}.</p>`;
+  }
   return `<p class="now" id="tablenow">Sua mesa agora: ${vsLine()}.</p>`;
 }
 function vHome(): string {

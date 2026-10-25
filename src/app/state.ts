@@ -36,6 +36,8 @@ export function applyTheme(): void {
 }
 /** The table the person chose (theme team, rivals, or seat by seat), with the colours as chosen in the settings. */
 export const table = (): { names: string[]; sides: [string | null, string | null] } => Core.lineup(S.team, S.rival, S.custom, S.colorBy || 'team');
+/** The six-seat table for three pairs on one phone. */
+export const table6 = (): { names: string[]; sides: [string | null, string | null] } => Core.lineup6(S.team, S.rival, S.custom, S.colorBy || 'team');
 /** The colours of the theme: the person's pair on the masthead and on "Nós", the other pair's on "Eles". During a
  *  game, the ones of that game; otherwise, the ones chosen. Without a theme, the bar table's own colours. */
 export function applyClub(game?: Game | null): void {

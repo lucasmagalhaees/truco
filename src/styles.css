@@ -138,13 +138,15 @@ main .wrap{display:flex;flex-direction:column;gap:14px;padding-top:14px;padding-
 .center{grid-area:center;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;grid-template-areas:". top ." "left . right" ". bottom .";align-items:center;justify-items:center;min-height:200px}
 .slot{position:relative}
 /* three pairs: six at the table, you at the bottom, your partner at the top, two on each side */
-.felt.six{grid-template-rows:auto 1fr 1fr auto;grid-template-areas:"vira top ." "lt center rt" "lb center rb" ". bottom .";min-height:380px}
+.felt.six{grid-template-columns:auto 1fr auto;grid-template-rows:auto 1fr 1fr auto;grid-template-areas:"vira top ." "lt center rt" "lb center rb" ". bottom .";min-height:380px}
 .felt.six .seat.p-lt{grid-area:lt}.felt.six .seat.p-lb{grid-area:lb}.felt.six .seat.p-rt{grid-area:rt}.felt.six .seat.p-rb{grid-area:rb}
 .felt.six .backs .pc{--w:22px}
-.felt.six .seat .who{font-size:13px;padding:4px 7px}
-.felt.six .center{grid-template-rows:repeat(4,auto);grid-template-areas:". top ." "lt . rt" "lb . rb" ". bottom .";min-height:230px;row-gap:2px}
+.felt.six .seat .who{font-size:12px;padding:3px 6px}
+.felt.six .center{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr 1fr;grid-template-areas:". top ." "lt . rt" "lb . rb" ". bottom .";min-height:160px;gap:2px}
 .felt.six .slot.p-lt{grid-area:lt}.felt.six .slot.p-lb{grid-area:lb}.felt.six .slot.p-rt{grid-area:rt}.felt.six .slot.p-rb{grid-area:rb}
-.felt.six .slot .pc{--w:38px}
+.felt.six .slot .pc{--w:34px}
+.felt.six .slot.fly.p-lt,.felt.six .slot.fly.p-lb{animation:fromLeft .32s ease-out both}
+.felt.six .slot.fly.p-rt,.felt.six .slot.fly.p-rb{animation:fromRight .32s ease-out both}
 .slot .pc{--w:46px}
 .slot.p-top{grid-area:top}.slot.p-bottom{grid-area:bottom}.slot.p-left{grid-area:left}.slot.p-right{grid-area:right}
 .slot.old{opacity:.55;filter:saturate(.6)}
