@@ -300,7 +300,7 @@ with sync_playwright() as p:
 
     # ---------- truco accepted, and a round taken by the suit (zap over copas) ----------
     stack({'vira': '4o', 'dealer': 3, 'starter': 0, 'turn': 0, 'hands': [['5c', '4e', '6o'], ['5p', '4c', '6e'], ['Ke', '7o', 'Qe'], ['Jo', 'Jc', '6c']]})
-    assert pg.locator('#hand .pc.man').count() == 1 and 'copas' in txt('#hand') and pg.locator('#hand .pc small').count() == 3, 'rodinhas: the manilha and the places'
+    assert pg.locator('#hand .pc.man').count() == 1 and 'copas' in txt('#hand') and pg.locator('#hand .pc small').count() == 0, 'rodinhas: the manilha marked, no ordinal on the cards'
     assert 'manilha: 5' in txt('#vira')
     # you ask: the card says so by name, your chair stands out, and the one who answers for them is named (D15)
     pg.evaluate('window.__APP.ui.wait = 1e6'); pg.click('[data-act=truco]')
