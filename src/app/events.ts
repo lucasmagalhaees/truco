@@ -3,7 +3,7 @@ import type { Answer, DrillKind, Flavor, Game, Level, RealTable, Speed, Target, 
 import { buzz, later, sound } from './fx';
 import { confetti, lift, render, shoutLine, stamp, toast } from './render';
 import { $, valOf } from './format';
-import { S, applyTheme, saveS, setS, table, TABS, ui } from './state';
+import { S, applyTheme, saveS, setS, table, table6, TABS, ui } from './state';
 import { back, backTo, closeOver, go, openOver } from './nav';
 import type { Tab } from './state';
 import { applyUpdate, checkNow } from './update';
@@ -85,7 +85,7 @@ export function schedule(): void {
  *  one computer player against two computer pairs, with the bar table's names and colours (D27). */
 function newGame(): void {
   ui.drill = null; ui.editing = false;
-  play(S.trio ? Core.newGame(rand, S.level, { teams: 3, humans: [0], names: [], sides: [null, null] }) : Core.newGame(rand, S.level, table()));
+  play(S.trio ? Core.newGame(rand, S.level, { teams: 3, humans: [0], ...table6() }) : Core.newGame(rand, S.level, table()));
   toast(`Partida nova, ${S.trio ? '3 duplas, ' : ''}nível ${{ facil: 'fácil', medio: 'médio', dificil: 'difícil', extremo: 'extremo' }[S.level]}.`);
 }
 /** Back to the start screen. Leaving a game (ended or not) lands on the Jogar tab; leaving a drill or the real table,

@@ -124,6 +124,22 @@ export function lineup(team?: string | null, rival?: string | null, custom?: Rec
   const theirs = playersOf(r.id, custom);
   return { names: ['Você', theirs[0], mine[0], theirs[1]], sides: [keyOf(`${t.id}/0`, by), keyOf(`${r.id}/0`, by)] };
 }
+/** The default six-seat bar table. */
+export const DEFAULT_NAMES_6 = ['Você', 'Biu', 'Zé', 'Cida', 'Toinho', 'Nena'];
+/** Who sits where in a game of three pairs (six seats, D27): Você at 0, partner at 3, two opponents at (1,4) and (2,5).
+ *  With a team: your star is the partner, the other two fill the opponents; with a rival, its three fill the other side.
+ *  Without a team: the six-seat bar table. */
+export function lineup6(team?: string | null, rival?: string | null, custom?: Record<string, string[]>, by: ColorBy = 'team'): { names: string[]; sides: [string | null, string | null] } {
+  const t = teamById(team);
+  if (!t) return { names: [...DEFAULT_NAMES_6], sides: [null, null] };
+  const mine = playersOf(t.id, custom), r = teamById(rival);
+  if (!r || r.id === t.id) {
+    // team without rival: star is partner, bar names fill the other four seats (samePerson safe)
+    return { names: ['Você', DEFAULT_NAMES_6[1], DEFAULT_NAMES_6[2], mine[0], DEFAULT_NAMES_6[4], DEFAULT_NAMES_6[5]], sides: [keyOf(`${t.id}/0`, by), null] };
+  }
+  const theirs = playersOf(r.id, custom);
+  return { names: ['Você', theirs[0], theirs[2], mine[0], theirs[1], mine[1]], sides: [keyOf(`${t.id}/0`, by), keyOf(`${r.id}/0`, by)] };
+}
 
 /** How many rivals are suggested for a team, at most. */
 export const RIVALS_MAX = 3;
